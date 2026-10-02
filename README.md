@@ -307,6 +307,7 @@ uv run pytest                            # unit and contract tests, both clients
 uv run ruff format . && uv run ruff check . && uv run pyright
 uv run python scripts/generate.py        # after updating openapi.json
 uv run python scripts/unasync.py         # after changing src/nohead/_async
+uv run python scripts/samples.py         # after changing tests/calls.py (the docs' code samples)
 ```
 
 **How the code is organized:**
