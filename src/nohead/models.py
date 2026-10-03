@@ -200,9 +200,10 @@ class Field(NoheadModel):
     multiple: bool
     position: int
     configuration: dict[str, Any]
-    """Type-specific options, e.g. `max_length`, `options`, `target_collection_id`, plus search
-    options (used when the collection is search-enabled): `searchable` (default true for
-    text, long_text, rich_text and enum), `filterable` and `sortable` (default false).
+    """Type-specific options, e.g. `max_length`, `options`, `target_collection_id`, plus the
+    options for searches with API keys: `searchable` (the search words match the field;
+    default true for text, long_text, rich_text and enum), `filterable` and `sortable`
+    (default false).
     """
     deleted: bool
     aliases: list[FieldAliases]
@@ -255,7 +256,10 @@ class Collection(NoheadModel):
     schema_version: int
     deleted: bool
     search_enabled: bool
-    """Whether records can be searched (`GET /v1/collections/{collection_id}/search`)."""
+    """Whether API keys can search the collection (`GET
+    /v1/collections/{collection_id}/search`). Every collection is indexed; members can
+    search it in the web app either way.
+    """
     fields: list[Field]
     """Active fields in position order."""
     created_at: Timestamp
@@ -636,9 +640,10 @@ class SearchIndex(NoheadModel):
     object: str
     collection_id: str
     enabled: bool
+    """The collection's `search_enabled`; the index is kept up to date either way."""
     status: str
-    """`building` until first built; `stale` while a rebuild is pending; `failed` if the last
-    rebuild failed (it is retried).
+    """`building` until first built; `stale` from the change that queues a rebuild until it has
+    run; `failed` if the last rebuild failed (it is retried).
     """
     documents: int
     last_built_at: NullableTimestamp

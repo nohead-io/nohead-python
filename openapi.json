@@ -2768,7 +2768,7 @@
       "get": {
         "operationId": "collections_search",
         "summary": "Search records",
-        "description": "Full-text search in a search-enabled collection, ranked by relevance (or\n`sort`). Equality filters work on `status` and on fields marked\n`filterable`; `sort` on `created_at`, `updated_at`, `published_at` and\nfields marked `sortable` (`-` for descending). Results are the current\nrecords; changes appear within seconds. At most the first 1,000 hits\ncan be paged through. `expand` embeds related records and assets as\nin the records list. `409` until search is enabled and the index is built.\n",
+        "description": "Full-text search in a collection, ranked by relevance (or `sort`).\nWith an API key, the collection must be `search_enabled` and the words\nmatch its `searchable` fields only; members in the web app search any\ncollection, on all its text fields. Equality filters work on `status`\nand on fields marked `filterable`; `sort` on `created_at`, `updated_at`,\n`published_at` and fields marked `sortable` (`-` for descending).\nResults are the current records; changes appear within seconds. At\nmost the first 1,000 hits can be paged through. `expand` embeds related\nrecords and assets as in the records list. `409` when search is not\nenabled for API keys, while a new collection's index is first built,\nand when filtering or sorting on a field newly made `filterable` or\n`sortable` until the rebuild that adds it has run (detail code\n`rebuilding`; the index status is `stale` meanwhile).\n",
         "tags": [
           "search"
         ],
@@ -2953,7 +2953,7 @@
       "get": {
         "operationId": "projects_search",
         "summary": "Search across collections",
-        "description": "One ranked list of matching records from the project's search-enabled\ncollections (or those named in `collections`). `filter[status]` narrows\nby status.\n",
+        "description": "One ranked list of matching records from the project's collections (or\nthose named in `collections`): with an API key, those with\n`search_enabled`, matching their `searchable` fields as in a collection\nsearch. `filter[status]` narrows by status.\n",
         "tags": [
           "search"
         ],
@@ -6643,7 +6643,7 @@
           },
           "configuration": {
             "type": "object",
-            "description": "Type-specific options, e.g. `max_length`, `options`, `target_collection_id`, plus\nsearch options (used when the collection is search-enabled): `searchable`\n(default true for text, long_text, rich_text and enum), `filterable` and `sortable`\n(default false).\n"
+            "description": "Type-specific options, e.g. `max_length`, `options`, `target_collection_id`, plus\nthe options for searches with API keys: `searchable` (the search words match the\nfield; default true for text, long_text, rich_text and enum), `filterable` and\n`sortable` (default false).\n"
           },
           "deleted": {
             "type": "boolean"
@@ -6822,7 +6822,7 @@
           },
           "search_enabled": {
             "type": "boolean",
-            "description": "Whether records can be searched (`GET /v1/collections/{collection_id}/search`)."
+            "description": "Whether API keys can search the collection (`GET /v1/collections/{collection_id}/search`).\nEvery collection is indexed; members can search it in the web app either way.\n"
           },
           "fields": {
             "type": "array",
@@ -8248,18 +8248,18 @@
             "type": "string"
           },
           "enabled": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "The collection's `search_enabled`; the index is kept up to date either way."
           },
           "status": {
             "type": "string",
             "enum": [
-              "disabled",
               "building",
               "ready",
               "stale",
               "failed"
             ],
-            "description": "`building` until first built; `stale` while a rebuild is pending; `failed` if the last rebuild failed (it is retried)."
+            "description": "`building` until first built; `stale` from the change that queues a rebuild until it has run; `failed` if the last rebuild failed (it is retried)."
           },
           "documents": {
             "type": "integer"
