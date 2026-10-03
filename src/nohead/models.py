@@ -642,8 +642,8 @@ class SearchIndex(NoheadModel):
     enabled: bool
     """The collection's `search_enabled`; the index is kept up to date either way."""
     status: str
-    """`building` until first built; `stale` while a rebuild is pending; `failed` if the last
-    rebuild failed (it is retried).
+    """`building` until first built; `stale` from the change that queues a rebuild until it has
+    run; `failed` if the last rebuild failed (it is retried).
     """
     documents: int
     last_built_at: NullableTimestamp

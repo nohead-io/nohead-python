@@ -2768,7 +2768,7 @@
       "get": {
         "operationId": "collections_search",
         "summary": "Search records",
-        "description": "Full-text search in a collection, ranked by relevance (or `sort`).\nWith an API key, the collection must be `search_enabled` and the words\nmatch its `searchable` fields only; members in the web app search any\ncollection, on all its text fields. Equality filters work on `status`\nand on fields marked `filterable`; `sort` on `created_at`, `updated_at`,\n`published_at` and fields marked `sortable` (`-` for descending).\nResults are the current records; changes appear within seconds. At\nmost the first 1,000 hits can be paged through. `expand` embeds related\nrecords and assets as in the records list. `409` when search is not\nenabled for API keys, and while a new collection's index is first built.\n",
+        "description": "Full-text search in a collection, ranked by relevance (or `sort`).\nWith an API key, the collection must be `search_enabled` and the words\nmatch its `searchable` fields only; members in the web app search any\ncollection, on all its text fields. Equality filters work on `status`\nand on fields marked `filterable`; `sort` on `created_at`, `updated_at`,\n`published_at` and fields marked `sortable` (`-` for descending).\nResults are the current records; changes appear within seconds. At\nmost the first 1,000 hits can be paged through. `expand` embeds related\nrecords and assets as in the records list. `409` when search is not\nenabled for API keys, while a new collection's index is first built,\nand when filtering or sorting on a field newly made `filterable` or\n`sortable` until the rebuild that adds it has run (detail code\n`rebuilding`; the index status is `stale` meanwhile).\n",
         "tags": [
           "search"
         ],
@@ -8259,7 +8259,7 @@
               "stale",
               "failed"
             ],
-            "description": "`building` until first built; `stale` while a rebuild is pending; `failed` if the last rebuild failed (it is retried)."
+            "description": "`building` until first built; `stale` from the change that queues a rebuild until it has run; `failed` if the last rebuild failed (it is retried)."
           },
           "documents": {
             "type": "integer"
