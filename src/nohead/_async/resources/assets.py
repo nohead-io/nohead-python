@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Literal
 
 from typing_extensions import Unpack
@@ -69,12 +70,25 @@ class AsyncAssets(AsyncResource):
         )
 
     def list(
-        self, *, deleted: bool | None = None, limit: int | None = None, cursor: str | None = None
+        self,
+        *,
+        content_type: str | Sequence[str] | None = None,
+        deleted: bool | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
     ) -> AsyncPaginator[Asset]:
+        """`content_type` lists only assets of those MIME types or `type/*` wildcards
+        (`["image/*", "application/pdf"]`), for example the ones an asset field accepts
+        (its `accepted_types`)."""
         return self._client.paginate(
             "assets_list",
             item=Asset,
-            query={"deleted": deleted, "limit": limit, "cursor": cursor},
+            query={
+                "content_type": content_type,
+                "deleted": deleted,
+                "limit": limit,
+                "cursor": cursor,
+            },
         )
 
     async def get(self, asset: str) -> Asset:
