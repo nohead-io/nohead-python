@@ -198,12 +198,16 @@ class Field(NoheadModel):
     type: FieldType
     required: bool
     multiple: bool
+    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
+    available for boolean, rich_text and json fields.
+    """
     position: int
     configuration: dict[str, Any]
-    """Type-specific options, e.g. `max_length`, `options`, `target_collection_id`, plus the
-    options for searches with API keys: `searchable` (the search words match the field;
-    default true for text, long_text, rich_text and enum), `filterable` and `sortable`
-    (default false).
+    """Type-specific options, e.g. `max_length`, `options`, `target_collection_id`,
+    `accepted_types` (asset fields: MIME types or `type/*` wildcards that newly written
+    values must have; any file when absent), plus the options for searches with API keys:
+    `searchable` (the search words match the field; default true for text, long_text,
+    rich_text and enum), `filterable` and `sortable` (default false).
     """
     deleted: bool
     aliases: list[FieldAliases]
@@ -227,6 +231,9 @@ class FieldCreate(NoheadModel):
     type: FieldType
     required: bool | None = None
     multiple: bool | None = None
+    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
+    available for boolean, rich_text and json fields.
+    """
     position: int | None = None
     configuration: dict[str, Any] | None = None
 
@@ -237,6 +244,9 @@ class FieldUpdate(NoheadModel):
     type: FieldType | None = None
     required: bool | None = None
     multiple: bool | None = None
+    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
+    available for boolean, rich_text and json fields.
+    """
     position: int | None = None
     configuration: dict[str, Any] | None = None
 
@@ -355,6 +365,9 @@ class FieldDefinition(NoheadModel):
     type: FieldType
     configuration: dict[str, Any]
     multiple: bool
+    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
+    available for boolean, rich_text and json fields.
+    """
     required: bool
 
 
@@ -367,6 +380,9 @@ class FieldMigrationRequest(NoheadModel):
     `description` carries over.
     """
     multiple: bool | None = None
+    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
+    available for boolean, rich_text and json fields.
+    """
     required: bool | None = None
     backfill: Any = None
     """Value for active records that have no value, validated like a record value of the new

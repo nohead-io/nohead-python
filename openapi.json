@@ -2283,7 +2283,7 @@
       "get": {
         "operationId": "assets_list",
         "summary": "List assets",
-        "description": "The project's assets, newest first. `deleted=true` lists deleted ones instead.\n",
+        "description": "The project's assets, newest first. `deleted=true` lists deleted ones instead.\n`content_type` lists only assets of those types, for example the ones an\nasset field accepts (its `accepted_types`).\n",
         "tags": [
           "assets"
         ],
@@ -2296,6 +2296,15 @@
           },
           {
             "$ref": "#/components/parameters/Deleted"
+          },
+          {
+            "name": "content_type",
+            "in": "query",
+            "description": "Comma-separated MIME types or `type/*` wildcards.",
+            "schema": {
+              "type": "string"
+            },
+            "example": "image/*,application/pdf"
           }
         ],
         "responses": {
@@ -2336,7 +2345,7 @@
       "post": {
         "operationId": "assets_upload",
         "summary": "Start an upload",
-        "description": "Step 1 of uploading a file. Returns a pending asset and an `upload`: send\nthe file's bytes with `upload.method` to `upload.url`, with `upload.headers`,\nbefore `upload.expires_at`. The bytes go directly to storage, not through\nthis API. Then call `POST /v1/assets/{asset_id}/complete`.\n\n`content_type` and `byte_size` must be the file's; storage refuses another\ncontent type and completion refuses another size.\n",
+        "description": "Step 1 of uploading a file. Returns a pending asset and an `upload`: send\nthe file's bytes with `upload.method` to `upload.url`, with `upload.headers`,\nbefore `upload.expires_at`. The bytes go directly to storage, not through\nthis API. Then call `POST /v1/assets/{asset_id}/complete`.\n\n`content_type` and `byte_size` must be the file's; storage refuses another\ncontent type and completion refuses another size.\n\nThe file counts toward the organization's storage from here on, while it\nuploads too. On plans where storage is a hard limit (Free), a file that\nwould go over it is refused with `402 plan_limit_exceeded`; on others,\n`Nohead-Usage-Warning` reports going over.\n",
         "tags": [
           "assets"
         ],
@@ -2382,6 +2391,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PlanLimitExceeded"
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
@@ -6636,14 +6648,15 @@
             "type": "boolean"
           },
           "multiple": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`). Not available for boolean, rich_text and json fields."
           },
           "position": {
             "type": "integer"
           },
           "configuration": {
             "type": "object",
-            "description": "Type-specific options, e.g. `max_length`, `options`, `target_collection_id`, plus\nthe options for searches with API keys: `searchable` (the search words match the\nfield; default true for text, long_text, rich_text and enum), `filterable` and\n`sortable` (default false).\n"
+            "description": "Type-specific options, e.g. `max_length`, `options`, `target_collection_id`,\n`accepted_types` (asset fields: MIME types or `type/*` wildcards that newly\nwritten values must have; any file when absent), plus\nthe options for searches with API keys: `searchable` (the search words match the\nfield; default true for text, long_text, rich_text and enum), `filterable` and\n`sortable` (default false).\n"
           },
           "deleted": {
             "type": "boolean"
@@ -6717,7 +6730,8 @@
             "type": "boolean"
           },
           "multiple": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`). Not available for boolean, rich_text and json fields."
           },
           "position": {
             "type": "integer"
@@ -6743,7 +6757,8 @@
             "type": "boolean"
           },
           "multiple": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`). Not available for boolean, rich_text and json fields."
           },
           "position": {
             "type": "integer"
@@ -7210,7 +7225,8 @@
             "type": "object"
           },
           "multiple": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`). Not available for boolean, rich_text and json fields."
           },
           "required": {
             "type": "boolean"
@@ -7230,7 +7246,8 @@
             "description": "The complete new configuration. When the type changes and this is omitted, only `description` carries over."
           },
           "multiple": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`). Not available for boolean, rich_text and json fields."
           },
           "required": {
             "type": "boolean"
