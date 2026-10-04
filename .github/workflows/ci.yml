@@ -54,3 +54,17 @@ jobs:
       - run: uv run python scripts/samples.py
       - run: git diff --exit-code
       - run: uv build
+
+  # The one check main's ruleset requires, so the required checks don't change
+  # when the version matrix does.
+  ci-success:
+    name: CI passed
+    if: always()
+    needs: [test, checks]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify all jobs succeeded
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: echo "$RESULTS" | jq -e 'all(. == "success")'

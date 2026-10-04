@@ -331,9 +331,9 @@ NOHEAD_API_URL=http://localhost:3000 NOHEAD_API_KEY=sk_live_... \
 
 1. Bump the version in `pyproject.toml` and `src/nohead/_version.py`.
 2. Add a section for it to `CHANGELOG.md` (`## 1.2.3`), which becomes the release's notes.
-3. Merge to `main`.
-4. Run the **SDK release** workflow in the Nohead API repository. It runs this commit's smoke test against the API and pushes the tag `v1.2.3`.
-5. The tag starts `.github/workflows/release.yml`. It checks the version and its notes, tests and builds, and publishes to PyPI through trusted publishing (no token, with attestations). Then it creates the GitHub release with the built files.
+3. Merge to `main`. Its ruleset requires the **CI passed** check, so the commit goes through a pull request or a branch whose CI passed, and force pushes are refused.
+4. Run the **SDK release** workflow in the Nohead API repository. It runs this commit's smoke test against the API and pushes the tag `v1.2.3`. Nobody else can push `v*` tags: a tag ruleset lets only that workflow's deploy key through.
+5. The tag starts `.github/workflows/release.yml`. Its publishing job runs in the `release` environment, which only `v*` tags can use, and the registry's trusted publisher accepts only that environment. It checks the version and its notes, tests and builds, and publishes to PyPI through trusted publishing (no token, with attestations). Then it creates the GitHub release with the built files.
 
 ## License
 

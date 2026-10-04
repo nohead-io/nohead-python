@@ -54,6 +54,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # PyPI's trusted publisher only accepts this environment, which only v* tags can use.
+    environment: release
     permissions:
       id-token: write # PyPI trusted publishing and attestations
     steps:
