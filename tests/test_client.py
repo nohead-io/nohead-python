@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 import tomllib
 from pathlib import Path
 
@@ -42,6 +43,9 @@ def test_identifies_itself() -> None:
     nohead.records.get("rec_1")
     headers = calls.calls[0].headers
     assert headers["nohead-client"] == f"sdk-python/{__version__}"
+    assert (
+        headers["user-agent"] == f"nohead-python/{__version__} python/{platform.python_version()}"
+    )
     assert headers["accept"] == "application/json"
     assert headers["x-extra"] == "yes"
 

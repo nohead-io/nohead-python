@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import random
 import typing
 import uuid
@@ -132,6 +133,9 @@ def encode(body: Any) -> bytes:
     return json.dumps(body, default=default, separators=(",", ":")).encode()
 
 
+USER_AGENT = f"nohead-python/{__version__} python/{platform.python_version()}"
+
+
 def headers(
     settings: Settings,
     method: str,
@@ -145,6 +149,7 @@ def headers(
         "Accept": "application/json",
         "Authorization": f"Bearer {settings.api_key}",
         "Nohead-Client": f"sdk-python/{__version__}",
+        "User-Agent": USER_AGENT,
         **settings.headers,
     }
     if has_body:
