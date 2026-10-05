@@ -11,7 +11,7 @@ for post in nohead.records.list("posts", filter={"status": "published"}):
     print(post.data["title"])
 ```
 
-> **Status:** 0.x, not yet published to PyPI. Until it is, install from GitHub: `pip install git+https://github.com/nohead-io/nohead-python`.
+> **Status:** 0.x until the Nohead API launches.
 
 ## Contents
 
