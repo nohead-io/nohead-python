@@ -108,10 +108,11 @@ class Invitation(NoheadModel):
     invited_by: InvitationInvitedBy
     email_delivery: InvitationEmailDelivery | None
     """What became of the invitation email, or null while it has not been sent (or when sending
-    is off). `sent`: accepted for delivery. `not_sent`: the address had bounced or been
-    marked as spam before, so no email went out. `bounced`: the email could not be
-    delivered; check the address. `complained`: the invitee marked it as spam. Either way
-    the invitation still works when the invitee signs in with the address.
+    is off). `sent`: accepted for delivery. `not_sent`: no email went out, because the
+    address had bounced or been marked as spam before, or had already received several
+    invitation emails that day. `bounced`: the email could not be delivered; check the
+    address. `complained`: the invitee marked it as spam. Either way the invitation still
+    works when the invitee signs in with the address.
     """
     expires_at: Timestamp
     responded_at: NullableTimestamp

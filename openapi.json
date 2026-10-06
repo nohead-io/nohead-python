@@ -4751,7 +4751,7 @@
       "post": {
         "operationId": "invitations_create",
         "summary": "Invite someone",
-        "description": "Invites an email address with a role (`members.manage`; only owners can\ninvite owners). The invitee sees it after signing in with that verified\naddress and accepts it with `POST /v1/me/invitations/{invitation_id}/accept`.\nNo email is sent yet. Invitations expire after 14 days. `409` if one is\nalready pending for the address.\n",
+        "description": "Invites an email address with a role (`members.manage`; only owners can\ninvite owners). The invitee sees it after signing in with that verified\naddress and accepts it with `POST /v1/me/invitations/{invitation_id}/accept`,\nand is emailed about it (see `email_delivery`). Invitations expire after\n14 days. `409` if one is already pending for the address. Each\ninvitation is an email sent on your behalf, so they are limited per\ninviting user and per organization (`429`), and revoking one does not\ngive it back. One address gets only a few invitation emails a day;\npast that the invitation is still made, with `email_delivery.status`\n`not_sent`.\n",
         "tags": [
           "members"
         ],
@@ -6451,7 +6451,7 @@
             }
           },
           "email_delivery": {
-            "description": "What became of the invitation email, or null while it has not been sent (or when sending is off). `sent`: accepted for delivery. `not_sent`: the address had bounced or been marked as spam before, so no email went out. `bounced`: the email could not be delivered; check the address. `complained`: the invitee marked it as spam. Either way the invitation still works when the invitee signs in with the address.",
+            "description": "What became of the invitation email, or null while it has not been sent (or when sending is off). `sent`: accepted for delivery. `not_sent`: no email went out, because the address had bounced or been marked as spam before, or had already received several invitation emails that day. `bounced`: the email could not be delivered; check the address. `complained`: the invitee marked it as spam. Either way the invitation still works when the invitee signs in with the address.",
             "oneOf": [
               {
                 "type": "null"
