@@ -28,8 +28,10 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ github.sha }}
           TAG: ${{ github.ref_name }}
+        # Compared with main's commit, not the name, which a tag could shadow.
         run: |
-          status=$(gh api "repos/$REPO/compare/main...$SHA" --jq .status)
+          main=$(gh api "repos/$REPO/git/ref/heads/main" --jq .object.sha)
+          status=$(gh api "repos/$REPO/compare/$main...$SHA" --jq .status)
           case "$status" in
             identical | behind) ;;
             *) echo "::error::$TAG ($SHA) is not on main ($status)"; exit 1 ;;
