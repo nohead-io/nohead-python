@@ -1142,6 +1142,7 @@
       "get": {
         "operationId": "collections_list",
         "summary": "List collections",
+        "description": "The project's collections. With `deleted=true`, those scheduled for deletion; published-only API keys get `403` for those.",
         "tags": [
           "collections"
         ],
@@ -1472,6 +1473,7 @@
       "get": {
         "operationId": "collections_get_schema",
         "summary": "Get the schema at a version",
+        "description": "Published-only API keys read only the current version; earlier ones are `403`.",
         "tags": [
           "collections"
         ],
@@ -1524,7 +1526,7 @@
       "get": {
         "operationId": "schema_changes_list",
         "summary": "List schema changes",
-        "description": "The collection's schema history, newest first.",
+        "description": "The collection's schema history, newest first. Published-only API keys get `403`.",
         "tags": [
           "collections"
         ],
@@ -1582,6 +1584,7 @@
       "get": {
         "operationId": "schema_changes_get",
         "summary": "Get a schema change",
+        "description": "Published-only API keys get `403`.",
         "tags": [
           "collections"
         ],
@@ -1623,6 +1626,7 @@
       "get": {
         "operationId": "fields_list",
         "summary": "List fields",
+        "description": "The collection's fields. With `deleted=true`, its deleted fields; published-only API keys get `403` for those.",
         "tags": [
           "fields"
         ],
@@ -2055,7 +2059,7 @@
       "get": {
         "operationId": "migrations_list",
         "summary": "List field migrations",
-        "description": "The collection's field migrations, newest first.",
+        "description": "The collection's field migrations, newest first. Published-only API keys get `403`.",
         "tags": [
           "migrations"
         ],
@@ -2192,6 +2196,7 @@
       "get": {
         "operationId": "migrations_get",
         "summary": "Get a field migration",
+        "description": "Published-only API keys get `403`.",
         "tags": [
           "migrations"
         ],
