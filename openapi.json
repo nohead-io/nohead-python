@@ -2685,7 +2685,7 @@
       "get": {
         "operationId": "assets_download_url",
         "summary": "Get a download URL",
-        "description": "A short-lived URL (15 minutes) that downloads the original file under its filename.",
+        "description": "A short-lived URL (2 minutes) that downloads the original file under its\nfilename: ask for it when the download starts, not ahead of time. A\ndownload that has started finishes however long it takes. Limited to a\nfew per file and client IP (`429`).\n",
         "tags": [
           "assets"
         ],
@@ -2914,7 +2914,7 @@
       "post": {
         "operationId": "search_index_rebuild",
         "summary": "Rebuild the search index",
-        "description": "Rebuilds the collection's index from its records in the background.\nSearch keeps working with the current index until the new one is ready.\nRarely needed: indexes follow record and schema changes automatically.\n",
+        "description": "Rebuilds the collection's index from its records in the background.\nSearch keeps working with the current index until the new one is ready.\nRarely needed: indexes follow record and schema changes automatically.\nLimited to a few an hour per collection and per organization (`429`).\n",
         "tags": [
           "search"
         ],
@@ -5756,8 +5756,8 @@
       "session": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "nohead_session",
-        "description": "A person signed in to the web app: the httpOnly cookie its sign-in\nsets, accepted only on requests from the web app's origin. Servers,\nCI, the CLI and agents use an API key.\n"
+        "name": "__Host-nohead_session",
+        "description": "A person signed in to the web app: the httpOnly cookie its sign-in\nsets, accepted only on requests from the web app's origin (named\n`nohead_session` over plain http, in local development). Servers,\nCI, the CLI and agents use an API key.\n"
       }
     },
     "parameters": {
