@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 15
     steps:
       # Only a commit on main is released, whoever pushed the tag: the deploy
-      # key that pushes tags also syncs the contract (nohead-io/nohead#130).
+      # key that pushes tags also syncs the contract.
       - name: Check the tag is on main
         env:
           GH_TOKEN: ${{ github.token }}
