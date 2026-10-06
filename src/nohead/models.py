@@ -332,6 +332,9 @@ class Actor(NoheadModel):
     id: str | None
     """The user (`usr_...`) or API key (`key_...`), or null for system changes."""
     name: str | None
+    """Resolved when read, never stored: a user's current name (or email), "Deleted user" once
+    they deleted their account, an API key's name, or "System".
+    """
 
 
 class SchemaChangeProperties(NoheadModel):
@@ -614,6 +617,20 @@ class FeatureFlags(NoheadModel):
     project_id: str | None
     flags: dict[str, bool]
     """Flag name to enabled, for every registered flag the caller may see."""
+
+
+class AccountDeletionCode(NoheadModel):
+    object: str
+    email: str
+    """Where the code was sent."""
+    expires_at: datetime
+
+
+class AccountDeletion(NoheadModel):
+    object: str
+    user_id: str
+    """The deleted user, as history still refers to it."""
+    deleted_at: datetime
 
 
 class PrincipalUser(NoheadModel):

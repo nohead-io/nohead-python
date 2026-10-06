@@ -5498,6 +5498,121 @@
             "$ref": "#/components/responses/RateLimited"
           }
         }
+      },
+      "delete": {
+        "operationId": "me_delete",
+        "summary": "Delete my account",
+        "description": "Deletes the signed-in user's account, confirmed with the code\nemailed by `POST /v1/me/deletion-code`. Their name and email are\nremoved, every session ends, and their memberships and the pending\ninvitations they sent are revoked. Changes they made stay in their\norganizations' history, by \"Deleted user\". Organizations they are\nthe only member of are deleted with it (restorable for 30 days, as\nwith `DELETE /v1/organizations/{organization_id}`). API keys they\ncreated belong to their projects and keep working; the access\nreview lists them. The same address can sign up again as a new\nuser.\n\nRefused (409) while they are the only owner of an organization\nwith other members, or an organization only they belong to has a\npaid subscription. A wrong or expired code is a 422. Session only.\n",
+        "tags": [
+          "system"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "description": "The six-digit code emailed by `POST /v1/me/deletion-code`."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The account is deleted, and the session cookie cleared.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeletion"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/me/deletion-code": {
+      "post": {
+        "operationId": "me_deletion_code_send",
+        "summary": "Email a code to delete my account",
+        "description": "Emails the signed-in user a six-digit code that confirms\n`DELETE /v1/me`, valid for 10 minutes. Only the newest code works.\nRefused (409) for the same reasons as the deletion, so the\norganizations that still need the user are known before any code\nis sent. Session only.\n",
+        "tags": [
+          "system"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The code is on its way.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountDeletionCode"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
       }
     },
     "/v1/feature-flags": {
@@ -7058,7 +7173,8 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Resolved when read, never stored: a user's current name (or\nemail), \"Deleted user\" once they deleted their account, an API\nkey's name, or \"System\".\n"
           }
         }
       },
@@ -8103,6 +8219,50 @@
             "additionalProperties": {
               "type": "boolean"
             }
+          }
+        }
+      },
+      "AccountDeletionCode": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "object",
+          "email",
+          "expires_at"
+        ],
+        "properties": {
+          "object": {
+            "const": "account_deletion_code"
+          },
+          "email": {
+            "type": "string",
+            "description": "Where the code was sent."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AccountDeletion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "object",
+          "user_id",
+          "deleted_at"
+        ],
+        "properties": {
+          "object": {
+            "const": "account_deletion"
+          },
+          "user_id": {
+            "type": "string",
+            "description": "The deleted user, as history still refers to it."
+          },
+          "deleted_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
