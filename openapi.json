@@ -8800,7 +8800,8 @@
           "organization_id",
           "plan",
           "period",
-          "metrics"
+          "metrics",
+          "retention"
         ],
         "properties": {
           "object": {
@@ -8855,6 +8856,85 @@
             "items": {
               "$ref": "#/components/schemas/UsageMetric"
             }
+          },
+          "retention": {
+            "$ref": "#/components/schemas/UsageRetention"
+          }
+        }
+      },
+      "UsageRetention": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revision_days",
+          "audit_days",
+          "grace"
+        ],
+        "description": "How long the plan keeps record revisions (beyond each record's first and latest 10) and audit events, in days; null keeps everything.",
+        "properties": {
+          "revision_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "examples": [
+              365
+            ]
+          },
+          "audit_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "examples": [
+              90
+            ]
+          },
+          "grace": {
+            "description": "After a downgrade, the previous plan's longer retention still applies for 30 days; history past the plan's retention is removed after `ends_at`. Null otherwise.",
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UsageRetentionGrace"
+              }
+            ]
+          }
+        }
+      },
+      "UsageRetentionGrace": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ends_at",
+          "revision_days",
+          "audit_days"
+        ],
+        "properties": {
+          "ends_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revision_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Days of revisions kept until `ends_at`; null keeps everything.",
+            "examples": [
+              null
+            ]
+          },
+          "audit_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Days of audit events kept until `ends_at`.",
+            "examples": [
+              365
+            ]
           }
         }
       },

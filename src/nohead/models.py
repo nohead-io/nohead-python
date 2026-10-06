@@ -801,6 +801,28 @@ class Usage(NoheadModel):
     period: UsagePeriod
     """The current period; `end` is exclusive."""
     metrics: list[UsageMetric]
+    retention: UsageRetention
+
+
+class UsageRetention(NoheadModel):
+    """How long the plan keeps record revisions (beyond each record's first and latest 10) and
+    audit events, in days; null keeps everything.
+    """
+
+    revision_days: int | None
+    audit_days: int | None
+    grace: UsageRetentionGrace | None
+    """After a downgrade, the previous plan's longer retention still applies for 30 days;
+    history past the plan's retention is removed after `ends_at`. Null otherwise.
+    """
+
+
+class UsageRetentionGrace(NoheadModel):
+    ends_at: datetime
+    revision_days: int | None
+    """Days of revisions kept until `ends_at`; null keeps everything."""
+    audit_days: int | None
+    """Days of audit events kept until `ends_at`."""
 
 
 class UsageMetricDaily(NoheadModel):
