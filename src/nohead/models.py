@@ -30,9 +30,6 @@ class ListMeta(NoheadModel):
     next_cursor: str | None
     """Opaque cursor for the next page, or null on the last page."""
     has_more: bool
-    """Whether another page follows. A page can hold fewer than `limit` items, even none, while
-    this is true.
-    """
 
 
 class Organization(NoheadModel):
