@@ -5507,7 +5507,7 @@
       "delete": {
         "operationId": "me_delete",
         "summary": "Delete my account",
-        "description": "Deletes the signed-in user's account, confirmed with the code\nemailed by `POST /v1/me/deletion-code`. Their name and email are\nremoved, every session ends, and their memberships and the pending\ninvitations they sent are revoked. Changes they made stay in their\norganizations' history, by \"Deleted user\". Organizations they are\nthe only member of are deleted with it (restorable for 30 days, as\nwith `DELETE /v1/organizations/{organization_id}`). API keys they\ncreated belong to their projects and keep working; the access\nreview lists them. The same address can sign up again as a new\nuser.\n\nRefused (409) while they are the only owner of an organization\nwith other members, or an organization only they belong to has a\npaid subscription. A wrong or expired code is a 422. Wrong codes\ncount like wrong sign-in codes: after too many for the address, or\nfrom the IP, every code is refused with 429 until the limit resets.\nSession only.\n",
+        "description": "Deletes the signed-in user's account. It needs a session started in\nthe last 10 minutes (a fresh sign-in with an emailed code), so a\nsession alone cannot do it: otherwise 403 with detail code\n`recent_sign_in_required`, and the web app asks for a code. Their\nname and email are removed, every session ends, and their\nmemberships and the pending\ninvitations they sent are revoked. Changes they made stay in their\norganizations' history, by \"Deleted user\". Organizations they are\nthe only member of are deleted with it (restorable for 30 days, as\nwith `DELETE /v1/organizations/{organization_id}`). API keys they\ncreated belong to their projects and keep working; the access\nreview lists them. The same address can sign up again as a new\nuser.\n\nRefused (409) while they are the only owner of an organization\nwith other members, or an organization only they belong to has a\npaid subscription, checked before the sign-in's age. Session only.\n",
         "tags": [
           "system"
         ],
@@ -5521,26 +5521,6 @@
             "$ref": "#/components/parameters/IdempotencyKey"
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "code"
-                ],
-                "properties": {
-                  "code": {
-                    "type": "string",
-                    "description": "The six-digit code emailed by `POST /v1/me/deletion-code`."
-                  }
-                }
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "The account is deleted, and the session cookie cleared.",
@@ -5548,56 +5528,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AccountDeletion"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/me/deletion-code": {
-      "post": {
-        "operationId": "me_deletion_code_send",
-        "summary": "Email a code to delete my account",
-        "description": "Emails the signed-in user a six-digit code that confirms\n`DELETE /v1/me`, valid for 10 minutes. Only the newest code works.\nRefused (409) for the same reasons as the deletion, so the\norganizations that still need the user are known before any code\nis sent, and (409, detail code `email_suppressed`) when earlier email\nto the address bounced or was marked as spam, so no code could\narrive. Session only.\n",
-        "tags": [
-          "system"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "The code is on its way.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AccountDeletionCode"
                 }
               }
             }
@@ -8227,28 +8157,6 @@
           }
         }
       },
-      "AccountDeletionCode": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "object",
-          "email",
-          "expires_at"
-        ],
-        "properties": {
-          "object": {
-            "const": "account_deletion_code"
-          },
-          "email": {
-            "type": "string",
-            "description": "Where the code was sent."
-          },
-          "expires_at": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
       "AccountDeletion": {
         "type": "object",
         "additionalProperties": false,
@@ -9056,7 +8964,7 @@
             ]
           },
           "grace": {
-            "description": "After a downgrade, the previous plan's longer retention still applies for 30 days; history past the plan's retention is removed after `ends_at`. Null otherwise.",
+            "description": "After a downgrade, all history is kept for 30 days; history past the plan's retention is removed after `ends_at`. Null otherwise.",
             "oneOf": [
               {
                 "type": "null"
@@ -9086,7 +8994,7 @@
               "integer",
               "null"
             ],
-            "description": "Days of revisions kept until `ends_at`; null keeps everything.",
+            "description": "Days of revisions kept until `ends_at`; null keeps everything (as a downgrade's grace does).",
             "examples": [
               null
             ]
@@ -9096,9 +9004,9 @@
               "integer",
               "null"
             ],
-            "description": "Days of audit events kept until `ends_at`.",
+            "description": "Days of audit events kept until `ends_at`; null keeps everything (as a downgrade's grace does).",
             "examples": [
-              365
+              null
             ]
           }
         }

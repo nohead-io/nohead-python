@@ -620,13 +620,6 @@ class FeatureFlags(NoheadModel):
     """Flag name to enabled, for every registered flag the caller may see."""
 
 
-class AccountDeletionCode(NoheadModel):
-    object: str
-    email: str
-    """Where the code was sent."""
-    expires_at: datetime
-
-
 class AccountDeletion(NoheadModel):
     object: str
     user_id: str
@@ -830,17 +823,21 @@ class UsageRetention(NoheadModel):
     revision_days: int | None
     audit_days: int | None
     grace: UsageRetentionGrace | None
-    """After a downgrade, the previous plan's longer retention still applies for 30 days;
-    history past the plan's retention is removed after `ends_at`. Null otherwise.
+    """After a downgrade, all history is kept for 30 days; history past the plan's retention is
+    removed after `ends_at`. Null otherwise.
     """
 
 
 class UsageRetentionGrace(NoheadModel):
     ends_at: datetime
     revision_days: int | None
-    """Days of revisions kept until `ends_at`; null keeps everything."""
+    """Days of revisions kept until `ends_at`; null keeps everything (as a downgrade's grace
+    does).
+    """
     audit_days: int | None
-    """Days of audit events kept until `ends_at`."""
+    """Days of audit events kept until `ends_at`; null keeps everything (as a downgrade's grace
+    does).
+    """
 
 
 class UsageMetricDaily(NoheadModel):
