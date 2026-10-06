@@ -20,6 +20,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      # Only a commit on main is released, whoever pushed the tag: the deploy
+      # key that pushes tags also syncs the contract (nohead-io/nohead#130).
+      - name: Check the tag is on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          status=$(gh api "repos/$REPO/compare/main...$SHA" --jq .status)
+          case "$status" in
+            identical | behind) ;;
+            *) echo "::error::$TAG ($SHA) is not on main ($status)"; exit 1 ;;
+          esac
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
