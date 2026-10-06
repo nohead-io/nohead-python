@@ -92,9 +92,7 @@ def check(requests: list[httpx.Request]) -> None:
 def test_the_sync_client_covers_the_contract() -> None:
     nohead, recorder = make_sync([mock_reply])
     for call in every_call(nohead) + every_parameter(nohead):
-        result = call()
-        if hasattr(result, "data") and hasattr(result, "has_next_page"):
-            list(result.data)
+        call()
     check(recorder.calls)
 
 

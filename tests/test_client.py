@@ -113,9 +113,11 @@ def test_with_options_shares_the_connection() -> None:
 
 def test_context_managers() -> None:
     with Nohead(api_key="sk_live_x") as nohead:
-        assert nohead.records is not None
+        assert not nohead._client.http.is_closed
+    assert nohead._client.http.is_closed
 
 
 async def test_async_context_manager() -> None:
     async with AsyncNohead(api_key="sk_live_x") as nohead:
-        assert nohead.records is not None
+        assert not nohead._client.http.is_closed
+    assert nohead._client.http.is_closed

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from itertools import islice
+
 import pytest
 
 from nohead import AsyncPage, NoheadError, Page
@@ -25,6 +27,12 @@ def test_iterates_across_pages_keeping_the_parameters() -> None:
     assert ids == ["rec_1", "rec_2", "rec_3"]
     assert calls.calls[1].url.params["cursor"] == "c2"
     assert calls.calls[1].url.params["filter[status]"] == "draft"
+
+
+def test_stops_fetching_once_it_has_enough() -> None:
+    nohead, calls = make_sync([page([record("rec_1"), record("rec_2")], "c2")])
+    assert [r.id for r in islice(nohead.records.list("posts"), 1)] == ["rec_1"]
+    assert len(calls.calls) == 1
 
 
 def test_pages_by_hand() -> None:
@@ -54,13 +62,6 @@ def test_search_totals() -> None:
     assert calls.calls[0].url.params["collections"] == "posts,pages"
 
 
-async def test_async_await_gives_the_first_page() -> None:
-    nohead, _ = make_async([page([record("rec_1")], "c2")])
-    first = await nohead.records.list("posts")
-    assert isinstance(first, AsyncPage)
-    assert first.data[0].id == "rec_1"
-
-
 async def test_async_iterates_across_pages() -> None:
     nohead, calls = make_async([page([record("rec_1")], "c2"), page([record("rec_2")], None)])
     ids = [r.id async for r in nohead.records.list("posts")]
@@ -71,5 +72,7 @@ async def test_async_iterates_across_pages() -> None:
 async def test_async_pages_by_hand() -> None:
     nohead, _ = make_async([page([record("rec_1")], "c2"), page([record("rec_2")], None)])
     first = await nohead.records.list("posts")
+    assert isinstance(first, AsyncPage)
+    assert first.data[0].id == "rec_1"
     second = await first.get_next_page()
     assert second.data[0].id == "rec_2"

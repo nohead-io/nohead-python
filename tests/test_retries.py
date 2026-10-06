@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 import httpx
 import pytest
 
@@ -23,11 +25,14 @@ def test_retries_server_errors_with_one_idempotency_key() -> None:
     assert len({c.headers["idempotency-key"] for c in calls.calls}) == 1
 
 
-def test_waits_out_a_short_retry_after() -> None:
+def test_waits_out_a_short_retry_after(monkeypatch: pytest.MonkeyPatch) -> None:
+    waits: list[float] = []
+    monkeypatch.setattr(time, "sleep", waits.append)
     nohead, calls = make_sync(
-        [api_error(429, "rate_limited", NOW), json_response(200, record("r"))]
+        [api_error(429, "rate_limited", {"retry-after": "3"}), json_response(200, record("r"))]
     )
     nohead.records.get("r")
+    assert waits == [3]
     assert len(calls.calls) == 2
 
 
