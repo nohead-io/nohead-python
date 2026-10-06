@@ -9,7 +9,7 @@
       "email": "hello@nohead.io",
       "url": "https://nohead.io"
     },
-    "description": "The Nohead API manages projects, collections (your data models), their\nfields, and records (your content), with full version history.\n\n## Authentication\n\nSend `Authorization: Bearer <token>`. Servers, CI and agents use a\nproject API key (`sk_live_...`, created in the web app under API keys)\nwith scopes such as `records:read` or `schema:write`. Organization,\nproject, member and API key management need a person signed in to the\nweb app and are not available to API keys.\n\n## Resources and IDs\n\nEvery object has an opaque, prefixed `id` (`col_`, `fld_`, `rec_`, ...)\nand an `object` type. Record values live under `data`, keyed by each\nfield's `api_key`. Timestamps are ISO 8601 in UTC. Deletes are soft and\ncan be undone.\n\n## Lists\n\nLists return `{ \"data\": [...], \"meta\": { \"next_cursor\", \"has_more\" } }`.\nPass `limit` (1-100) and `cursor` to page, and `sort` (prefix `-` for\ndescending). Read on while `has_more` is true: a page can hold fewer\nthan `limit` items, even none. Records also take `filter[<api_key>]=value`,\n`filter[status]` and `expand=<relation fields>`.\n\n## Errors\n\nErrors share one envelope: `{ \"error\": { \"type\", \"message\",\n\"request_id\", \"details\" } }`. `details` lists field-level problems as\n`{ \"field\", \"code\", \"message\" }`. Include the `request_id` when asking\nfor support.\n\n## Safe retries and concurrent edits\n\nSend `Idempotency-Key` on any `POST`, `PATCH` or `DELETE` to make retrying\nit safe: the first result is stored for 24 hours and returned again for\nthe same request. Record responses carry the record's revision as an\n`ETag`; send it back as `If-Match` to update only if nobody changed the\nrecord in the meantime (`412` otherwise).\n\n## History\n\nEvery change to a record is a revision, attributed to the person or API\nkey that made it: record revisions can be listed, diffed and reverted,\nand collections keep a schema history. Send `Nohead-Change-Note` to\nrecord why a change was made. Changes that rewrite existing values\n(such as a field's type) are explicit, previewable field migrations.\n\nHow long revisions are kept depends on the organization's plan. Older\nones are removed, but every record keeps its first revision and its\nlast 10; `history_pruned_through` says how far history was removed.\n",
+    "description": "The Nohead API manages projects, collections (your data models), their\nfields, and records (your content), with full version history.\n\n## Authentication\n\nSend `Authorization: Bearer <token>`. Servers, CI and agents use a\nproject API key (`sk_live_...`, created in the web app under API keys)\nwith scopes such as `records:read` or `schema:write`. Organization,\nproject, member and API key management need a person signed in to the\nweb app and are not available to API keys.\n\n## Resources and IDs\n\nEvery object has an opaque, prefixed `id` (`col_`, `fld_`, `rec_`, ...)\nand an `object` type. Record values live under `data`, keyed by each\nfield's `api_key`. Timestamps are ISO 8601 in UTC. Deletes are soft and\ncan be undone.\n\n## Lists\n\nLists return `{ \"data\": [...], \"meta\": { \"next_cursor\", \"has_more\" } }`.\nPass `limit` (1-100) and `cursor` to page, and `sort` (prefix `-` for\ndescending). Records also take `filter[<api_key>]=value`,\n`filter[status]` and `expand=<relation fields>`.\n\n## Errors\n\nErrors share one envelope: `{ \"error\": { \"type\", \"message\",\n\"request_id\", \"details\" } }`. `details` lists field-level problems as\n`{ \"field\", \"code\", \"message\" }`. Include the `request_id` when asking\nfor support.\n\n## Safe retries and concurrent edits\n\nSend `Idempotency-Key` on any `POST`, `PATCH` or `DELETE` to make retrying\nit safe: the first result is stored for 24 hours and returned again for\nthe same request. Record responses carry the record's revision as an\n`ETag`; send it back as `If-Match` to update only if nobody changed the\nrecord in the meantime (`412` otherwise).\n\n## History\n\nEvery change to a record is a revision, attributed to the person or API\nkey that made it: record revisions can be listed, diffed and reverted,\nand collections keep a schema history. Send `Nohead-Change-Note` to\nrecord why a change was made. Changes that rewrite existing values\n(such as a field's type) are explicit, previewable field migrations.\n\nHow long revisions are kept depends on the organization's plan. Older\nones are removed, but every record keeps its first revision and its\nlast 10; `history_pruned_through` says how far history was removed.\n",
     "license": {
       "name": "Proprietary",
       "identifier": "LicenseRef-Proprietary"
@@ -769,7 +769,7 @@
       "post": {
         "operationId": "record_revisions_revert",
         "summary": "Revert to a revision",
-        "description": "Writes a new `revert` revision whose data is the target revision mapped\nonto the current schema. With `dry_run=true`, returns a preview and\nwrites nothing.\n",
+        "description": "Writes a new `revert` revision whose data is the target revision mapped\nonto the current schema. With `dry_run=true`, returns a preview and\nwrites nothing; the preview shows the old revision's data, so it also\nneeds `records:read`.\n",
         "tags": [
           "records"
         ],
@@ -2109,7 +2109,7 @@
       "post": {
         "operationId": "fields_migrate",
         "summary": "Migrate a field",
-        "description": "Changes a field in a way that rewrites existing record values: its\n`type`, `multiple`, a stricter `configuration`, or making it `required`\nwith a `backfill` for records that have no value.\n\nEvery record is checked first. With `dry_run=true` the result is a\npreview: counts per outcome and sample records, nothing written. Without\nit, a migration whose values do not all convert is refused (`422`)\nunless `on_invalid` is `clear`; otherwise it is accepted (`202`) and\napplied in the background. Poll `GET /v1/migrations/{migration_id}`.\n\nWhile a migration is pending or running, writes to the collection's\nrecords and schema return `409`. Each record whose data changes gets a\n`migrate` revision, so cleared or converted values stay recoverable.\n",
+        "description": "Changes a field in a way that rewrites existing record values: its\n`type`, `multiple`, a stricter `configuration`, or making it `required`\nwith a `backfill` for records that have no value.\n\nEvery record is checked first. With `dry_run=true` the result is a\npreview: counts per outcome and sample records, nothing written. Without\nit, a migration whose values do not all convert is refused (`422`)\nunless `on_invalid` is `clear`; otherwise it is accepted (`202`) and\napplied in the background. Poll `GET /v1/migrations/{migration_id}`.\n\nWhile a migration is pending or running, schema writes to the collection\nreturn `409`, and record writes do once it is running (a pending one may\nwait for others to finish). A value written while it waits that does\nnot convert fails the migration, or is cleared with `on_invalid: clear`. Each record whose data changes gets a\n`migrate` revision, so cleared or converted values stay recoverable.\nA dry run's preview shows sample record values, so it also needs\n`records:read`.\n",
         "tags": [
           "migrations"
         ],
@@ -2288,7 +2288,7 @@
       "get": {
         "operationId": "assets_list",
         "summary": "List assets",
-        "description": "The project's assets, newest first. `deleted=true` lists deleted ones instead.\n`content_type` lists only assets of those types, for example the ones an\nasset field accepts (its `accepted_types`). Published-only API keys see\nonly assets that published records use, and get pages that can be short\n(or empty) while `has_more` is true.\n",
+        "description": "The project's assets, newest first. `deleted=true` lists deleted ones instead.\n`content_type` lists only assets of those types, for example the ones an\nasset field accepts (its `accepted_types`). Published-only API keys get\n`403`: sites reach assets through records (`expand=`), one at a time.\n",
         "tags": [
           "assets"
         ],
@@ -2350,7 +2350,7 @@
       "post": {
         "operationId": "assets_upload",
         "summary": "Start an upload",
-        "description": "Step 1 of uploading a file. Returns a pending asset and an `upload`: send\nthe file's bytes with `upload.method` to `upload.url`, with `upload.headers`,\nbefore `upload.expires_at`. The bytes go directly to storage, not through\nthis API. Then call `POST /v1/assets/{asset_id}/complete`.\n\n`content_type` and `byte_size` must be the file's; storage refuses another\ncontent type and completion refuses another size.\n\nThe file counts toward the organization's storage from here on, while it\nuploads too. On plans where storage is a hard limit (Free), a file that\nwould go over it is refused with `402 plan_limit_exceeded`; on others,\n`Nohead-Usage-Warning` reports going over.\n",
+        "description": "Step 1 of uploading a file. Returns a pending asset and an `upload`: send\nthe file's bytes with `upload.method` to `upload.url`, with `upload.headers`,\nbefore `upload.expires_at`. The bytes go directly to storage, not through\nthis API. Then call `POST /v1/assets/{asset_id}/complete`.\n\n`content_type` and `byte_size` must be the file's; storage refuses another\ncontent type and completion refuses another size.\n\nThe file counts toward the organization's storage from here on, while it\nuploads too. On plans where storage is a hard limit (Free), a file that\nwould go over it is refused with `402 plan_limit_exceeded`; on others,\n`Nohead-Usage-Warning` reports going over.\n\nA project can have at most 100 uploads in progress (started within the\nupload's lifetime, not yet completed or deleted); past that, `409` with\n`too_many_uploads`. Uploads never completed are removed after a day.\n",
         "tags": [
           "assets"
         ],
@@ -2576,7 +2576,7 @@
       "get": {
         "operationId": "assets_image_url",
         "summary": "Get an image URL",
-        "description": "A signed URL for a transformed rendition of a ready image asset\n(JPEG, PNG, GIF, WebP or AVIF). The same asset and options always give\nthe same URL, so it can be cached and embedded; it does not expire.\nOnly these options can be requested, so nobody can generate other\ntransformations. Without options it serves the original size. Width and\nheight round up to the next of 16, 32, 48, 64, 96, 128, 160, 192, 256,\n320, 384, 480, 512, 640, 768, 800, 960, 1024, 1200, 1280, 1536, 1600,\n1920, 2048, 2560, 3072, 3840 and 4096, and quality to a multiple of 10:\nthe response says what was signed.\n",
+        "description": "A signed URL for a transformed rendition of a ready image asset\n(JPEG, PNG, GIF, WebP or AVIF). The same asset and options always give\nthe same URL, so it can be cached and embedded; it does not expire.\nOnly these options can be requested, so nobody can generate other\ntransformations. Without options it serves the original size. A width\nor height on its own rounds up to the next of 16, 32, 48, 64, 96, 128,\n160, 192, 256, 320, 384, 480, 512, 640, 768, 800, 960, 1024, 1200, 1280,\n1536, 1600, 1920, 2048, 2560, 3072, 3840 and 4096; with both, the larger\ndoes and the other keeps its ratio to it, rounded up to a multiple of\n1/32. Quality rounds up to a multiple of 10. The response says what\nwas signed.\n",
         "tags": [
           "assets"
         ],
@@ -2685,7 +2685,7 @@
       "get": {
         "operationId": "assets_download_url",
         "summary": "Get a download URL",
-        "description": "A short-lived URL (2 minutes) that downloads the original file under its\nfilename: ask for it when the download starts, not ahead of time. A\ndownload that has started finishes however long it takes. Limited to a\nfew per file and client IP (`429`).\n",
+        "description": "A short-lived URL (2 minutes) that downloads the original file under its\nfilename: ask for it when the download starts, not ahead of time. A\ndownload that has started finishes however long it takes.\n",
         "tags": [
           "assets"
         ],
@@ -4756,7 +4756,7 @@
       "post": {
         "operationId": "invitations_create",
         "summary": "Invite someone",
-        "description": "Invites an email address with a role (`members.manage`; only owners can\ninvite owners). The invitee sees it after signing in with that verified\naddress and accepts it with `POST /v1/me/invitations/{invitation_id}/accept`,\nand is emailed about it (see `email_delivery`). Invitations expire after\n14 days. `409` if one is already pending for the address. Each\ninvitation is an email sent on your behalf, so they are limited per\ninviting user and per organization (`429`), and revoking one does not\ngive it back. One address gets only a few invitation emails a day;\npast that the invitation is still made, with `email_delivery.status`\n`not_sent`.\n",
+        "description": "Invites an email address with a role (`members.manage`; only owners can\ninvite owners). The invitee sees it after signing in with that verified\naddress and accepts it with `POST /v1/me/invitations/{invitation_id}/accept`,\nand is emailed about it (see `email_delivery`). Invitations expire after\n14 days. `409` if one is already pending for the address. Each\ninvitation is an email sent on your behalf, so they are limited per\ninviting user (`429`), and revoking one does not give it back. One\naddress gets only a few invitation emails a day;\npast that the invitation is still made, with `email_delivery.status`\n`not_sent`.\n",
         "tags": [
           "members"
         ],
@@ -5577,7 +5577,7 @@
       "post": {
         "operationId": "me_deletion_code_send",
         "summary": "Email a code to delete my account",
-        "description": "Emails the signed-in user a six-digit code that confirms\n`DELETE /v1/me`, valid for 10 minutes. Only the newest code works.\nRefused (409) for the same reasons as the deletion, so the\norganizations that still need the user are known before any code\nis sent. Session only.\n",
+        "description": "Emails the signed-in user a six-digit code that confirms\n`DELETE /v1/me`, valid for 10 minutes. Only the newest code works.\nRefused (409) for the same reasons as the deletion, so the\norganizations that still need the user are known before any code\nis sent, and (409, detail code `email_suppressed`) when earlier email\nto the address bounced or was marked as spam, so no code could\narrive. Session only.\n",
         "tags": [
           "system"
         ],
@@ -5876,7 +5876,7 @@
       "Expand": {
         "name": "expand",
         "in": "query",
-        "description": "Comma-separated relation or asset field API keys whose records or assets to embed under `expanded` (at most 5).",
+        "description": "Comma-separated relation or asset field API keys whose records or assets to embed under `expanded` (at most 5). Embedding needs permission to read what is embedded: `records:read` for relations, `assets:read` for assets (`403` otherwise).",
         "schema": {
           "type": "string"
         },
@@ -6157,8 +6157,7 @@
             "description": "Opaque cursor for the next page, or null on the last page."
           },
           "has_more": {
-            "type": "boolean",
-            "description": "Whether another page follows. A page can hold fewer than `limit` items, even none, while this is true."
+            "type": "boolean"
           }
         }
       },
@@ -10318,7 +10317,7 @@
         }
       },
       "RateLimited": {
-        "description": "Too many requests for this API key or user (or, with failing\ncredentials, this IP address). A published-only key is counted per\nclient IP, and all of an organization's keys together are limited too.\nWait `Retry-After` seconds; retries with the same `Idempotency-Key`\nare safe.\n",
+        "description": "Too many requests for this API key or user (or, with failing\ncredentials, this IP address). A published-only key is counted per\nclient IP. Wait `Retry-After` seconds; retries with the same `Idempotency-Key`\nare safe.\n",
         "headers": {
           "X-Request-Id": {
             "$ref": "#/components/headers/RequestId"
