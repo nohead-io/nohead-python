@@ -3642,7 +3642,7 @@
       "post": {
         "operationId": "api_keys_create",
         "summary": "Create an API key",
-        "description": "Returns the token exactly once. Store it securely.",
+        "description": "Returns the token exactly once. Store it securely. A project has at most 25 usable keys (`409` past that; revoke one first).",
         "tags": [
           "api-keys"
         ],
@@ -10317,7 +10317,7 @@
         }
       },
       "RateLimited": {
-        "description": "Too many requests for this API key or user (or, with failing\ncredentials, this IP address). Wait `Retry-After` seconds; retries with\nthe same `Idempotency-Key` are safe.\n",
+        "description": "Too many requests for this API key or user (or, with failing\ncredentials, this IP address). A published-only key is counted per\nclient IP, and all of an organization's keys together are limited too.\nWait `Retry-After` seconds; retries with the same `Idempotency-Key`\nare safe.\n",
         "headers": {
           "X-Request-Id": {
             "$ref": "#/components/headers/RequestId"
