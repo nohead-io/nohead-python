@@ -120,7 +120,7 @@ def test_keeps_unknown_fields_and_values() -> None:
 async def test_async_requests() -> None:
     nohead, calls = make_async([json_response(201, record("rec_1"))])
     created = await nohead.records.create("posts", data={"title": "Hi"}, change_note="Import")
-    assert created.data == {"title": "Hi"} or created.id == "rec_1"
+    assert created.id == "rec_1"
     assert calls.calls[0].headers["nohead-change-note"] == "Import"
     assert calls.body(0) == {"data": {"title": "Hi"}}
 

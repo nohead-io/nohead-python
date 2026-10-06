@@ -82,6 +82,16 @@ def test_uploads_a_file_object() -> None:
     assert calls.calls[1].content == b"hello"
 
 
+def test_needs_byte_size_for_a_stream() -> None:
+    class Stream(io.BytesIO):
+        def seekable(self) -> bool:
+            return False
+
+    nohead, _ = make_sync([CREATED])
+    with pytest.raises(UploadError):
+        nohead.assets.upload(Stream(b"hello"))
+
+
 def test_storage_refusing_the_bytes() -> None:
     nohead, _ = make_sync([CREATED, httpx.Response(403, text="denied")])
     with pytest.raises(UploadError) as caught:
