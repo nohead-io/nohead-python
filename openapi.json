@@ -2517,7 +2517,7 @@
       "post": {
         "operationId": "assets_complete",
         "summary": "Complete an upload",
-        "description": "Step 2 of uploading a file: verifies the uploaded file (it exists, with the\ndeclared size and content type), reads image dimensions and marks the asset\n`ready`. Only ready assets can be used in records. Safe to retry: a ready\nasset is returned unchanged. `422 upload_missing` means the file has not\nbeen uploaded yet; `422 upload_mismatch` means it differed from what was\ndeclared, and the asset is marked `failed`.\n",
+        "description": "Step 2 of uploading a file: verifies the uploaded file (it exists, with the\ndeclared size and content type), reads image dimensions and marks the asset\n`ready`. Only ready assets can be used in records. Safe to retry: a ready\nasset is returned unchanged. `422 upload_missing` means the file has not\nbeen uploaded yet; `422 upload_mismatch` means it differed from what was\ndeclared, and the asset is marked `failed`. `409` if the file was uploaded\nagain while it was being checked: complete it again.\n",
         "tags": [
           "assets"
         ],
