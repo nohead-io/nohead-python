@@ -9,7 +9,7 @@
       "email": "hello@nohead.io",
       "url": "https://nohead.io"
     },
-    "description": "The Nohead API manages projects, collections (your data models), their\nfields, and records (your content), with full version history.\n\n## Authentication\n\nSend `Authorization: Bearer <token>`. Servers, CI and agents use a\nproject API key (`sk_live_...`, created in the web app under API keys)\nwith scopes such as `records:read` or `schema:write`. Organization,\nproject, member and API key management need a person signed in to the\nweb app and are not available to API keys.\n\n## Resources and IDs\n\nEvery object has an opaque, prefixed `id` (`col_`, `fld_`, `rec_`, ...)\nand an `object` type. Record values live under `data`, keyed by each\nfield's `api_key`. Timestamps are ISO 8601 in UTC. Deletes are soft and\ncan be undone.\n\n## Lists\n\nLists return `{ \"data\": [...], \"meta\": { \"next_cursor\", \"has_more\" } }`.\nPass `limit` (1-100) and `cursor` to page, and `sort` (prefix `-` for\ndescending). Records also take `filter[<api_key>]=value`,\n`filter[status]` and `expand=<relation fields>`.\n\n## Errors\n\nErrors share one envelope: `{ \"error\": { \"type\", \"message\",\n\"request_id\", \"details\" } }`. `details` lists field-level problems as\n`{ \"field\", \"code\", \"message\" }`. Include the `request_id` when asking\nfor support.\n\n## Safe retries and concurrent edits\n\nSend `Idempotency-Key` on any `POST`, `PATCH` or `DELETE` to make retrying\nit safe: the first result is stored for 24 hours and returned again for\nthe same request. Record responses carry the record's revision as an\n`ETag`; send it back as `If-Match` to update only if nobody changed the\nrecord in the meantime (`412` otherwise).\n\n## History\n\nEvery change to a record is a revision, attributed to the person or API\nkey that made it: record revisions can be listed, diffed and reverted,\nand collections keep a schema history. Send `Nohead-Change-Note` to\nrecord why a change was made. Changes that rewrite existing values\n(such as a field's type) are explicit, previewable field migrations.\n\nHow long revisions are kept depends on the organization's plan. Older\nones are removed, but every record keeps its first revision and its\nlast 10; `history_pruned_through` says how far history was removed.\n",
+    "description": "The Nohead API manages projects, collections (your data models), their\nfields, and records (your content), with full version history.\n\n## Authentication\n\nSend `Authorization: Bearer <token>`. Servers, CI and agents use a\nproject API key (`sk_live_...`, created in the web app under API keys)\nwith scopes such as `records:read` or `schema:write`. Organization,\nproject, member and API key management need a person signed in to the\nweb app and are not available to API keys.\n\n## Resources and IDs\n\nEvery object has an opaque, prefixed `id` (`col_`, `fld_`, `rec_`, ...)\nand an `object` type. Record values live under `data`, keyed by each\nfield's `api_key`. Timestamps are ISO 8601 in UTC. Deletes are soft and\ncan be undone.\n\n## Lists\n\nLists return `{ \"data\": [...], \"meta\": { \"next_cursor\", \"has_more\" } }`.\nPass `limit` (1-100) and `cursor` to page, and `sort` (prefix `-` for\ndescending). Read on while `has_more` is true: a page can hold fewer\nthan `limit` items, even none. Records also take `filter[<api_key>]=value`,\n`filter[status]` and `expand=<relation fields>`.\n\n## Errors\n\nErrors share one envelope: `{ \"error\": { \"type\", \"message\",\n\"request_id\", \"details\" } }`. `details` lists field-level problems as\n`{ \"field\", \"code\", \"message\" }`. Include the `request_id` when asking\nfor support.\n\n## Safe retries and concurrent edits\n\nSend `Idempotency-Key` on any `POST`, `PATCH` or `DELETE` to make retrying\nit safe: the first result is stored for 24 hours and returned again for\nthe same request. Record responses carry the record's revision as an\n`ETag`; send it back as `If-Match` to update only if nobody changed the\nrecord in the meantime (`412` otherwise).\n\n## History\n\nEvery change to a record is a revision, attributed to the person or API\nkey that made it: record revisions can be listed, diffed and reverted,\nand collections keep a schema history. Send `Nohead-Change-Note` to\nrecord why a change was made. Changes that rewrite existing values\n(such as a field's type) are explicit, previewable field migrations.\n\nHow long revisions are kept depends on the organization's plan. Older\nones are removed, but every record keeps its first revision and its\nlast 10; `history_pruned_through` says how far history was removed.\n",
     "license": {
       "name": "Proprietary",
       "identifier": "LicenseRef-Proprietary"
@@ -2288,7 +2288,7 @@
       "get": {
         "operationId": "assets_list",
         "summary": "List assets",
-        "description": "The project's assets, newest first. `deleted=true` lists deleted ones instead.\n`content_type` lists only assets of those types, for example the ones an\nasset field accepts (its `accepted_types`).\n",
+        "description": "The project's assets, newest first. `deleted=true` lists deleted ones instead.\n`content_type` lists only assets of those types, for example the ones an\nasset field accepts (its `accepted_types`). Published-only API keys see\nonly assets that published records use, and get pages that can be short\n(or empty) while `has_more` is true.\n",
         "tags": [
           "assets"
         ],
@@ -2517,7 +2517,7 @@
       "post": {
         "operationId": "assets_complete",
         "summary": "Complete an upload",
-        "description": "Step 2 of uploading a file: verifies the uploaded file (it exists, with the\ndeclared size and content type), reads image dimensions and marks the asset\n`ready`. Only ready assets can be used in records. Safe to retry: a ready\nasset is returned unchanged. `422 upload_missing` means the file has not\nbeen uploaded yet; `422 upload_mismatch` means it differed from what was\ndeclared, and the asset is marked `failed`.\n",
+        "description": "Step 2 of uploading a file: verifies the uploaded file (it exists, with the\ndeclared size and content type), reads image dimensions and marks the asset\n`ready`. Only ready assets can be used in records. Safe to retry: a ready\nasset is returned unchanged. `422 upload_missing` means the file has not\nbeen uploaded yet; `422 upload_mismatch` means it differed from what was\ndeclared, and the asset is marked `failed`. `409` if the file was uploaded\nagain while it was being checked: complete it again.\n",
         "tags": [
           "assets"
         ],
@@ -2576,7 +2576,7 @@
       "get": {
         "operationId": "assets_image_url",
         "summary": "Get an image URL",
-        "description": "A signed URL for a transformed rendition of a ready image asset\n(JPEG, PNG, GIF, WebP or AVIF). The same asset and options always give\nthe same URL, so it can be cached and embedded; it does not expire.\nOnly these options can be requested, so nobody can generate other\ntransformations. Without options it serves the original size.\n",
+        "description": "A signed URL for a transformed rendition of a ready image asset\n(JPEG, PNG, GIF, WebP or AVIF). The same asset and options always give\nthe same URL, so it can be cached and embedded; it does not expire.\nOnly these options can be requested, so nobody can generate other\ntransformations. Without options it serves the original size. Width and\nheight round up to the next of 16, 32, 48, 64, 96, 128, 160, 192, 256,\n320, 384, 480, 512, 640, 768, 800, 960, 1024, 1200, 1280, 1536, 1600,\n1920, 2048, 2560, 3072, 3840 and 4096, and quality to a multiple of 10:\nthe response says what was signed.\n",
         "tags": [
           "assets"
         ],
@@ -2685,7 +2685,7 @@
       "get": {
         "operationId": "assets_download_url",
         "summary": "Get a download URL",
-        "description": "A short-lived URL (15 minutes) that downloads the original file under its filename.",
+        "description": "A short-lived URL (2 minutes) that downloads the original file under its\nfilename: ask for it when the download starts, not ahead of time. A\ndownload that has started finishes however long it takes. Limited to a\nfew per file and client IP (`429`).\n",
         "tags": [
           "assets"
         ],
@@ -2914,7 +2914,7 @@
       "post": {
         "operationId": "search_index_rebuild",
         "summary": "Rebuild the search index",
-        "description": "Rebuilds the collection's index from its records in the background.\nSearch keeps working with the current index until the new one is ready.\nRarely needed: indexes follow record and schema changes automatically.\n",
+        "description": "Rebuilds the collection's index from its records in the background.\nSearch keeps working with the current index until the new one is ready.\nRarely needed: indexes follow record and schema changes automatically.\nLimited to a few an hour per collection and per organization (`429`).\n",
         "tags": [
           "search"
         ],
@@ -3642,7 +3642,7 @@
       "post": {
         "operationId": "api_keys_create",
         "summary": "Create an API key",
-        "description": "Returns the token exactly once. Store it securely.",
+        "description": "Returns the token exactly once. Store it securely. A project has at most 25 usable keys (`409` past that; revoke one first).",
         "tags": [
           "api-keys"
         ],
@@ -4190,7 +4190,7 @@
       "post": {
         "operationId": "organizations_create",
         "summary": "Create an organization",
-        "description": "Creates an organization with the current user as its owner.",
+        "description": "Creates an organization on the Free plan, with the current user as its owner.\nOne person owns at most 2 Free organizations, counting those scheduled for\ndeletion until they are purged: past that, `409` with the detail code\n`free_organization_limit`. Paid organizations don't count.\n",
         "tags": [
           "organizations"
         ],
@@ -5756,8 +5756,8 @@
       "session": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "nohead_session",
-        "description": "A person signed in to the web app: the httpOnly cookie its sign-in\nsets, accepted only on requests from the web app's origin. Servers,\nCI, the CLI and agents use an API key.\n"
+        "name": "__Host-nohead_session",
+        "description": "A person signed in to the web app: the httpOnly cookie its sign-in\nsets, accepted only on requests from the web app's origin (named\n`nohead_session` over plain http, in local development). Servers,\nCI, the CLI and agents use an API key.\n"
       }
     },
     "parameters": {
@@ -6157,7 +6157,8 @@
             "description": "Opaque cursor for the next page, or null on the last page."
           },
           "has_more": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Whether another page follows. A page can hold fewer than `limit` items, even none, while this is true."
           }
         }
       },
@@ -10317,7 +10318,7 @@
         }
       },
       "RateLimited": {
-        "description": "Too many requests for this API key or user (or, with failing\ncredentials, this IP address). Wait `Retry-After` seconds; retries with\nthe same `Idempotency-Key` are safe.\n",
+        "description": "Too many requests for this API key or user (or, with failing\ncredentials, this IP address). A published-only key is counted per\nclient IP, and all of an organization's keys together are limited too.\nWait `Retry-After` seconds; retries with the same `Idempotency-Key`\nare safe.\n",
         "headers": {
           "X-Request-Id": {
             "$ref": "#/components/headers/RequestId"
