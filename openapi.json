@@ -4190,7 +4190,7 @@
       "post": {
         "operationId": "organizations_create",
         "summary": "Create an organization",
-        "description": "Creates an organization with the current user as its owner.",
+        "description": "Creates an organization on the Free plan, with the current user as its owner.\nOne person owns at most 2 Free organizations, counting those scheduled for\ndeletion until they are purged: past that, `409` with the detail code\n`free_organization_limit`. Paid organizations don't count.\n",
         "tags": [
           "organizations"
         ],
