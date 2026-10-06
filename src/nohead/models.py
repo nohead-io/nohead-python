@@ -108,10 +108,11 @@ class Invitation(NoheadModel):
     invited_by: InvitationInvitedBy
     email_delivery: InvitationEmailDelivery | None
     """What became of the invitation email, or null while it has not been sent (or when sending
-    is off). `sent`: accepted for delivery. `not_sent`: the address had bounced or been
-    marked as spam before, so no email went out. `bounced`: the email could not be
-    delivered; check the address. `complained`: the invitee marked it as spam. Either way
-    the invitation still works when the invitee signs in with the address.
+    is off). `sent`: accepted for delivery. `not_sent`: no email went out, because the
+    address had bounced or been marked as spam before, or had already received several
+    invitation emails that day. `bounced`: the email could not be delivered; check the
+    address. `complained`: the invitee marked it as spam. Either way the invitation still
+    works when the invitee signs in with the address.
     """
     expires_at: Timestamp
     responded_at: NullableTimestamp
@@ -332,6 +333,9 @@ class Actor(NoheadModel):
     id: str | None
     """The user (`usr_...`) or API key (`key_...`), or null for system changes."""
     name: str | None
+    """Resolved when read, never stored: a user's current name (or email), "Deleted user" once
+    they deleted their account, an API key's name, or "System".
+    """
 
 
 class SchemaChangeProperties(NoheadModel):
@@ -616,6 +620,20 @@ class FeatureFlags(NoheadModel):
     """Flag name to enabled, for every registered flag the caller may see."""
 
 
+class AccountDeletionCode(NoheadModel):
+    object: str
+    email: str
+    """Where the code was sent."""
+    expires_at: datetime
+
+
+class AccountDeletion(NoheadModel):
+    object: str
+    user_id: str
+    """The deleted user, as history still refers to it."""
+    deleted_at: datetime
+
+
 class PrincipalUser(NoheadModel):
     id: str
     email: str
@@ -801,6 +819,28 @@ class Usage(NoheadModel):
     period: UsagePeriod
     """The current period; `end` is exclusive."""
     metrics: list[UsageMetric]
+    retention: UsageRetention
+
+
+class UsageRetention(NoheadModel):
+    """How long the plan keeps record revisions (beyond each record's first and latest 10) and
+    audit events, in days; null keeps everything.
+    """
+
+    revision_days: int | None
+    audit_days: int | None
+    grace: UsageRetentionGrace | None
+    """After a downgrade, the previous plan's longer retention still applies for 30 days;
+    history past the plan's retention is removed after `ends_at`. Null otherwise.
+    """
+
+
+class UsageRetentionGrace(NoheadModel):
+    ends_at: datetime
+    revision_days: int | None
+    """Days of revisions kept until `ends_at`; null keeps everything."""
+    audit_days: int | None
+    """Days of audit events kept until `ends_at`."""
 
 
 class UsageMetricDaily(NoheadModel):
