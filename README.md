@@ -324,7 +324,7 @@ The smoke test (`smoke/smoke.py`) runs the core flow against a real API, with bo
 ```bash
 uv build
 NOHEAD_API_URL=http://localhost:3000 NOHEAD_API_KEY=sk_live_... \
-  uv run --isolated --no-project --with dist/nohead-0.1.0-py3-none-any.whl python smoke/smoke.py
+  uv run --isolated --no-project --with dist/nohead-0.2.0-py3-none-any.whl python smoke/smoke.py
 ```
 
 ## Releasing

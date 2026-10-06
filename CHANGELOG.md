@@ -5,6 +5,11 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## 0.2.0
+
+- Types follow the API's current contract. They add types only for
+  operations an API key can't call, so no method changed.
+
 ## 0.1.0
 
 The first release.
