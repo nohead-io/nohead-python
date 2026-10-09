@@ -186,7 +186,8 @@ class Generator:
         ):
             self.add_class(name, schema)
             return
-        target = self.type_of(schema, name)
+        # An object inside the alias (a oneOf variant) needs a name of its own.
+        target = self.type_of(schema, name + "Object")
         self.aliases[name] = (target, set(re.findall(r"[A-Za-z_]\w*", target)))
 
     def render(self, imports: str) -> str:

@@ -182,7 +182,7 @@ class ProjectList(NoheadModel):
     meta: ListMeta
 
 
-class RecordFilterValue(NoheadModel):
+class RecordFilterValueObject(NoheadModel):
     eq: str | None = None
     ne: str | None = None
     gt: str | None = None
@@ -1157,7 +1157,7 @@ Timestamp: TypeAlias = datetime
 NullableTimestamp: TypeAlias = datetime | None
 Role: TypeAlias = str
 Permission: TypeAlias = str
-RecordFilterValue: TypeAlias = str | RecordFilterValue
+RecordFilterValue: TypeAlias = str | RecordFilterValueObject
 FieldType: TypeAlias = str
 SchemaChange: TypeAlias = SchemaChangeProperties
 Via: TypeAlias = str
