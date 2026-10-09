@@ -120,34 +120,21 @@
         ],
         "parameters": [
           {
-            "name": "filter",
-            "in": "query",
-            "style": "deepObject",
-            "explode": true,
-            "description": "Equality filters: `filter[status]=published`, `filter[deleted]=true`,\nand `filter[<field api_key>]=value` for scalar field types (for\nmultiple-value fields: \"contains value\").\n",
-            "schema": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            }
+            "$ref": "#/components/parameters/RecordFilter"
           },
           {
             "name": "sort",
             "in": "query",
+            "description": "`id`, `created_at`, `updated_at`, `published_at` (unpublished\nrecords first), or the API key of a text, number, boolean, date or\nenum field with one value (records without a value last, in both\ndirections; text by code point). `-` for descending.\n",
             "schema": {
               "type": "string",
-              "enum": [
-                "created_at",
-                "-created_at",
-                "updated_at",
-                "-updated_at",
-                "published_at",
+              "pattern": "^-?[a-z][a-z0-9_]*$",
+              "default": "-created_at",
+              "examples": [
                 "-published_at",
-                "id",
-                "-id"
-              ],
-              "default": "-created_at"
+                "title",
+                "-published_on"
+              ]
             }
           },
           {
@@ -1022,17 +1009,7 @@
         ],
         "parameters": [
           {
-            "name": "filter",
-            "in": "query",
-            "style": "deepObject",
-            "explode": true,
-            "description": "The list's filters (`filter[status]`, `filter[deleted]`, `filter[<field api_key>]`).",
-            "schema": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            }
+            "$ref": "#/components/parameters/RecordFilter"
           }
         ],
         "responses": {
@@ -2883,7 +2860,7 @@
       "get": {
         "operationId": "collections_search",
         "summary": "Search records",
-        "description": "Full-text search in a collection, ranked by relevance (or `sort`).\nWith an API key, the collection must be `search_enabled` and the words\nmatch its `searchable` fields only; members in the web app search any\ncollection, on all its text fields. Equality filters work on `status`\nand on fields marked `filterable`; `sort` on `created_at`, `updated_at`,\n`published_at` and fields marked `sortable` (`-` for descending).\nResults are the current records; changes appear within seconds. At\nmost the first 1,000 hits can be paged through. `expand` embeds related\nrecords and assets as in the records list. `409` when search is not\nenabled for API keys, while a new collection's index is first built,\nand when filtering or sorting on a field newly made `filterable` or\n`sortable` until the rebuild that adds it has run (detail code\n`rebuilding`; the index status is `stale` meanwhile).\n",
+        "description": "Full-text search in a collection, ranked by relevance (or `sort`).\nWith an API key, the collection must be `search_enabled` and the words\nmatch its `searchable` fields only; members in the web app search any\ncollection, on all its text fields. Filters work as in the records list,\non `status` and on fields marked `filterable` (not on `deleted` or the\ntimestamps); `sort` on `created_at`, `updated_at`, `published_at` and\nfields marked `sortable` (`-` for descending).\nResults are the current records; changes appear within seconds. At\nmost the first 1,000 hits can be paged through. `expand` embeds related\nrecords and assets as in the records list. `409` when search is not\nenabled for API keys, while a new collection's index is first built,\nand when filtering or sorting on a field newly made `filterable` or\n`sortable` until the rebuild that adds it has run (detail code\n`rebuilding`; the index status is `stale` meanwhile).\n",
         "tags": [
           "search"
         ],
@@ -2903,16 +2880,7 @@
             "$ref": "#/components/parameters/Cursor"
           },
           {
-            "name": "filter",
-            "in": "query",
-            "style": "deepObject",
-            "explode": true,
-            "schema": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "string"
-              }
-            }
+            "$ref": "#/components/parameters/RecordFilter"
           },
           {
             "name": "sort",
@@ -5910,6 +5878,41 @@
         },
         "example": "author,tags"
       },
+      "RecordFilter": {
+        "name": "filter",
+        "in": "query",
+        "style": "deepObject",
+        "explode": true,
+        "description": "`filter[<key>]=value` (equal), or `filter[<key>][<operator>]=value`;\nfilters combine with AND. Keys are field API keys, `status`,\n`deleted` (`true` lists soft-deleted records instead) and, in record\nlists and counts, `created_at`, `updated_at` and `published_at`.\n\n- `eq`, `ne`: equal, not equal. For fields with several values,\n  \"contains\" and \"does not contain\". `ne` matches records with no value.\n- `gt`, `gte`, `lt`, `lte`: integer, decimal and date fields with one\n  value, and the timestamps.\n- `in`: any of up to 100 comma-separated values (`\\,` is a comma\n  inside a value, `\\\\` a backslash); for fields with several values,\n  \"contains any of\".\n- `exists`: `true` for records with a value, `false` for those without\n  (and `published_at`: ever published).\n\nValues are parsed per field type (`\"5\"` is not the integer 5), but\nnot held to the field's limits (`price[lt]=10` works when `max` is 5). Dates\ntake `today`, and dates with a time `now` too. A day (`YYYY-MM-DD`)\ngiven for a date with a time, or a timestamp, covers that day in the\nfield's `time_zone` (UTC without one): `gte` from its start, `lte` to\nits end, `eq` within it. A date with a time matches the same moment\nwritten with any offset.\n",
+        "schema": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/components/schemas/RecordFilterValue"
+          }
+        },
+        "examples": {
+          "upcoming": {
+            "summary": "Events from today on",
+            "value": {
+              "starts_on": {
+                "gte": "today"
+              }
+            }
+          },
+          "cheap": {
+            "summary": "Published products under 50 in two categories",
+            "value": {
+              "status": "published",
+              "price": {
+                "lt": "50"
+              },
+              "category": {
+                "in": "shoes,bags"
+              }
+            }
+          }
+        }
+      },
       "AuditEventFilter": {
         "name": "filter",
         "in": "query",
@@ -6731,6 +6734,50 @@
             "$ref": "#/components/schemas/ListMeta"
           }
         }
+      },
+      "RecordFilterValue": {
+        "description": "A value to equal, or operators with their values (see the `filter` parameter).",
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "minProperties": 1,
+            "properties": {
+              "eq": {
+                "type": "string"
+              },
+              "ne": {
+                "type": "string"
+              },
+              "gt": {
+                "type": "string"
+              },
+              "gte": {
+                "type": "string"
+              },
+              "lt": {
+                "type": "string"
+              },
+              "lte": {
+                "type": "string"
+              },
+              "in": {
+                "type": "string",
+                "description": "Comma-separated; `\\,` is a comma inside a value."
+              },
+              "exists": {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "false"
+                ]
+              }
+            }
+          }
+        ]
       },
       "FieldType": {
         "type": "string",
