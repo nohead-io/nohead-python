@@ -41,6 +41,9 @@ class FieldCreate(TypedDict):
     api_key: str
     type: FieldType
     required: NotRequired[bool]
+    """Every record must have a value. Not available for boolean fields (a boolean is true or
+    false; no value reads as false).
+    """
     multiple: NotRequired[bool]
     """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
     string with `blank_value`). Not available for boolean, long_text, rich_text and json
@@ -83,6 +86,9 @@ class FieldUpdate(TypedDict):
     api_key: NotRequired[str]
     type: NotRequired[FieldType]
     required: NotRequired[bool]
+    """Every record must have a value. Not available for boolean fields (a boolean is true or
+    false; no value reads as false).
+    """
     multiple: NotRequired[bool]
     """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
     string with `blank_value`). Not available for boolean, long_text, rich_text and json

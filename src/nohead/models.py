@@ -210,6 +210,9 @@ class Field(NoheadModel):
     """Key used in record data. Part of the API contract."""
     type: FieldType
     required: bool
+    """Every record must have a value. Not available for boolean fields (a boolean is true or
+    false; no value reads as false).
+    """
     multiple: bool
     """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
     string with `blank_value`). Not available for boolean, long_text, rich_text and json
@@ -266,6 +269,9 @@ class FieldCreate(NoheadModel):
     api_key: str
     type: FieldType
     required: bool | None = None
+    """Every record must have a value. Not available for boolean fields (a boolean is true or
+    false; no value reads as false).
+    """
     multiple: bool | None = None
     """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
     string with `blank_value`). Not available for boolean, long_text, rich_text and json
@@ -279,6 +285,9 @@ class FieldUpdate(NoheadModel):
     api_key: str | None = None
     type: FieldType | None = None
     required: bool | None = None
+    """Every record must have a value. Not available for boolean fields (a boolean is true or
+    false; no value reads as false).
+    """
     multiple: bool | None = None
     """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
     string with `blank_value`). Not available for boolean, long_text, rich_text and json

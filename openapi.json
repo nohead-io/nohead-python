@@ -6841,7 +6841,8 @@
             "$ref": "#/components/schemas/FieldType"
           },
           "required": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Every record must have a value. Not available for boolean fields (a boolean is true or false; no value reads as false)."
           },
           "multiple": {
             "type": "boolean",
@@ -6924,7 +6925,8 @@
             "$ref": "#/components/schemas/FieldType"
           },
           "required": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Every record must have a value. Not available for boolean fields (a boolean is true or false; no value reads as false)."
           },
           "multiple": {
             "type": "boolean",
@@ -6948,7 +6950,8 @@
             "$ref": "#/components/schemas/FieldType"
           },
           "required": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Every record must have a value. Not available for boolean fields (a boolean is true or false; no value reads as false)."
           },
           "multiple": {
             "type": "boolean",
