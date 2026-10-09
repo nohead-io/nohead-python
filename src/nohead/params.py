@@ -46,7 +46,6 @@ class FieldCreate(TypedDict):
     string with `blank_value`). Not available for boolean, long_text, rich_text and json
     fields.
     """
-    position: NotRequired[int]
     configuration: NotRequired[dict[str, Any]]
 
 
@@ -89,7 +88,6 @@ class FieldUpdate(TypedDict):
     string with `blank_value`). Not available for boolean, long_text, rich_text and json
     fields.
     """
-    position: NotRequired[int]
     configuration: NotRequired[dict[str, Any]]
 
 

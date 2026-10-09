@@ -1604,7 +1604,7 @@
       "get": {
         "operationId": "fields_list",
         "summary": "List fields",
-        "description": "The collection's fields. With `deleted=true`, its deleted fields; published-only API keys get `403` for those.",
+        "description": "The collection's fields, in position order (the record editor's). With `deleted=true`, its deleted fields, in the order they were created; published-only API keys get `403` for those.",
         "tags": [
           "fields"
         ],
@@ -6848,7 +6848,8 @@
             "description": "A list of distinct values (a repeated value is refused with `duplicate_value`, an empty string with `blank_value`). Not available for boolean, long_text, rich_text and json fields."
           },
           "position": {
-            "type": "integer"
+            "type": "integer",
+            "description": "Where the field sorts in the collection's order, lowest first. New fields are added last; `POST /v1/collections/{collection_id}/fields/reorder` changes the order, numbering the fields from 0."
           },
           "configuration": {
             "type": "object",
@@ -6929,9 +6930,6 @@
             "type": "boolean",
             "description": "A list of distinct values (a repeated value is refused with `duplicate_value`, an empty string with `blank_value`). Not available for boolean, long_text, rich_text and json fields."
           },
-          "position": {
-            "type": "integer"
-          },
           "configuration": {
             "type": "object"
           }
@@ -6955,9 +6953,6 @@
           "multiple": {
             "type": "boolean",
             "description": "A list of distinct values (a repeated value is refused with `duplicate_value`, an empty string with `blank_value`). Not available for boolean, long_text, rich_text and json fields."
-          },
-          "position": {
-            "type": "integer"
           },
           "configuration": {
             "type": "object"
