@@ -238,15 +238,15 @@ class Field(NoheadModel):
     rewrites values; turning `include_time` on or off does, through a field migration. Text
     fields (not long text) can have a `format`: `email`, `url` (an absolute `http` or
     `https` address) or `slug` (lowercase letters, digits and single hyphens, at most 200
-    characters; one value per record, never a list). A value that doesn't match is refused
-    with `invalid_format`. A format sets its own length limits (254 characters for emails,
-    2,048 for URLs), so `min_length` and `max_length` are for plain text. Text and integer
-    fields with one value can be `unique`: no two active records of the collection share a
-    value (emails compare ignoring capitals; records without a value don't count). A taken
-    value is refused with `taken` and the `record_id` that has it. Turning `unique` on is
-    refused with `duplicate_values` while records share a value (and so is restoring a
-    deleted unique field, `409`). A field migration can't keep or turn on `unique`: migrate
-    without it, then turn it on again.
+    characters; one value per record, never a list, and always unique: a slug field has
+    `unique: true`). A value that doesn't match is refused with `invalid_format`. A format
+    sets its own length limits (254 characters for emails, 2,048 for URLs), so `min_length`
+    and `max_length` are for plain text. Text and integer fields with one value can be
+    `unique`: no two active records of the collection share a value (emails compare ignoring
+    capitals; records without a value don't count). A taken value is refused with `taken`
+    and the `record_id` that has it. Turning `unique` on is refused with `duplicate_values`
+    while records share a value (and so is restoring a deleted unique field, `409`). A field
+    migration can't keep or turn on `unique`: migrate without it, then turn it on again.
     """
     deleted: bool
     aliases: list[FieldAliases]
