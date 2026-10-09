@@ -14,12 +14,18 @@ section is its GitHub release's notes.
 - Boolean fields can't be `required`: a boolean is true or false, and no
   value reads as false.
 - Text fields take a `format` (`email`, `url`, `slug`; slugs are always
-  unique) and text and integer fields `unique`; a taken value's error detail has the `record_id` that has
-  it (`code: "taken"`).
+  unique) and text and integer fields `unique`; a taken value's error detail
+  has the `record_id` that has it (`code: "taken"`).
 - Filters take operators: `{"price": {"lt": 50}}`, with `eq`, `ne`, `gt`,
   `gte`, `lt`, `lte`, `in` (a list) and `exists`, and record lists sort by a
   field's value (`RecordSort` is now any string). Commas and backslashes in
   list values are escaped, so a value can hold a comma.
+- Date filters take `today`, and dates with a time `now`.
+- `assets.usage()`: where an asset is used, as counts of the records that use
+  it (and of those, the published ones) and the 10 most recently updated with
+  the fields that use it. Needs the `records:read` scope too.
+- `assets.purge()`: permanently deletes a deleted asset now, instead of 30
+  days after the delete, and frees its storage.
 
 ## 0.2.0
 

@@ -119,7 +119,7 @@ nohead.records.list("posts", cursor=saved_cursor)
 
 With `AsyncNohead`, `await nohead.records.list(...)` gives the first page and `async for` walks them all.
 
-Filters take a value to equal, or operators: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in` (a list) and `exists`. They combine with AND. On fields with several values, equal means "contains". Values are strings, numbers, booleans, `datetime`s (for date fields with a time) and `date`s (for plain date fields, sent as `YYYY-MM-DD`); dates take `"today"` too. Lists sort by a field as well, with records that have no value last:
+Filters take a value to equal, or operators: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in` (a list) and `exists`. They combine with AND. On fields with several values, equal means "contains". Values are strings, numbers, booleans, `datetime`s (for date fields with a time) and `date`s (for plain date fields, sent as `YYYY-MM-DD`); dates take `"today"` too, and dates with a time `"now"`. Lists sort by a field as well, with records that have no value last:
 
 ```python
 nohead.records.list(
