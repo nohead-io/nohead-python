@@ -9,7 +9,7 @@ from typing_extensions import Unpack
 from ..._errors import UploadError
 from ..._pagination import Page
 from ..._uploads import Uploadable, open_upload
-from ...models import Asset, AssetUpload, DownloadUrl, ImageUrl
+from ...models import Asset, AssetUpload, AssetUsage, DownloadUrl, ImageUrl
 from ...params import AssetUploadCreate
 from ._resource import Resource
 
@@ -96,7 +96,8 @@ class Assets(Resource):
         return self._client.request("assets_get", cast=Asset, path={"asset_id": asset})
 
     def delete(self, asset: str, *, idempotency_key: str | None = None) -> Asset:
-        """Soft-deletes the asset; the file is purged after 30 days."""
+        """Soft-deletes the asset; the file is purged after 30 days (or sooner with
+        `purge`)."""
         return self._client.request(
             "assets_delete",
             cast=Asset,
@@ -111,6 +112,23 @@ class Assets(Resource):
             path={"asset_id": asset},
             idempotency_key=idempotency_key,
         )
+
+    def purge(self, asset: str, *, idempotency_key: str | None = None) -> Asset:
+        """Permanently deletes a deleted asset now, instead of 30 days after the delete,
+        and returns it as it was. It can't be restored; records that reference it keep
+        the ID. Raises ConflictError if the asset isn't deleted: delete it first."""
+        return self._client.request(
+            "assets_purge",
+            cast=Asset,
+            path={"asset_id": asset},
+            idempotency_key=idempotency_key,
+        )
+
+    def usage(self, asset: str) -> AssetUsage:
+        """Where the asset is used: how many undeleted records use it (`records`), how
+        many of them are published (`published`), and the 10 most recently updated with
+        the fields they use it in (`uses`). Needs the `records:read` scope too."""
+        return self._client.request("assets_usage", cast=AssetUsage, path={"asset_id": asset})
 
     def image_url(
         self,

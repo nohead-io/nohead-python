@@ -216,6 +216,8 @@ url = nohead.assets.image_url(asset.id, width=1200, format="webp").url
 
 **Uploading from a browser:** create the upload on your server with `create_upload`, `PUT` the file from the browser, then `complete` it.
 
+**Deleting:** `usage` shows which records use an asset. `delete` keeps the file for 30 days, during which `restore` undoes it; `purge` removes a deleted asset for good, now.
+
 ## Search
 
 ```python
@@ -289,7 +291,7 @@ It's also available as `nohead.webhooks.unwrap(...)` on a client. Events can arr
 | `collections.search_index` | `get`, `rebuild` |
 | `fields` | `list`, `create`, `update`, `delete`, `restore`, `reorder`, `remove_alias`, `migrate` |
 | `migrations` | `list`, `get`, `cancel` |
-| `assets` | `upload`, `create_upload`, `complete`, `list`, `get`, `delete`, `restore`, `image_url`, `download_url` |
+| `assets` | `upload`, `create_upload`, `complete`, `list`, `get`, `usage`, `delete`, `restore`, `purge`, `image_url`, `download_url` |
 | `webhooks` | `list`, `get`, `create`, `update`, `delete`, `rotate_secret`, `test`, `unwrap` |
 | `webhooks.deliveries` | `list`, `get`, `retry` |
 | `audit_events` | `list` |

@@ -199,8 +199,9 @@ class Field(NoheadModel):
     type: FieldType
     required: bool
     multiple: bool
-    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
-    available for boolean, rich_text and json fields.
+    """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
+    string with `blank_value`). Not available for boolean, long_text, rich_text and json
+    fields.
     """
     position: int
     configuration: dict[str, Any]
@@ -232,8 +233,9 @@ class FieldCreate(NoheadModel):
     type: FieldType
     required: bool | None = None
     multiple: bool | None = None
-    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
-    available for boolean, rich_text and json fields.
+    """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
+    string with `blank_value`). Not available for boolean, long_text, rich_text and json
+    fields.
     """
     position: int | None = None
     configuration: dict[str, Any] | None = None
@@ -245,8 +247,9 @@ class FieldUpdate(NoheadModel):
     type: FieldType | None = None
     required: bool | None = None
     multiple: bool | None = None
-    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
-    available for boolean, rich_text and json fields.
+    """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
+    string with `blank_value`). Not available for boolean, long_text, rich_text and json
+    fields.
     """
     position: int | None = None
     configuration: dict[str, Any] | None = None
@@ -369,8 +372,9 @@ class FieldDefinition(NoheadModel):
     type: FieldType
     configuration: dict[str, Any]
     multiple: bool
-    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
-    available for boolean, rich_text and json fields.
+    """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
+    string with `blank_value`). Not available for boolean, long_text, rich_text and json
+    fields.
     """
     required: bool
 
@@ -384,13 +388,14 @@ class FieldMigrationRequest(NoheadModel):
     `description` carries over.
     """
     multiple: bool | None = None
-    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
-    available for boolean, rich_text and json fields.
+    """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
+    string with `blank_value`). Not available for boolean, long_text, rich_text and json
+    fields.
     """
     required: bool | None = None
     backfill: Any = None
     """Value for active records that have no value, validated like a record value of the new
-    definition.
+    definition; an empty string is refused with `blank_value`.
     """
     on_invalid: str | None = None
     """`clear` removes values that cannot be converted (or backfills them); `fail` refuses the
@@ -518,10 +523,12 @@ class Record(NoheadModel):
     deleted: bool
     data: RecordData
     expanded: dict[str, Record | Asset | list[Record | Asset] | None] | None = None
-    """Only with `expand`: what each requested relation or asset field points at, keyed by
-    field API key: records for relation fields, assets for asset fields. A single value is
-    the object, or null when it no longer exists; a multiple value is a list of those that
-    still exist. Expanded records are not expanded further.
+    """Only with `expand`: what each requested relation, asset or rich text field points at,
+    keyed by field API key: records for relation fields, assets for asset fields. A single
+    value is the object, or null when it no longer exists; a multiple value is a list of
+    those that still exist. For a rich text field, the list of assets its images show, in
+    document order, leaving out those that no longer exist. Expanded records are not
+    expanded further.
     """
     created_at: Timestamp
     updated_at: Timestamp
@@ -992,8 +999,8 @@ class Asset(NoheadModel):
     """`pending` until the upload is completed; only `ready` assets can be used in records."""
     deleted: bool
     preview_url: str | None
-    """A signed URL of a small rendition (fits in 640×640, WebP), for ready images; null
-    otherwise.
+    """A signed URL of a small rendition (fits in 640×640, WebP), for ready images, deleted
+    ones included until they are purged; null otherwise.
     """
     uploaded_at: NullableTimestamp
     created_at: Timestamp
@@ -1014,6 +1021,23 @@ class ImageUrl(NoheadModel):
     fit: str
     format: str
     quality: int | None
+
+
+class AssetUsageUses(NoheadModel):
+    record: Record
+    fields: list[str]
+    """API keys of the record's fields that use the asset."""
+
+
+class AssetUsage(NoheadModel):
+    object: str
+    asset_id: str
+    records: int
+    """Undeleted records that use the asset."""
+    published: int
+    """Of those, the published ones (what sites show)."""
+    uses: list[AssetUsageUses]
+    """The most recently updated records that use the asset."""
 
 
 class DownloadUrl(NoheadModel):

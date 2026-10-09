@@ -42,8 +42,9 @@ class FieldCreate(TypedDict):
     type: FieldType
     required: NotRequired[bool]
     multiple: NotRequired[bool]
-    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
-    available for boolean, rich_text and json fields.
+    """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
+    string with `blank_value`). Not available for boolean, long_text, rich_text and json
+    fields.
     """
     position: NotRequired[int]
     configuration: NotRequired[dict[str, Any]]
@@ -58,13 +59,14 @@ class FieldMigrationRequest(TypedDict):
     `description` carries over.
     """
     multiple: NotRequired[bool]
-    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
-    available for boolean, rich_text and json fields.
+    """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
+    string with `blank_value`). Not available for boolean, long_text, rich_text and json
+    fields.
     """
     required: NotRequired[bool]
     backfill: NotRequired[Any]
     """Value for active records that have no value, validated like a record value of the new
-    definition.
+    definition; an empty string is refused with `blank_value`.
     """
     on_invalid: NotRequired[Literal["fail", "clear"]]
     """`clear` removes values that cannot be converted (or backfills them); `fail` refuses the
@@ -78,8 +80,9 @@ class FieldUpdate(TypedDict):
     type: NotRequired[FieldType]
     required: NotRequired[bool]
     multiple: NotRequired[bool]
-    """A list of distinct values (a repeated value is refused with `duplicate_value`). Not
-    available for boolean, rich_text and json fields.
+    """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
+    string with `blank_value`). Not available for boolean, long_text, rich_text and json
+    fields.
     """
     position: NotRequired[int]
     configuration: NotRequired[dict[str, Any]]
