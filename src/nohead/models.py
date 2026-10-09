@@ -227,20 +227,20 @@ class Field(NoheadModel):
     """Type-specific options, e.g. `max_length`, `options`, `target_collection_id`,
     `accepted_types` (asset fields: MIME types or `type/*` wildcards that newly written
     values must have; any file when absent), `include_time` and `time_zone` (date fields,
-    below), `format`, `relative`, `unique` and `source_field` (text fields, below), plus the
-    options for searches with API keys: `searchable` (the search words match the field;
-    default true for text, long_text, rich_text and enum), `filterable` and `sortable`
-    (default false). Date fields hold a calendar date, `YYYY-MM-DD`, with no time and no
-    time zone: returned exactly as written, so it never shows as the day before or after.
-    With `include_time: true` they hold a moment: ISO 8601 with an offset, stored in UTC and
-    returned in UTC, or with the offset of `time_zone` (an IANA name such as
-    `Europe/Copenhagen`, daylight saving included) when the field has one. Input may use any
-    offset. Changing `time_zone` never rewrites values; turning `include_time` on or off
-    does, through a field migration. Text fields (not long text) can have a `format`:
-    `email`, `url` (`http` or `https`; with `relative: true` also paths starting with `/`)
-    or `slug` (lowercase letters, digits and single hyphens, at most 200 characters). A
-    value that doesn't match is refused with `invalid_format`. `source_field` (another text
-    field's ID, with `slug`) is the field the editor fills the slug from. Text and integer
+    below), `format` and `unique` (text fields, below), plus the options for searches with
+    API keys: `searchable` (the search words match the field; default true for text,
+    long_text, rich_text and enum), `filterable` and `sortable` (default false). Date fields
+    hold a calendar date, `YYYY-MM-DD`, with no time and no time zone: returned exactly as
+    written, so it never shows as the day before or after. With `include_time: true` they
+    hold a moment: ISO 8601 with an offset, stored in UTC and returned in UTC, or with the
+    offset of `time_zone` (an IANA name such as `Europe/Copenhagen`, daylight saving
+    included) when the field has one. Input may use any offset. Changing `time_zone` never
+    rewrites values; turning `include_time` on or off does, through a field migration. Text
+    fields (not long text) can have a `format`: `email`, `url` (an absolute `http` or
+    `https` address) or `slug` (lowercase letters, digits and single hyphens, at most 200
+    characters; one value per record, never a list). A value that doesn't match is refused
+    with `invalid_format`. A format sets its own length limits (254 characters for emails,
+    2,048 for URLs), so `min_length` and `max_length` are for plain text. Text and integer
     fields with one value can be `unique`: no two active records of the collection share a
     value (emails compare ignoring capitals; records without a value don't count). A taken
     value is refused with `taken` and the `record_id` that has it. Turning `unique` on is
