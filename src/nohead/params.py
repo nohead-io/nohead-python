@@ -58,7 +58,7 @@ class FieldMigrationRequest(TypedDict):
     type: NotRequired[FieldType]
     configuration: NotRequired[dict[str, Any]]
     """The complete new configuration. When the type changes and this is omitted, only
-    `description` carries over.
+    `description`, `searchable`, `filterable` and `sortable` carry over.
     """
     multiple: NotRequired[bool]
     """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
