@@ -72,6 +72,11 @@ class FieldMigrationRequest(TypedDict):
     """`clear` removes values that cannot be converted (or backfills them); `fail` refuses the
     migration.
     """
+    time_zone: NotRequired[str]
+    """When a date field's `include_time` is turned off: the IANA time zone (e.g.
+    `Europe/Copenhagen`) whose day each moment falls on. Default: the field's `time_zone`,
+    else UTC. Refused for any other change.
+    """
 
 
 class FieldUpdate(TypedDict):
@@ -121,7 +126,7 @@ FieldType: TypeAlias = Literal[
     "integer",
     "decimal",
     "boolean",
-    "datetime",
+    "date",
     "enum",
     "asset",
     "relation",
