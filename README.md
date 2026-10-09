@@ -119,7 +119,7 @@ nohead.records.list("posts", cursor=saved_cursor)
 
 With `AsyncNohead`, `await nohead.records.list(...)` gives the first page and `async for` walks them all.
 
-Filters are equality filters (for fields with several values: "contains"), and accept strings, numbers, booleans and datetimes:
+Filters are equality filters (for fields with several values: "contains"), and accept strings, numbers, booleans, `datetime`s (for date fields with a time) and `date`s (for plain date fields, sent as `YYYY-MM-DD`):
 
 ```python
 nohead.records.list(

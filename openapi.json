@@ -2109,7 +2109,7 @@
       "post": {
         "operationId": "fields_migrate",
         "summary": "Migrate a field",
-        "description": "Changes a field in a way that rewrites existing record values: its\n`type`, `multiple`, a stricter `configuration`, or making it `required`\nwith a `backfill` for records that have no value.\n\nEvery record is checked first. With `dry_run=true` the result is a\npreview: counts per outcome and sample records, nothing written. Without\nit, a migration whose values do not all convert is refused (`422`)\nunless `on_invalid` is `clear`; otherwise it is accepted (`202`) and\napplied in the background. Poll `GET /v1/migrations/{migration_id}`.\n\nWhile a migration is pending or running, schema writes to the collection\nreturn `409`, and record writes do once it is running (a pending one may\nwait for others to finish). A value written while it waits that does\nnot convert fails the migration, or is cleared with `on_invalid: clear`. Each record whose data changes gets a\n`migrate` revision, so cleared or converted values stay recoverable.\nA dry run's preview shows sample record values, so it also needs\n`records:read`.\n",
+        "description": "Changes a field in a way that rewrites existing record values: its\n`type`, `multiple`, a stricter `configuration`, a date's\n`include_time`, or making it `required` with a `backfill` for records\nthat have no value.\n\nEvery record is checked first. With `dry_run=true` the result is a\npreview: counts per outcome and sample records, nothing written. Without\nit, a migration whose values do not all convert is refused (`422`)\nunless `on_invalid` is `clear`; otherwise it is accepted (`202`) and\napplied in the background. Poll `GET /v1/migrations/{migration_id}`.\n\nWhile a migration is pending or running, schema writes to the collection\nreturn `409`, and record writes do once it is running (a pending one may\nwait for others to finish). A value written while it waits that does\nnot convert fails the migration, or is cleared with `on_invalid: clear`. Each record whose data changes gets a\n`migrate` revision, so cleared or converted values stay recoverable.\nA dry run's preview shows sample record values, so it also needs\n`records:read`.\n",
         "tags": [
           "migrations"
         ],
@@ -6741,7 +6741,7 @@
           "integer",
           "decimal",
           "boolean",
-          "datetime",
+          "date",
           "enum",
           "asset",
           "relation",
@@ -6804,7 +6804,7 @@
           },
           "configuration": {
             "type": "object",
-            "description": "Type-specific options, e.g. `max_length`, `options`, `target_collection_id`,\n`accepted_types` (asset fields: MIME types or `type/*` wildcards that newly\nwritten values must have; any file when absent), plus\nthe options for searches with API keys: `searchable` (the search words match the\nfield; default true for text, long_text, rich_text and enum), `filterable` and\n`sortable` (default false).\n"
+            "description": "Type-specific options, e.g. `max_length`, `options`, `target_collection_id`,\n`accepted_types` (asset fields: MIME types or `type/*` wildcards that newly\nwritten values must have; any file when absent), `include_time` and\n`time_zone` (date fields, below), plus\nthe options for searches with API keys: `searchable` (the search words match the\nfield; default true for text, long_text, rich_text and enum), `filterable` and\n`sortable` (default false).\n\nDate fields hold a calendar date, `YYYY-MM-DD`, with no time and no\ntime zone: returned exactly as written, so it never shows as the day\nbefore or after. With `include_time: true` they hold a moment: ISO\n8601 with an offset, stored in UTC and returned in UTC, or with the\noffset of `time_zone` (an IANA name such as `Europe/Copenhagen`,\ndaylight saving included) when the field has one. Input may use any\noffset. Changing `time_zone` never rewrites values; turning\n`include_time` on or off does, through a field migration.\n"
           },
           "deleted": {
             "type": "boolean"
@@ -7412,6 +7412,13 @@
             ],
             "default": "fail",
             "description": "`clear` removes values that cannot be converted (or backfills them); `fail` refuses the migration."
+          },
+          "time_zone": {
+            "type": "string",
+            "description": "When a date field's `include_time` is turned off: the IANA time zone\n(e.g. `Europe/Copenhagen`) whose day each moment falls on. Default:\nthe field's `time_zone`, else UTC. Refused for any other change.\n",
+            "examples": [
+              "Europe/Copenhagen"
+            ]
           }
         }
       },
@@ -7562,6 +7569,7 @@
           "to",
           "backfill",
           "on_invalid",
+          "time_zone",
           "records",
           "failure",
           "schema_change_id",
@@ -7629,6 +7637,13 @@
               "fail",
               "clear"
             ]
+          },
+          "time_zone": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The time zone dates were read in when `include_time` was turned off, if one was given."
           },
           "records": {
             "$ref": "#/components/schemas/FieldMigrationCounts"

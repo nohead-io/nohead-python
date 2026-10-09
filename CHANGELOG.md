@@ -5,6 +5,13 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- Field types: `datetime` is now `date`. A plain date field holds
+  `YYYY-MM-DD`; with `include_time` it holds a moment, written in the field's
+  `time_zone` when it has one. Field migrations take `time_zone`, the zone
+  whose day each moment falls on when the time is removed.
+
 ## 0.2.0
 
 - Types follow the API's current contract. They add types only for
