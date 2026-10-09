@@ -182,6 +182,18 @@ class ProjectList(NoheadModel):
     meta: ListMeta
 
 
+class RecordFilterValueObject(NoheadModel):
+    eq: str | None = None
+    ne: str | None = None
+    gt: str | None = None
+    gte: str | None = None
+    lt: str | None = None
+    lte: str | None = None
+    in_: str | None = _Field(None, alias="in")
+    """Comma-separated; `\\,` is a comma inside a value."""
+    exists: str | None = None
+
+
 class FieldAliases(NoheadModel):
     api_key: str
     expires_at: Timestamp
@@ -1145,6 +1157,7 @@ Timestamp: TypeAlias = datetime
 NullableTimestamp: TypeAlias = datetime | None
 Role: TypeAlias = str
 Permission: TypeAlias = str
+RecordFilterValue: TypeAlias = str | RecordFilterValueObject
 FieldType: TypeAlias = str
 SchemaChange: TypeAlias = SchemaChangeProperties
 Via: TypeAlias = str

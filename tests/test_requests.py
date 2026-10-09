@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -38,6 +38,29 @@ def test_serializes_filters_sorts_and_expansions() -> None:
     assert params["expand"] == "author,tags"
     assert params["limit"] == "50"
     assert "cursor" not in params
+
+
+def test_serializes_filter_operators_escaping_commas_in_lists() -> None:
+    nohead, calls = make_sync([page([], None)])
+    nohead.records.list(
+        "products",
+        filter={
+            "status": {"ne": "draft"},
+            "price": {"gte": 10, "lt": 50},
+            "category": {"in": ["shoes", "hats, caps", "a\\b"]},
+            "cover": {"exists": True},
+            "released": {"gte": date(2026, 10, 9)},
+        },
+        sort="-price",
+    )
+    params = calls.calls[0].url.params
+    assert params["filter[status][ne]"] == "draft"
+    assert params["filter[price][gte]"] == "10"
+    assert params["filter[price][lt]"] == "50"
+    assert params["filter[category][in]"] == "shoes,hats\\, caps,a\\\\b"
+    assert params["filter[cover][exists]"] == "true"
+    assert params["filter[released][gte]"] == "2026-10-09"
+    assert params["sort"] == "-price"
 
 
 def test_sends_bodies_as_json() -> None:

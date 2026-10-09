@@ -86,8 +86,9 @@ def url(settings: Settings, template: str, values: Mapping[str, str | int]) -> s
 
 def query(params: Mapping[str, Any] | None) -> tuple[tuple[str, str], ...]:
     """Query parameters as the API reads them: mappings become `key[sub]=...`
-    (`filter[status]=published`), lists are comma-separated (`expand=author,tags`),
-    booleans are `true`/`false`, dates ISO 8601. None values are left out."""
+    (`filter[price][lt]=50`), lists are comma-separated (`expand=author,tags`) with
+    `\\,` for a comma inside a value and `\\\\` for a backslash, booleans are
+    `true`/`false`, dates ISO 8601. None values are left out."""
     out: list[tuple[str, str]] = []
 
     def add(key: str, value: Any) -> None:
@@ -97,7 +98,7 @@ def query(params: Mapping[str, Any] | None) -> tuple[tuple[str, str], ...]:
             for name, inner in value.items():  # pyright: ignore[reportUnknownVariableType]
                 add(f"{key}[{name}]", inner)
         elif isinstance(value, list | tuple):
-            items = [scalar(v) for v in value if v is not None]  # pyright: ignore[reportUnknownVariableType]
+            items = [escape(scalar(v)) for v in value if v is not None]  # pyright: ignore[reportUnknownVariableType]
             if items:
                 out.append((key, ",".join(items)))
         else:
@@ -106,6 +107,11 @@ def query(params: Mapping[str, Any] | None) -> tuple[tuple[str, str], ...]:
     for key, value in (params or {}).items():
         add(key, value)
     return tuple(out)
+
+
+def escape(item: str) -> str:
+    """A list item with its backslashes and commas escaped."""
+    return item.replace("\\", "\\\\").replace(",", "\\,")
 
 
 def scalar(value: Any) -> str:

@@ -7,6 +7,10 @@ section is its GitHub release's notes.
 
 ## Unreleased
 
+- Filters take operators: `{"price": {"lt": 50}}`, with `eq`, `ne`, `gt`,
+  `gte`, `lt`, `lte`, `in` (a list) and `exists`, and record lists sort by a
+  field's value (`RecordSort` is now any string). Commas and backslashes in
+  list values are escaped, so a value can hold a comma.
 - Field types: `datetime` is now `date`. A plain date field holds
   `YYYY-MM-DD`; with `include_time` it holds a moment, written in the field's
   `time_zone` when it has one. Field migrations take `time_zone`, the zone
