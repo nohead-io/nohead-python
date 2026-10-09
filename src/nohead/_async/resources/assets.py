@@ -8,7 +8,7 @@ from typing_extensions import Unpack
 from ..._errors import UploadError
 from ..._pagination import AsyncPaginator
 from ..._uploads import Uploadable, open_upload
-from ...models import Asset, AssetUpload, DownloadUrl, ImageUrl
+from ...models import Asset, AssetUpload, AssetUsage, DownloadUrl, ImageUrl
 from ...params import AssetUploadCreate
 from ._resource import AsyncResource
 
@@ -95,7 +95,8 @@ class AsyncAssets(AsyncResource):
         return await self._client.request("assets_get", cast=Asset, path={"asset_id": asset})
 
     async def delete(self, asset: str, *, idempotency_key: str | None = None) -> Asset:
-        """Soft-deletes the asset; the file is purged after 30 days."""
+        """Soft-deletes the asset; the file is purged after 30 days (or sooner with
+        `purge`)."""
         return await self._client.request(
             "assets_delete",
             cast=Asset,
@@ -110,6 +111,23 @@ class AsyncAssets(AsyncResource):
             path={"asset_id": asset},
             idempotency_key=idempotency_key,
         )
+
+    async def purge(self, asset: str, *, idempotency_key: str | None = None) -> Asset:
+        """Permanently deletes a deleted asset now, instead of 30 days after the delete,
+        and returns it as it was. It can't be restored; records that reference it keep
+        the ID. Raises ConflictError if the asset isn't deleted: delete it first."""
+        return await self._client.request(
+            "assets_purge",
+            cast=Asset,
+            path={"asset_id": asset},
+            idempotency_key=idempotency_key,
+        )
+
+    async def usage(self, asset: str) -> AssetUsage:
+        """Where the asset is used: how many undeleted records use it (`records`), how
+        many of them are published (`published`), and the 10 most recently updated with
+        the fields they use it in (`uses`). Needs the `records:read` scope too."""
+        return await self._client.request("assets_usage", cast=AssetUsage, path={"asset_id": asset})
 
     async def image_url(
         self,
