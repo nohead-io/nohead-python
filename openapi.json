@@ -9,7 +9,7 @@
       "email": "hello@nohead.io",
       "url": "https://nohead.io"
     },
-    "description": "The Nohead API manages projects, collections (your data models), their\nfields, and records (your content), with full version history.\n\n## Authentication\n\nSend `Authorization: Bearer <token>`. Servers, CI and agents use a\nproject API key (`sk_live_...`, created in the web app under API keys)\nwith scopes such as `records:read` or `schema:write`. Organization,\nproject, member and API key management need a person signed in to the\nweb app and are not available to API keys.\n\n## Resources and IDs\n\nEvery object has an opaque, prefixed `id` (`col_`, `fld_`, `rec_`, ...)\nand an `object` type. Record values live under `data`, keyed by each\nfield's `api_key`. Timestamps are ISO 8601 in UTC. Deletes are soft and\ncan be undone.\n\n## Lists\n\nLists return `{ \"data\": [...], \"meta\": { \"next_cursor\", \"has_more\" } }`.\nPass `limit` (1-100) and `cursor` to page, and `sort` (prefix `-` for\ndescending). Records also take `filter[<api_key>]=value`,\n`filter[status]` and `expand=<relation fields>`.\n\n## Errors\n\nErrors share one envelope: `{ \"error\": { \"type\", \"message\",\n\"request_id\", \"details\" } }`. `details` lists field-level problems as\n`{ \"field\", \"code\", \"message\" }`. Include the `request_id` when asking\nfor support.\n\n## Safe retries and concurrent edits\n\nSend `Idempotency-Key` on any `POST`, `PATCH` or `DELETE` to make retrying\nit safe: the first result is stored for 24 hours and returned again for\nthe same request. Record responses carry the record's revision as an\n`ETag`; send it back as `If-Match` to update only if nobody changed the\nrecord in the meantime (`412` otherwise).\n\n## History\n\nEvery change to a record is a revision, attributed to the person or API\nkey that made it: record revisions can be listed, diffed and reverted,\nand collections keep a schema history. Send `Nohead-Change-Note` to\nrecord why a change was made. Changes that rewrite existing values\n(such as a field's type) are explicit, previewable field migrations.\n\nHow long revisions are kept depends on the organization's plan. Older\nones are removed, but every record keeps its first revision and its\nlast 10; `history_pruned_through` says how far history was removed.\n",
+    "description": "The Nohead API manages projects, collections (your data models), their\nfields, and records (your content), with full version history.\n\n## Authentication\n\nSend `Authorization: Bearer <token>`. Servers, CI and agents use a\nproject API key (`sk_live_...`, created in the web app under API keys)\nwith scopes such as `records:read` or `schema:write`. Organization,\nproject, member and API key management need a person signed in to the\nweb app and are not available to API keys.\n\n## Resources and IDs\n\nEvery object has an opaque, prefixed `id` (`col_`, `fld_`, `rec_`, ...)\nand an `object` type. Record values live under `data`, keyed by each\nfield's `api_key`. Timestamps are ISO 8601 in UTC. Deletes are soft and\ncan be undone.\n\n## Lists\n\nLists return `{ \"data\": [...], \"meta\": { \"next_cursor\", \"has_more\" } }`.\nPass `limit` (1-100) and `cursor` to page, and `sort` (prefix `-` for\ndescending). Records also take `filter[<api_key>]=value`,\n`filter[status]` and `expand=<relation, asset or rich text fields>`.\n\n## Errors\n\nErrors share one envelope: `{ \"error\": { \"type\", \"message\",\n\"request_id\", \"details\" } }`. `details` lists field-level problems as\n`{ \"field\", \"code\", \"message\" }`. Include the `request_id` when asking\nfor support.\n\n## Safe retries and concurrent edits\n\nSend `Idempotency-Key` on any `POST`, `PATCH` or `DELETE` to make retrying\nit safe: the first result is stored for 24 hours and returned again for\nthe same request. Record responses carry the record's revision as an\n`ETag`; send it back as `If-Match` to update only if nobody changed the\nrecord in the meantime (`412` otherwise).\n\n## History\n\nEvery change to a record is a revision, attributed to the person or API\nkey that made it: record revisions can be listed, diffed and reverted,\nand collections keep a schema history. Send `Nohead-Change-Note` to\nrecord why a change was made. Changes that rewrite existing values\n(such as a field's type) are explicit, previewable field migrations.\n\nHow long revisions are kept depends on the organization's plan. Older\nones are removed, but every record keeps its first revision and its\nlast 10; `history_pruned_through` says how far history was removed.\n",
     "license": {
       "name": "Proprietary",
       "identifier": "LicenseRef-Proprietary"
@@ -2461,7 +2461,7 @@
       "delete": {
         "operationId": "assets_delete",
         "summary": "Delete an asset",
-        "description": "Soft-deletes the asset. The original is kept for 30 days, then purged;\nrecords that reference it keep the ID.\n",
+        "description": "Soft-deletes the asset. The original is kept for 30 days, then purged;\nrecords that reference it keep the ID. Until then it can be restored,\nand image URLs already handed out keep working. To remove it sooner,\npurge it (`POST /v1/assets/{asset_id}/purge`).\n",
         "tags": [
           "assets"
         ],
@@ -2721,6 +2721,48 @@
         }
       }
     },
+    "/v1/assets/{asset_id}/usage": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AssetId"
+        }
+      ],
+      "get": {
+        "operationId": "assets_usage",
+        "summary": "See where an asset is used",
+        "description": "The undeleted records that use the asset, through an asset field or\nas an image in a rich text field: how many, how many of them are\npublished, and the 10 most recently updated with the fields they use\nit in. Record history does not count. Needs `records:read` too, as\nit shows records; published-only API keys get `403`.\n",
+        "tags": [
+          "assets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Where the asset is used.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetUsage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
     "/v1/assets/{asset_id}/restore": {
       "parameters": [
         {
@@ -2747,6 +2789,62 @@
         "responses": {
           "200": {
             "description": "The restored asset.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/assets/{asset_id}/purge": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AssetId"
+        }
+      ],
+      "post": {
+        "operationId": "assets_purge",
+        "summary": "Permanently delete a deleted asset",
+        "description": "Removes a deleted asset's original from storage now, instead of 30\ndays after the delete, and frees its storage. It cannot be restored.\nRecords that reference it keep the ID, which no longer resolves. Its\nimage URLs stop working within a minute or so (the CDN's copies are\ncleared), though browsers keep copies they already cached. An asset\nthat is not deleted is a `409`: delete it first.\n",
+        "tags": [
+          "assets"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          },
+          {
+            "$ref": "#/components/parameters/ChangeNote"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The purged asset, as it was.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5806,7 +5904,7 @@
       "Expand": {
         "name": "expand",
         "in": "query",
-        "description": "Comma-separated relation or asset field API keys whose records or assets to embed under `expanded` (at most 5). Embedding needs permission to read what is embedded: `records:read` for relations, `assets:read` for assets (`403` otherwise).",
+        "description": "Comma-separated relation, asset or rich text field API keys whose records or assets to embed under `expanded` (at most 5); for a rich text field, the assets its images show. Embedding needs permission to read what is embedded: `records:read` for relations, `assets:read` for assets and rich text (`403` otherwise).",
         "schema": {
           "type": "string"
         },
@@ -6699,7 +6797,7 @@
           },
           "multiple": {
             "type": "boolean",
-            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`). Not available for boolean, rich_text and json fields."
+            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`, an empty string with `blank_value`). Not available for boolean, long_text, rich_text and json fields."
           },
           "position": {
             "type": "integer"
@@ -6781,7 +6879,7 @@
           },
           "multiple": {
             "type": "boolean",
-            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`). Not available for boolean, rich_text and json fields."
+            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`, an empty string with `blank_value`). Not available for boolean, long_text, rich_text and json fields."
           },
           "position": {
             "type": "integer"
@@ -6808,7 +6906,7 @@
           },
           "multiple": {
             "type": "boolean",
-            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`). Not available for boolean, rich_text and json fields."
+            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`, an empty string with `blank_value`). Not available for boolean, long_text, rich_text and json fields."
           },
           "position": {
             "type": "integer"
@@ -7277,7 +7375,7 @@
           },
           "multiple": {
             "type": "boolean",
-            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`). Not available for boolean, rich_text and json fields."
+            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`, an empty string with `blank_value`). Not available for boolean, long_text, rich_text and json fields."
           },
           "required": {
             "type": "boolean"
@@ -7298,13 +7396,13 @@
           },
           "multiple": {
             "type": "boolean",
-            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`). Not available for boolean, rich_text and json fields."
+            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`, an empty string with `blank_value`). Not available for boolean, long_text, rich_text and json fields."
           },
           "required": {
             "type": "boolean"
           },
           "backfill": {
-            "description": "Value for active records that have no value, validated like a record value of the new definition."
+            "description": "Value for active records that have no value, validated like a record value of the new definition; an empty string is refused with `blank_value`."
           },
           "on_invalid": {
             "type": "string",
@@ -7678,7 +7776,7 @@
       },
       "RecordData": {
         "type": "object",
-        "description": "Field values keyed by field `api_key`.",
+        "description": "Field values keyed by field `api_key`. A rich text value is a\nProseMirror/Tiptap JSON document (`{\"type\": \"doc\", \"content\": [...]}`).\nAn image of an asset in it is `{\"type\": \"image\", \"attrs\": {\"asset_id\":\n\"ast_...\", \"alt\": \"...\"}}`, between the document's blocks (not inside\na list or quote), at most 100 per document (`too_many_images`); a\nnewly shown image must be an uploaded JPEG, PNG, GIF, WebP or AVIF of\nthe project (`invalid_reference`, `type_not_accepted`). `expand` embeds the assets, and published-only\nkeys can read the images of published records.\n",
         "additionalProperties": true,
         "examples": [
           {
@@ -7761,7 +7859,7 @@
           },
           "expanded": {
             "type": "object",
-            "description": "Only with `expand`: what each requested relation or asset field\npoints at, keyed by field API key: records for relation fields,\nassets for asset fields. A single value is the object, or null when\nit no longer exists; a multiple value is a list of those that still\nexist. Expanded records are not expanded further.\n",
+            "description": "Only with `expand`: what each requested relation, asset or rich\ntext field points at, keyed by field API key: records for\nrelation fields, assets for asset fields. A single value is the object, or null when\nit no longer exists; a multiple value is a list of those that still\nexist. For a rich text field, the list of assets its images show,\nin document order, leaving out those that no longer exist.\nExpanded records are not expanded further.\n",
             "additionalProperties": {
               "anyOf": [
                 {
@@ -9612,7 +9710,7 @@
               "null"
             ],
             "format": "uri",
-            "description": "A signed URL of a small rendition (fits in 640×640, WebP), for ready images; null otherwise."
+            "description": "A signed URL of a small rendition (fits in 640×640, WebP), for ready images, deleted ones included until they are purged; null otherwise."
           },
           "uploaded_at": {
             "$ref": "#/components/schemas/NullableTimestamp"
@@ -9703,6 +9801,61 @@
               "integer",
               "null"
             ]
+          }
+        }
+      },
+      "AssetUsage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "object",
+          "asset_id",
+          "records",
+          "published",
+          "uses"
+        ],
+        "properties": {
+          "object": {
+            "const": "asset_usage"
+          },
+          "asset_id": {
+            "type": "string"
+          },
+          "records": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Undeleted records that use the asset."
+          },
+          "published": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Of those, the published ones (what sites show)."
+          },
+          "uses": {
+            "type": "array",
+            "maxItems": 10,
+            "description": "The most recently updated records that use the asset.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "record",
+                "fields"
+              ],
+              "properties": {
+                "record": {
+                  "$ref": "#/components/schemas/Record"
+                },
+                "fields": {
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "API keys of the record's fields that use the asset.",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
           }
         }
       },
