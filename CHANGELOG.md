@@ -5,8 +5,12 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
-## Unreleased
+## 0.3.0
 
+- **Breaking:** the `datetime` field type is now `date`. A plain date field holds
+  `YYYY-MM-DD`; with `include_time` it holds a moment, written in the field's
+  `time_zone` when it has one. Field migrations take `time_zone`, the zone
+  whose day each moment falls on when the time is removed.
 - Text fields take a `format` (`email`, `url`, `slug`) and text and integer
   fields `unique`; a taken value's error detail has the `record_id` that has
   it (`code: "taken"`).
@@ -14,10 +18,6 @@ section is its GitHub release's notes.
   `gte`, `lt`, `lte`, `in` (a list) and `exists`, and record lists sort by a
   field's value (`RecordSort` is now any string). Commas and backslashes in
   list values are escaped, so a value can hold a comma.
-- Field types: `datetime` is now `date`. A plain date field holds
-  `YYYY-MM-DD`; with `include_time` it holds a moment, written in the field's
-  `time_zone` when it has one. Field migrations take `time_zone`, the zone
-  whose day each moment falls on when the time is removed.
 
 ## 0.2.0
 
