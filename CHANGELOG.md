@@ -26,6 +26,10 @@ section is its GitHub release's notes.
   the fields that use it. Needs the `records:read` scope too.
 - `assets.purge()`: permanently deletes a deleted asset now, instead of 30
   days after the delete, and frees its storage.
+- An error reads only the fields of the API's error envelope that have the
+  right type, so JSON from a proxy or gateway that merely looks like one no
+  longer gives it a non-string `message`, `type` or `request_id`, nor raises
+  a `TypeError` while the error is built.
 
 ## 0.2.0
 
