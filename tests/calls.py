@@ -4,6 +4,7 @@ into the API reference's code sample for the operation it calls (samples.json)."
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Callable
 from typing import Any
 
@@ -27,7 +28,7 @@ def example_reply(route: Route, request: httpx.Request) -> Any:
     schema = route.response.schema
     if request.url.params.get("dry_run") == "true" and "oneOf" in schema:
         schema = schema["oneOf"][-1]  # the preview (records.revisions.revert)
-    body = example(schema)
+    body = copy.deepcopy(example(schema))  # examples are the contract's
     if route.id == "assets_upload":
         body["upload"]["url"] = "https://storage.test/u"
     return body
