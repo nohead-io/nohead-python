@@ -4,41 +4,34 @@ into the API reference's code sample for the operation it calls (samples.json)."
 
 from __future__ import annotations
 
-import re
+import copy
 from collections.abc import Callable
 from typing import Any
 
 import httpx
 
-from .conftest import json_response, page, record
-
-UPLOAD = {
-    "object": "asset_upload",
-    "asset": {
-        "id": "ast_01J9ZQ3F8X",
-        "filename": "hello.txt",
-    },  # incomplete on purpose: built unvalidated
-    "upload": {
-        "method": "PUT",
-        "url": "https://storage.test/u",
-        "headers": {},
-        "expires_at": "2026-10-02T13:00:00.000Z",
-    },
-}
-LISTS = re.compile(
-    r"/(records|collections|fields|assets|webhooks|deliveries|revisions|schema-changes|migrations|audit-events|search)$"
-)
+from .conftest import json_response
+from .spec import Route, example, route_of
 
 
 def mock_reply(request: httpx.Request) -> httpx.Response:
-    """A plausible answer to any of the calls in every_call."""
+    """The reply to any of the calls in every_call: the contract's example of the
+    operation's success response (tests/spec.py), with an upload URL on storage."""
     if request.url.host == "storage.test":
         return httpx.Response(200)
-    if request.url.path.endswith("/assets/uploads"):
-        return json_response(201, UPLOAD)
-    if request.method == "GET" and LISTS.search(request.url.path):
-        return page([record("rec_01J9ZQ3F8X")], None)
-    return json_response(200, record("rec_01J9ZQ3F8X"))
+    route = route_of(request.method, request.url.path)
+    return json_response(route.status, example_reply(route, request))
+
+
+def example_reply(route: Route, request: httpx.Request) -> Any:
+    """The body of mock_reply for a request of an operation."""
+    schema = route.response.schema
+    if request.url.params.get("dry_run") == "true" and "oneOf" in schema:
+        schema = schema["oneOf"][-1]  # the preview (records.revisions.revert)
+    body = copy.deepcopy(example(schema))  # examples are the contract's
+    if route.id == "assets_upload":
+        body["upload"]["url"] = "https://storage.test/u"
+    return body
 
 
 def every_call(nohead: Any) -> list[Callable[[], Any]]:

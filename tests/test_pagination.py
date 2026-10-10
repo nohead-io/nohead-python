@@ -9,14 +9,20 @@ from nohead import AsyncPage, NoheadError, Page
 from .conftest import json_response, make_async, make_sync, page, record
 
 
-def test_returns_the_first_page() -> None:
-    nohead, calls = make_sync([page([record("rec_1")], "c2")])
+def test_returns_the_first_page_then_pages_by_hand() -> None:
+    nohead, calls = make_sync([page([record("rec_1")], "c2"), page([record("rec_2")], None)])
     first = nohead.records.list("posts", limit=1)
     assert isinstance(first, Page)
     assert [r.id for r in first.data] == ["rec_1"]
     assert first.meta.next_cursor == "c2"
     assert first.has_next_page()
     assert "cursor" not in calls.calls[0].url.params
+    second = first.get_next_page()
+    assert second.data[0].id == "rec_2"
+    assert calls.calls[1].url.params["cursor"] == "c2"
+    assert not second.has_next_page()
+    with pytest.raises(NoheadError):
+        second.get_next_page()
 
 
 def test_iterates_across_pages_keeping_the_parameters() -> None:
@@ -33,15 +39,6 @@ def test_stops_fetching_once_it_has_enough() -> None:
     nohead, calls = make_sync([page([record("rec_1"), record("rec_2")], "c2")])
     assert [r.id for r in islice(nohead.records.list("posts"), 1)] == ["rec_1"]
     assert len(calls.calls) == 1
-
-
-def test_pages_by_hand() -> None:
-    nohead, _ = make_sync([page([record("rec_1")], "c2"), page([record("rec_2")], None)])
-    second = nohead.records.list("posts").get_next_page()
-    assert second.data[0].id == "rec_2"
-    assert not second.has_next_page()
-    with pytest.raises(NoheadError):
-        second.get_next_page()
 
 
 def test_resumes_from_a_cursor() -> None:
