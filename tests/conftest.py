@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import inspect
 import json
+import time
 from collections.abc import Callable, Iterator
 from typing import Any
 
@@ -94,6 +97,38 @@ def page(items: list[Any], next_cursor: str | None, **meta: Any) -> httpx.Respon
         "meta": {"next_cursor": next_cursor, "has_more": next_cursor is not None, **meta},
     }
     return json_response(200, body)
+
+
+Make = Callable[..., tuple[Any, Recorder]]
+
+
+@pytest.fixture(params=["sync", "async"])
+def make(request: pytest.FixtureRequest) -> Make:
+    """make_sync or make_async: the test runs with each client. Await what the client's
+    methods return with `resolve`."""
+    return make_sync if request.param == "sync" else make_async
+
+
+async def resolve(result: Any) -> Any:
+    """What a call returns, awaited when the client is async."""
+    return await result if inspect.isawaitable(result) else result
+
+
+@pytest.fixture
+def waits(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    """The seconds each client waits between attempts, which take no time here."""
+    found: list[float] = []
+
+    async def sleep(seconds: float) -> None:
+        found.append(seconds)
+
+    monkeypatch.setattr(time, "sleep", found.append)
+    monkeypatch.setattr(asyncio, "sleep", sleep)
+    return found
+
+
+BACKOFF = _base.backoff
+"""The client's backoff, which no_backoff replaces in every test."""
 
 
 @pytest.fixture(autouse=True)
