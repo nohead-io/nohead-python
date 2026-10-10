@@ -236,16 +236,16 @@ class Field(NoheadModel):
     returned in UTC, or with the offset of `time_zone` (an IANA name such as
     `Europe/Copenhagen`, daylight saving included) when the field has one. Input may use any
     offset. Changing `time_zone` never rewrites values; turning `include_time` on or off
-    does, through a field migration. Text fields (not long text) can have a `format`:
-    `email`, `url` (an absolute `http` or `https` address) or `slug` (lowercase letters,
-    digits and single hyphens, at most 200 characters; one value per record, never a list,
-    and always unique: a slug field has `unique: true`). A value that doesn't match is
-    refused with `invalid_format`. A format sets its own length limits (254 characters for
-    emails, 2,048 for URLs), so `min_length` and `max_length` are for plain text. Text and
-    integer fields with one value can be `unique`: no two active records of the collection
-    share a value (emails compare ignoring capitals; records without a value don't count). A
-    taken value is refused with `taken` and the `record_id` that has it. Turning `unique` on
-    is refused with `duplicate_values` while records share a value (and so is restoring a
+    does, through a field migration. Text fields (not long text) can have a `format`: `slug`
+    (lowercase letters, digits and single hyphens, at most 200 characters; one value per
+    record, never a list, and always unique: a slug field has `unique: true`), `url` (an
+    absolute `http` or `https` address) or `email`. A value that doesn't match is refused
+    with `invalid_format`. A format sets its own length limits (254 characters for emails,
+    2,048 for URLs), so `min_length` and `max_length` are for plain text. Text and integer
+    fields with one value can be `unique`: no two active records of the collection share a
+    value (emails compare ignoring capitals; records without a value don't count). A taken
+    value is refused with `taken` and the `record_id` that has it. Turning `unique` on is
+    refused with `duplicate_values` while records share a value (and so is restoring a
     deleted unique field, `409`). A field migration to a unique field is refused with
     `duplicate_values` when its converted values or backfill would be shared, and fails if
     values written while it waits would be.
