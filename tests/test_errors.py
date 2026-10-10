@@ -88,6 +88,16 @@ async def test_bodies_that_are_not_api_errors(make: Make) -> None:
     assert error.request_id == "req_9"
 
 
+async def test_fields_of_the_wrong_type(make: Make) -> None:
+    # A gateway's JSON that looks like an envelope but is not one.
+    body = {"error": {"type": ["x"], "message": {"text": "x"}, "request_id": 7, "details": "none"}}
+    response = httpx.Response(502, json=body, headers={"x-request-id": "req_9"})
+    error = await failure(make, response)
+    assert isinstance(error, InternalServerError)
+    assert (error.type, error.message) == (None, "Request failed with status 502")
+    assert (error.request_id, error.details) == ("req_9", [])
+
+
 async def test_unknown_types_stay_api_errors(make: Make) -> None:
     error = await failure(make, api_error(418, "teapot_error"))
     assert type(error) is APIError

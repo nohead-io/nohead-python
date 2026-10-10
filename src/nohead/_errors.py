@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -168,11 +168,22 @@ def retry_after_seconds(headers: httpx.Headers) -> float | None:
 
 
 def _envelope(body: Any) -> dict[str, Any]:
-    if isinstance(body, dict):
-        error = body.get("error")  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        if isinstance(error, dict):
-            return error  # pyright: ignore[reportUnknownVariableType]
-    return {}
+    """The error envelope's fields that have the right type: a proxy or gateway
+    in front of the API may answer with any JSON."""
+    if not isinstance(body, dict):
+        return {}
+    error = cast("dict[str, Any]", body).get("error")
+    if not isinstance(error, dict):
+        return {}
+    error = cast("dict[str, Any]", error)
+    fields: dict[str, Any] = {
+        name: value
+        for name in ("type", "message", "request_id")
+        if isinstance(value := error.get(name), str)
+    }
+    if isinstance(details := error.get("details"), list):
+        fields["details"] = cast("list[Any]", details)
+    return fields
 
 
 def _detail(raw: Any) -> ErrorDetail:
