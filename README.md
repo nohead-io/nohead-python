@@ -325,7 +325,7 @@ uv run python scripts/samples.py         # after changing tests/calls.py (the do
   - `src/nohead/params.py`
   - the operation table, `src/nohead/_generated/operations.py`
 - **The async client is the source.** `src/nohead/_async` is written by hand, and `scripts/unasync.py` generates the sync client in `src/nohead/_sync` from it. Edit only the async code.
-- `tests/test_contract.py` calls every public method of both clients. It fails when an API-key operation in the contract has no method, when a query parameter is never sent (no method takes it, or no call passes it), or when a request doesn't match its operation.
+- `tests/test_contract.py` calls every public method of both clients. It fails when an API-key operation in the contract has no method, when a query parameter is never sent (no method takes it, or no call passes it), or when a request doesn't match its operation (method, path, query parameters and JSON body, against their schemas). Each call gets an example of its operation's response, built from the contract's schema, and must return it, parsed without a `NoheadWarning`.
 
 The smoke test (`smoke/smoke.py`) runs the core flow against a real API, with both clients, using the built package. Nohead's own CI runs it on every API contract change.
 

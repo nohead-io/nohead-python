@@ -26,7 +26,13 @@ Repository = "https://github.com/nohead-io/nohead-python"
 Issues = "https://github.com/nohead-io/nohead-python/issues"
 
 [dependency-groups]
-dev = ["pytest>=9.1", "pytest-asyncio>=1.4", "ruff>=0.16", "pyright>=1.1.414"]
+dev = [
+  "pytest>=9.1",
+  "pytest-asyncio>=1.4",
+  "ruff>=0.16",
+  "pyright>=1.1.414",
+  "jsonschema>=4.26",
+]
 
 [build-system]
 requires = ["hatchling>=1.27"]
