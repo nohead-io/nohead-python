@@ -6,7 +6,9 @@ import json
 import os
 import platform
 import random
+import re
 import typing
+import urllib.parse
 import uuid
 import warnings as _warnings
 from collections.abc import Mapping
@@ -166,7 +168,11 @@ def headers(
         revision = if_match if isinstance(if_match, int) else if_match.revision
         out["If-Match"] = f'"{revision}"'
     if change_note:
-        out["Nohead-Change-Note"] = change_note
+        # Percent-encoded UTF-8, as encodeURIComponent: header values are
+        # bytes (the API decodes it). A lone surrogate becomes U+FFFD.
+        # (A Python string holds surrogates only unpaired.)
+        well_formed = re.sub("[\ud800-\udfff]", "\ufffd", change_note)
+        out["Nohead-Change-Note"] = urllib.parse.quote(well_formed, safe="-_.!~*'()")
     return out
 
 
