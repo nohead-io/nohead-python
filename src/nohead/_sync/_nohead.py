@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from types import TracebackType
-from typing import Literal, Self
+from typing import Self
 
 import httpx
 
@@ -113,20 +113,23 @@ class Nohead:
         query: str,
         *,
         collections: Sequence[str] | None = None,
-        status: Literal["draft", "published"] | None = None,
+        published: bool | None = None,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> Page[Record, SearchResultsMeta]:
         """Full-text search across the key's project (or some of its collections),
-        most relevant first, through the first 1,000 hits."""
+        most relevant first, through the first 1,000 hits. `published=True` finds
+        published records only, `False` unpublished ones."""
         return self._client.paginate(
             "projects_search",
             item=Record,
             meta=SearchResultsMeta,
             query={
                 "q": query,
-                "collections": collections,
-                "filter": {"status": status},
+                "filter": {
+                    "collection": {"in": collections} if collections is not None else None,
+                    "published_at": {"exists": published} if published is not None else None,
+                },
                 "limit": limit,
                 "cursor": cursor,
             },

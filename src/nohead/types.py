@@ -29,8 +29,10 @@ RecordFilter: TypeAlias = Mapping[
     str, FilterValue | FilterOperators | Mapping[str, FilterValue | Sequence[FilterValue]]
 ]
 """Filters, combined with AND: a value to equal, or operators, e.g.
-`{"status": "published", "price": {"lt": 50}, "category": {"in": ["shoes", "bags"]}}`.
-Record lists and counts also filter `created_at`, `updated_at` and `published_at`.
+`{"published_at": {"exists": True}, "price": {"lt": 50}, "category": {"in": ["shoes", "bags"]}}`.
+`published_at` with `exists` says whether records are published; record lists and
+counts also filter `created_at`, `updated_at` and `published_at` by range, and
+`{"deleted": True}` lists deleted records instead.
 None values are left out."""
 
 RecordSort: TypeAlias = str

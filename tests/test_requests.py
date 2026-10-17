@@ -72,14 +72,23 @@ def test_sends_bodies_as_json() -> None:
     assert calls.body(0) == {"data": {"title": "Hi"}}
 
 
+SCHEDULE = {
+    "object": "schedule",
+    "record_id": "rec_1",
+    "publish_at": None,
+    "unpublish_at": None,
+    "last_error": None,
+}
+
+
 def test_serializes_dates_in_bodies() -> None:
-    nohead, calls = make_sync([json_response(200, record("rec_1"))])
+    nohead, calls = make_sync([json_response(200, SCHEDULE)])
     nohead.records.schedule("rec_1", publish_at=datetime(2027, 1, 1, 9, tzinfo=UTC))
     assert calls.body(0) == {"publish_at": "2027-01-01T09:00:00Z"}
 
 
 def test_clears_scheduled_times() -> None:
-    nohead, calls = make_sync([json_response(200, record("rec_1"))])
+    nohead, calls = make_sync([json_response(200, SCHEDULE)])
     nohead.records.schedule("rec_1", clear=["unpublish_at"])
     assert calls.body(0) == {"unpublish_at": None}
 
@@ -132,10 +141,10 @@ def test_diff_names_its_revisions() -> None:
 
 
 def test_keeps_unknown_fields_and_values() -> None:
-    body = record("rec_1", title="Hi") | {"status": "archived", "brand_new": True}
+    body = record("rec_1", title="Hi") | {"collection": "archive", "brand_new": True}
     nohead, _ = make_sync([json_response(200, body)])
     post = nohead.records.get("rec_1")
-    assert post.status == "archived"
+    assert post.collection == "archive"
     assert post.model_extra == {"brand_new": True}
     assert post.created_at == datetime(2026, 10, 2, 12, tzinfo=UTC)
 
@@ -149,13 +158,13 @@ async def test_async_requests() -> None:
 
 
 def test_builds_responses_that_do_not_match_the_models() -> None:
-    odd = record("rec_1") | {"revision": "not a number", "schedule": {"publish_at": None}}
+    odd = record("rec_1") | {"revision": "not a number", "published_at": "not a time"}
     nohead, _ = make_sync([json_response(200, odd)])
     with pytest.warns(nohead_warning()):
         post = nohead.records.get("rec_1")
     assert post.id == "rec_1"
     assert post.revision == "not a number"  # pyright: ignore[reportUnnecessaryComparison]
-    assert post.schedule.publish_at is None
+    assert post.published_at == "not a time"  # pyright: ignore[reportUnnecessaryComparison]
 
 
 def nohead_warning() -> type[Warning]:

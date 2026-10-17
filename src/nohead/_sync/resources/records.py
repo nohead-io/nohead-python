@@ -9,16 +9,19 @@ from typing_extensions import Unpack
 
 from ..._pagination import Page
 from ...models import (
-    BulkRecordsResult,
     Record,
+    RecordBatch,
     RecordCount,
     RecordDiff,
+    RecordPublication,
     RecordRevision,
     RecordRevisionDetail,
+    RecordSchedule,
     RevertPreview,
+    ScheduledChange,
     SearchResultsMeta,
 )
-from ...params import BulkRecordsRequest, RecordWrite
+from ...params import RecordBatchRequest, RecordWrite
 from ...types import IfMatch, RecordFilter, RecordSort
 from .._client import APIClient
 from ._resource import Resource
@@ -44,8 +47,9 @@ class Records(Resource):
     ) -> Page[Record]:
         """A collection's records, newest first by default.
 
-        `filter` holds equality filters (`{"status": "published"}`), `expand` relation
-        or asset fields to embed under `expanded` (at most 5).
+        `filter` holds filters (`{"published_at": {"exists": True}}` for published
+        records), `expand` relation or asset fields to embed under `expanded` (at
+        most 5).
         """
         return self._client.paginate(
             "records_list",
@@ -60,18 +64,13 @@ class Records(Resource):
             },
         )
 
-    def get(
-        self,
-        record: str,
-        *,
-        expand: Sequence[str] | None = None,
-        include_deleted: bool | None = None,
-    ) -> Record:
+    def get(self, record: str, *, expand: Sequence[str] | None = None) -> Record:
+        """A deleted record too, with `deleted_at` and `purge_after`."""
         return self._client.request(
             "records_get",
             cast=Record,
             path={"record_id": record},
-            query={"expand": expand, "include_deleted": include_deleted},
+            query={"expand": expand},
         )
 
     def create(
@@ -82,7 +81,7 @@ class Records(Resource):
         change_note: str | None = None,
         **params: Unpack[RecordWrite],
     ) -> Record:
-        """Creates a draft: `create("posts", data={"title": "Hello"})`."""
+        """Creates an unpublished record: `create("posts", data={"title": "Hello"})`."""
         return self._client.request(
             "records_create",
             cast=Record,
@@ -120,7 +119,8 @@ class Records(Resource):
         idempotency_key: str | None = None,
         change_note: str | None = None,
     ) -> Record:
-        """Soft-deletes the record: `restore` brings it back within 30 days."""
+        """Soft-deletes the record: `restore` brings it back until its `purge_after`.
+        Deleting a deleted record changes nothing."""
         return self._client.request(
             "records_delete",
             cast=Record,
@@ -179,6 +179,20 @@ class Records(Resource):
             change_note=change_note,
         )
 
+    def publication(self, record: str) -> RecordPublication:
+        """What is live: since when, by whom, and the revision. Raises NotFoundError
+        (detail code `not_published`) for a record that isn't published."""
+        return self._client.request(
+            "records_get_publication", cast=RecordPublication, path={"record_id": record}
+        )
+
+    def get_schedule(self, record: str) -> RecordSchedule:
+        """When the record publishes or unpublishes on its own. Raises NotFoundError
+        (detail code `not_scheduled`) for a record with no schedule."""
+        return self._client.request(
+            "records_get_schedule", cast=RecordSchedule, path={"record_id": record}
+        )
+
     def schedule(
         self,
         record: str,
@@ -187,7 +201,7 @@ class Records(Resource):
         unpublish_at: datetime | str | None = None,
         clear: Sequence[Literal["publish_at", "unpublish_at"]] = (),
         idempotency_key: str | None = None,
-    ) -> Record:
+    ) -> RecordSchedule:
         """Publishes and/or unpublishes the record later. Times left out keep their
         value; name them in `clear` to remove them."""
         body: dict[str, Any] = {name: None for name in clear}
@@ -197,19 +211,36 @@ class Records(Resource):
             body["unpublish_at"] = unpublish_at
         return self._client.request(
             "records_schedule",
-            cast=Record,
+            cast=RecordSchedule,
             path={"record_id": record},
             body=body,
             idempotency_key=idempotency_key,
         )
 
-    def unschedule(self, record: str, *, idempotency_key: str | None = None) -> Record:
+    def unschedule(self, record: str, *, idempotency_key: str | None = None) -> RecordSchedule:
         """Clears both scheduled times."""
         return self._client.request(
             "records_unschedule",
-            cast=Record,
+            cast=RecordSchedule,
             path={"record_id": record},
             idempotency_key=idempotency_key,
+        )
+
+    def scheduled_changes(
+        self,
+        collection: str,
+        *,
+        sort: Literal["at", "-at"] | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
+    ) -> Page[ScheduledChange]:
+        """A collection's pending scheduled publishes and unpublishes, soonest first:
+        one per change, so a record due to publish and later unpublish appears twice."""
+        return self._client.paginate(
+            "scheduled_changes_list",
+            item=ScheduledChange,
+            path={"collection_id": collection},
+            query={"sort": sort, "limit": limit, "cursor": cursor},
         )
 
     def count(self, collection: str, *, filter: RecordFilter | None = None) -> RecordCount:
@@ -226,13 +257,13 @@ class Records(Resource):
         *,
         idempotency_key: str | None = None,
         change_note: str | None = None,
-        **params: Unpack[BulkRecordsRequest],
-    ) -> BulkRecordsResult:
+        **params: Unpack[RecordBatchRequest],
+    ) -> RecordBatch:
         """Publishes, unpublishes, deletes, restores or updates up to 100 records.
         Each record succeeds or fails on its own; see `results`."""
         return self._client.request(
             "records_bulk",
-            cast=BulkRecordsResult,
+            cast=RecordBatch,
             path={"collection_id": collection},
             body=params,
             idempotency_key=idempotency_key,

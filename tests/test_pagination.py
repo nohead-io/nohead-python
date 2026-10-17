@@ -56,7 +56,7 @@ def test_search_totals() -> None:
     hits = nohead.search("hello", collections=["posts", "pages"])
     assert hits.meta.total_estimate == 1
     assert calls.calls[0].url.path == "/v1/projects/prj_1/search"
-    assert calls.calls[0].url.params["collections"] == "posts,pages"
+    assert calls.calls[0].url.params["filter[collection][in]"] == "posts,pages"
 
 
 async def test_async_iterates_across_pages() -> None:

@@ -11,6 +11,7 @@ from ...models import (
     Field,
     FieldMigration,
     FieldMigrationPreview,
+    FieldOrder,
     Schema,
     SchemaChange,
     SchemaChangeDetail,
@@ -38,11 +39,12 @@ class AsyncCollections(AsyncResource):
     def list(
         self, *, deleted: bool | None = None, limit: int | None = None, cursor: str | None = None
     ) -> AsyncPaginator[Collection]:
-        """`deleted=True` lists deleted collections instead (restorable for 30 days)."""
+        """`deleted=True` lists deleted collections instead (restorable until their
+        `purge_after`)."""
         return self._client.paginate(
             "collections_list",
             item=Collection,
-            query={"deleted": deleted, "limit": limit, "cursor": cursor},
+            query={"filter": {"deleted": deleted}, "limit": limit, "cursor": cursor},
         )
 
     async def get(self, collection: str) -> Collection:
@@ -170,7 +172,7 @@ class AsyncFields(AsyncResource):
             "fields_list",
             item=Field,
             path={"collection_id": collection},
-            query={"deleted": deleted, "limit": limit, "cursor": cursor},
+            query={"filter": {"deleted": deleted}, "limit": limit, "cursor": cursor},
         )
 
     async def create(
@@ -232,6 +234,12 @@ class AsyncFields(AsyncResource):
             change_note=change_note,
         )
 
+    async def order(self, collection: str) -> FieldOrder:
+        """The collection's active fields, in order."""
+        return await self._client.request(
+            "fields_get_order", cast=FieldOrder, path={"collection_id": collection}
+        )
+
     async def reorder(
         self,
         collection: str,
@@ -239,11 +247,11 @@ class AsyncFields(AsyncResource):
         *,
         idempotency_key: str | None = None,
         change_note: str | None = None,
-    ) -> Collection:
-        """Puts the collection's fields in this order."""
+    ) -> FieldOrder:
+        """Puts the collection's fields in this order; lists every active field once."""
         return await self._client.request(
             "fields_reorder",
-            cast=Collection,
+            cast=FieldOrder,
             path={"collection_id": collection},
             body={"field_ids": list(field_ids)},
             idempotency_key=idempotency_key,

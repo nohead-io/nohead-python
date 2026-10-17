@@ -14,13 +14,6 @@ class AssetUploadCreate(TypedDict):
     """Exact size of the file in bytes (at most 100 MB by default)."""
 
 
-class BulkRecordsRequest(TypedDict):
-    action: Literal["publish", "unpublish", "delete", "restore", "update"]
-    record_ids: list[str]
-    data: NotRequired[dict[str, Any]]
-    """For `update`, the fields to set on every record (null clears one)."""
-
-
 class CollectionCreate(TypedDict):
     search_enabled: NotRequired[bool]
     name: str
@@ -97,6 +90,13 @@ class FieldUpdate(TypedDict):
     configuration: NotRequired[dict[str, Any]]
 
 
+class RecordBatchRequest(TypedDict):
+    action: Literal["publish", "unpublish", "delete", "restore", "update"]
+    record_ids: list[str]
+    data: NotRequired[dict[str, Any]]
+    """For `update`, the fields to set on every record (null clears one)."""
+
+
 class RecordScheduleUpdate(TypedDict):
     """A time in the future, or null for none. Omitted keys keep their value."""
 
@@ -112,14 +112,14 @@ class WebhookCreate(TypedDict):
     url: str
     """An https URL on the public internet."""
     description: NotRequired[str | None]
-    event_types: list[WebhookEventType | Literal["*"]]
+    event_types: list[WebhookSubscription]
     enabled: NotRequired[bool]
 
 
 class WebhookUpdate(TypedDict):
     url: NotRequired[str]
     description: NotRequired[str | None]
-    event_types: NotRequired[list[WebhookEventType | Literal["*"]]]
+    event_types: NotRequired[list[WebhookSubscription]]
     enabled: NotRequired[bool]
 
 
@@ -140,11 +140,33 @@ NullableTimestamp: TypeAlias = str | datetime | None
 RecordData: TypeAlias = dict[str, Any]
 WebhookEventType: TypeAlias = Literal[
     "record.created",
+    "record.imported",
     "record.updated",
-    "record.deleted",
     "record.published",
     "record.unpublished",
+    "record.deleted",
+    "record.restored",
+    "record.reverted",
+    "record.redacted",
+    "record.scheduled",
+    "record.unscheduled",
+    "record.schedule_failed",
+    "collection.created",
+    "collection.updated",
+    "collection.deleted",
+    "collection.restored",
+    "collection.fields_reordered",
+    "field.created",
+    "field.updated",
+    "field.deleted",
+    "field.restored",
+    "field.migrated",
+    "field.alias_removed",
     "asset.created",
     "asset.deleted",
-    "schema.changed",
+    "asset.restored",
+    "asset.purged",
 ]
+WebhookSubscription: TypeAlias = (
+    WebhookEventType | Literal["record.*", "collection.*", "field.*", "asset.*", "*"]
+)

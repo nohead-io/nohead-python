@@ -82,9 +82,11 @@ def sync_flow() -> str:
         expect([r.data["title"] for r in chosen.data] == ["Uno"], "filters take operators")
 
         published = nohead.records.publish(first.id)
-        expect(published.status == "published" and published.published_at, "publish publishes")
+        expect(published.published_at, "publish publishes")
+        publication = nohead.records.publication(first.id)
+        expect(publication.revision == published.revision, "the publication says what is live")
         unpublished = nohead.records.unpublish(first.id)
-        expect(unpublished.status == "draft", "unpublish takes it back")
+        expect(unpublished.published_at is None, "unpublish takes it back")
 
         try:
             nohead.records.create(collection.slug, data={})
@@ -104,7 +106,7 @@ def sync_flow() -> str:
         asset = nohead.assets.upload(b"hello", filename="hello.txt")
         LEFT["assets"] = asset.id
         expect(asset.status == "ready" and asset.byte_size == 5, "assets upload to storage")
-        expect(nohead.assets.delete(asset.id).deleted, "assets soft-delete")
+        expect(nohead.assets.delete(asset.id).deleted_at, "assets soft-delete")
         nohead.assets.purge(asset.id)
         del LEFT["assets"]
 
@@ -115,13 +117,17 @@ def sync_flow() -> str:
         rotated = nohead.webhooks.rotate_secret(webhook.id)
         expect(
             webhook.secret.startswith("whsec_") and rotated.secret != webhook.secret,
-            "rotating a webhook's secret replaces it",
+            "rotating a webhook's secret adds one",
         )
-        expect(nohead.webhooks.delete(webhook.id).deleted, "webhooks delete")
+        expect(
+            len(nohead.webhooks.secrets.list(webhook.id).data) == 2,
+            "the old secret signs alongside the new one",
+        )
+        expect(nohead.webhooks.delete(webhook.id).deleted_at, "webhooks delete")
         del LEFT["webhooks"]
 
         deleted = nohead.records.delete(first.id)
-        expect(deleted.deleted, "delete soft-deletes")
+        expect(deleted.deleted_at, "delete soft-deletes")
         return collection.slug
 
 

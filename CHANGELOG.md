@@ -7,6 +7,29 @@ section is its GitHub release's notes.
 
 ## 0.3.0
 
+- **Breaking:** the API is resource-oriented. Method names stay; what they
+  return and take follows it:
+  - Records have no `status`, `schedule` or `deleted`: a record is published
+    when `published_at` is set, and has `deleted_at` and `purge_after`.
+    Filter with `{"published_at": {"exists": True}}`. `records.get` returns
+    deleted records too (no `include_deleted`).
+  - `records.schedule` and `unschedule` return the schedule, and
+    `records.get_schedule`, `records.publication` and
+    `records.scheduled_changes` are new. `records.bulk` returns a
+    `RecordBatch`.
+  - `search` takes `published=True` instead of `status="published"`.
+  - Collections, fields, assets and webhooks have `deleted_at` and
+    `purge_after` instead of `deleted`, and migrations
+    `cancel_requested_at`.
+  - `assets.create_upload` returns the asset with its `upload`.
+  - `fields.reorder` returns the `FieldOrder`; `fields.order` reads it.
+  - Webhook event types are the activity log's actions (`record.restored`,
+    `field.updated`, ..., and wildcards such as `record.*`), and events carry
+    `actor` and `via`; `event.collection` and `event.schema_change` are
+    dicts, and `event.field` is new. `webhooks.rotate_secret` returns a
+    `WebhookSecretWithValue`; the old secret signs for 24 hours more.
+    `webhooks.secrets.list`, `webhooks.secrets.retire`, `webhooks.restore`
+    and `webhooks.list(deleted=True)` are new.
 - **Breaking:** the `datetime` field type is now `date`. A plain date field holds
   `YYYY-MM-DD`; with `include_time` it holds a moment, written in the field's
   `time_zone` when it has one. Field migrations take `time_zone`, the zone

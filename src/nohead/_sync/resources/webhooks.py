@@ -7,7 +7,14 @@ from typing import Literal
 from typing_extensions import Unpack
 
 from ..._pagination import Page
-from ...models import Webhook, WebhookDelivery, WebhookDeliveryDetail, WebhookWithSecret
+from ...models import (
+    Webhook,
+    WebhookDelivery,
+    WebhookDeliveryDetail,
+    WebhookSecret,
+    WebhookSecretWithValue,
+    WebhookWithSecret,
+)
 from ...params import WebhookCreate, WebhookUpdate
 from ...webhooks import WebhookEvent, unwrap
 from .._client import APIClient
@@ -20,10 +27,17 @@ class Webhooks(Resource):
     def __init__(self, client: APIClient) -> None:
         super().__init__(client)
         self.deliveries = Deliveries(client)
+        self.secrets = Secrets(client)
 
-    def list(self, *, limit: int | None = None, cursor: str | None = None) -> Page[Webhook]:
+    def list(
+        self, *, deleted: bool | None = None, limit: int | None = None, cursor: str | None = None
+    ) -> Page[Webhook]:
+        """`deleted=True` lists deleted webhooks instead (restorable until their
+        `purge_after`)."""
         return self._client.paginate(
-            "webhooks_list", item=Webhook, query={"limit": limit, "cursor": cursor}
+            "webhooks_list",
+            item=Webhook,
+            query={"filter": {"deleted": deleted}, "limit": limit, "cursor": cursor},
         )
 
     def get(self, webhook: str) -> Webhook:
@@ -52,6 +66,7 @@ class Webhooks(Resource):
         )
 
     def delete(self, webhook: str, *, idempotency_key: str | None = None) -> Webhook:
+        """Soft-deletes the webhook: `restore` brings it back until its `purge_after`."""
         return self._client.request(
             "webhooks_delete",
             cast=Webhook,
@@ -59,13 +74,23 @@ class Webhooks(Resource):
             idempotency_key=idempotency_key,
         )
 
+    def restore(self, webhook: str, *, idempotency_key: str | None = None) -> Webhook:
+        return self._client.request(
+            "webhooks_restore",
+            cast=Webhook,
+            path={"webhook_id": webhook},
+            idempotency_key=idempotency_key,
+        )
+
     def rotate_secret(
         self, webhook: str, *, idempotency_key: str | None = None
-    ) -> WebhookWithSecret:
-        """A new signing secret; the old one stops working at once."""
+    ) -> WebhookSecretWithValue:
+        """A new signing secret (`secret`, shown only here). The ones before it keep
+        signing for 24 hours, so receivers can switch without rejecting deliveries;
+        `secrets.retire` ends one sooner."""
         return self._client.request(
             "webhooks_rotate_secret",
-            cast=WebhookWithSecret,
+            cast=WebhookSecretWithValue,
             path={"webhook_id": webhook},
             idempotency_key=idempotency_key,
         )
@@ -107,7 +132,7 @@ class Deliveries(Resource):
             "webhook_deliveries_list",
             item=WebhookDelivery,
             path={"webhook_id": webhook},
-            query={"status": status, "limit": limit, "cursor": cursor},
+            query={"filter": {"status": status}, "limit": limit, "cursor": cursor},
         )
 
     def get(self, delivery: str) -> WebhookDeliveryDetail:
@@ -116,10 +141,34 @@ class Deliveries(Resource):
         )
 
     def retry(self, delivery: str, *, idempotency_key: str | None = None) -> WebhookDelivery:
-        """Sends the event again."""
+        """Sends the event again now, as a new attempt."""
         return self._client.request(
             "webhook_deliveries_retry",
             cast=WebhookDelivery,
             path={"delivery_id": delivery},
+            idempotency_key=idempotency_key,
+        )
+
+
+class Secrets(Resource):
+    """A webhook's signing secrets. `secret` is a secret ID (`whs_...`)."""
+
+    def list(
+        self, webhook: str, *, limit: int | None = None, cursor: str | None = None
+    ) -> Page[WebhookSecret]:
+        """Those signing deliveries now, oldest first, without their values."""
+        return self._client.paginate(
+            "webhook_secrets_list",
+            item=WebhookSecret,
+            path={"webhook_id": webhook},
+            query={"limit": limit, "cursor": cursor},
+        )
+
+    def retire(self, secret: str, *, idempotency_key: str | None = None) -> WebhookSecret:
+        """Stops signing with it now. The newest can't be retired: rotate first."""
+        return self._client.request(
+            "webhook_secrets_retire",
+            cast=WebhookSecret,
+            path={"secret_id": secret},
             idempotency_key=idempotency_key,
         )

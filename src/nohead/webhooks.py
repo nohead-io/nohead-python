@@ -17,10 +17,10 @@ import json
 import time
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from ._errors import WebhookVerificationError
-from .models import Asset, Collection, NoheadModel, Record, SchemaChange, Webhook
+from .models import Actor, Asset, Field, NoheadModel, Record, Webhook
 
 __all__ = ["WebhookEvent", "unwrap"]
 
@@ -34,16 +34,22 @@ class WebhookEvent(NoheadModel):
     id: str
     object: str
     type: str
-    """`record.created`, `record.updated`, `record.deleted`, `record.published`,
-    `record.unpublished`, `asset.created`, `asset.deleted`, `schema.changed` or
-    `webhook.test`."""
+    """The activity log's action: `record.*` (`record.created`, `record.published`,
+    `record.restored`, `record.scheduled`, ...), `collection.*`, `field.*`,
+    `asset.*`, or `webhook.test`."""
     created_at: datetime
     project_id: str
+    actor: Actor | None = None
+    """Who made the change. An integration that writes back can skip its own."""
+    via: str | None = None
+    """The client the change came through, when known."""
     data: dict[str, Any]
 
     @property
     def record(self) -> Record | None:
-        """`record.*` events: the record after the change."""
+        """`record.*` events: the record as the change's revision left it (as it is
+        now for events without a revision, such as `record.scheduled`), or None once
+        it is purged."""
         return self._part("record", Record)
 
     @property
@@ -63,19 +69,30 @@ class WebhookEvent(NoheadModel):
         return self._part("asset", Asset)
 
     @property
-    def collection(self) -> Collection | None:
-        """`schema.changed` events."""
-        return self._part("collection", Collection)
+    def collection(self) -> dict[str, Any] | None:
+        """`collection.*` and `field.*` events: the collection as the change left it
+        (`id`, `slug`, `name`, `schema_version`, `deleted_at`)."""
+        return self._dict("collection")
 
     @property
-    def schema_change(self) -> SchemaChange | None:
-        """`schema.changed` events."""
-        return self._part("schema_change", SchemaChange)
+    def schema_change(self) -> dict[str, Any] | None:
+        """`collection.*` and `field.*` events: the change (`id`, `operation`,
+        `from_version`, `to_version`)."""
+        return self._dict("schema_change")
+
+    @property
+    def field(self) -> Field | None:
+        """`field.alias_removed` events."""
+        return self._part("field", Field)
 
     @property
     def webhook(self) -> Webhook | None:
         """`webhook.test` events."""
         return self._part("webhook", Webhook)
+
+    def _dict(self, key: str) -> dict[str, Any] | None:
+        value: object = self.data.get(key)
+        return cast("dict[str, Any]", value) if isinstance(value, dict) else None
 
     def _part(self, key: str, model: type[M]) -> M | None:
         value = self.data.get(key)
