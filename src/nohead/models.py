@@ -49,8 +49,8 @@ class Organization(NoheadModel):
     """API key scopes the current user may put on new keys: those whose permissions their role
     holds.
     """
-    deleted: bool
-    """Scheduled for deletion (see `DELETE /v1/organizations/{id}`)."""
+    deleted_at: NullableTimestamp
+    """When it was scheduled for deletion (`DELETE /v1/organizations/{id}`); null unless it is."""
     purge_after: NullableTimestamp
     """When a scheduled deletion becomes permanent; null otherwise."""
     created_at: Timestamp
@@ -156,8 +156,8 @@ class Project(NoheadModel):
     name: str
     slug: str
     settings: dict[str, Any]
-    deleted: bool
-    """Scheduled for deletion (see `DELETE /v1/projects/{id}`)."""
+    deleted_at: NullableTimestamp
+    """When it was scheduled for deletion (`DELETE /v1/projects/{id}`); null unless it is."""
     purge_after: NullableTimestamp
     """When a scheduled deletion becomes permanent; null otherwise."""
     created_at: Timestamp
@@ -220,8 +220,8 @@ class Field(NoheadModel):
     """
     position: int
     """Where the field sorts in the collection's order, lowest first. New fields are added
-    last; `POST /v1/collections/{collection_id}/fields/reorder` changes the order, numbering
-    the fields from 0.
+    last; `PUT /v1/collections/{collection_id}/field-order` changes the order, numbering the
+    fields from 0.
     """
     configuration: dict[str, Any]
     """Type-specific options, e.g. `max_length`, `options`, `target_collection_id`,
@@ -250,7 +250,12 @@ class Field(NoheadModel):
     `duplicate_values` when its converted values or backfill would be shared, and fails if
     values written while it waits would be.
     """
-    deleted: bool
+    deleted_at: NullableTimestamp
+    """When the field was deleted; null unless it is. Its values stay hidden in records until
+    it is restored or purged.
+    """
+    purge_after: NullableTimestamp
+    """When a deleted field and its values are removed for good, unless restored first."""
     aliases: list[FieldAliases]
     """Old API keys of a renamed field that still work until `expires_at`: record data also
     carries the value under them, and writes, filters, sorts and `expand` accept them.
@@ -311,7 +316,12 @@ class Collection(NoheadModel):
     slug: str
     description: str | None
     schema_version: int
-    deleted: bool
+    deleted_at: NullableTimestamp
+    """When the collection was deleted; null unless it is."""
+    purge_after: NullableTimestamp
+    """When a deleted collection is removed for good, with its fields and records, unless
+    restored first.
+    """
     search_enabled: bool
     """Whether API keys can search the collection (`GET
     /v1/collections/{collection_id}/search`). Every collection is indexed; members can
@@ -352,7 +362,7 @@ class SchemaDefinitionFields(NoheadModel):
     multiple: bool
     position: int
     configuration: dict[str, Any]
-    deleted: bool
+    deleted_at: NullableTimestamp
 
 
 class SchemaDefinition(NoheadModel):
@@ -362,7 +372,7 @@ class SchemaDefinition(NoheadModel):
     name: str
     slug: str
     description: str | None
-    deleted: bool
+    deleted_at: NullableTimestamp
     search_enabled: bool | None = None
     fields: list[SchemaDefinitionFields]
 
@@ -394,7 +404,7 @@ class SchemaChangeProperties(NoheadModel):
     payload: dict[str, Any]
     """Operation details, e.g. `changes` and `breaking` for updates."""
     actor: Actor
-    via: ChangeVia
+    via: Via
     note: str | None
     request_id: str | None
     status: str
@@ -471,7 +481,7 @@ class FieldMigrationPreviewSamplesError(NoheadModel):
 
 class FieldMigrationPreviewSamples(NoheadModel):
     record_id: str
-    deleted: bool
+    deleted_at: NullableTimestamp
     outcome: str
     before: Any
     """The stored value before the migration, or null."""
@@ -520,9 +530,10 @@ class FieldMigration(NoheadModel):
     """Why the migration failed; null otherwise. A failed migration changed nothing."""
     schema_change_id: str | None
     """The `migrate_field` schema change, once complete."""
-    cancel_requested: bool
+    cancel_requested_at: NullableTimestamp
+    """When cancelling was asked for, while a running migration rolls back."""
     actor: Actor
-    via: ChangeVia
+    via: Via
     note: str | None
     request_id: str | None
     created_at: Timestamp
@@ -542,6 +553,8 @@ class RecordSchedule(NoheadModel):
     schedule is set.
     """
 
+    object: str
+    record_id: str
     publish_at: NullableTimestamp
     unpublish_at: NullableTimestamp
     last_error: str | None
@@ -554,15 +567,40 @@ class RecordScheduleUpdate(NoheadModel):
     unpublish_at: NullableTimestamp | None = None
 
 
+class RecordPublication(NoheadModel):
+    """A published record's live state."""
+
+    object: str
+    record_id: str
+    published_at: Timestamp
+    revision: int
+    """The revision that is live."""
+    published_by: Actor | None
+    """Who published it last; null when that revision is no longer kept."""
+
+
+class ScheduledChange(NoheadModel):
+    object: str
+    action: str
+    at: Timestamp
+    record_id: str
+    last_error: str | None
+    """Why the record's last scheduled change could not be made, as in its schedule."""
+
+
+class ScheduledChangeList(NoheadModel):
+    data: list[ScheduledChange]
+    meta: ListMeta
+
+
 class Record(NoheadModel):
     id: str
     object: str
     collection_id: str
     collection: str
     """The collection slug."""
-    status: str
     published_at: NullableTimestamp
-    schedule: RecordSchedule
+    """When the record was published; null while it is unpublished."""
     revision: int
     """Current revision number; also returned as the ETag."""
     schema_version: int
@@ -570,7 +608,10 @@ class Record(NoheadModel):
     """Revisions up to this number (except revision 1) were removed by the plan's history
     retention.
     """
-    deleted: bool
+    deleted_at: NullableTimestamp
+    """When the record was soft-deleted; null unless it is."""
+    purge_after: NullableTimestamp
+    """When a soft-deleted record is removed for good, unless restored first."""
     data: RecordData
     expanded: dict[str, Record | Asset | list[Record | Asset] | None] | None = None
     """Only with `expand`: what each requested relation, asset or rich text field points at,
@@ -595,8 +636,7 @@ class RecordList(NoheadModel):
 
 class Change(NoheadModel):
     """One change between two states. Field changes carry `field` (current API key) and the
-    stable `field_id`; attribute changes (`status`, `published_at`, `deleted`) carry
-    `attribute`.
+    stable `field_id`; attribute changes (`published_at`, `deleted_at`) carry `attribute`.
     """
 
     field: str | None = None
@@ -623,7 +663,7 @@ class RecordRevisionProperties(NoheadModel):
     """API keys of changed fields, and changed attributes."""
     redacted_fields: list[str]
     """API keys of fields whose values in this revision were redacted (`POST
-    /v1/records/{id}/redact`); those values read `{"$redacted": true}`.
+    /v1/records/{id}/redactions`); those values read `{"$redacted": true}`.
     """
     created_at: Timestamp
 
@@ -642,7 +682,6 @@ class Redaction(NoheadModel):
 
 
 class RecordRevisionDetail(RecordRevisionProperties):
-    status: str
     published_at: NullableTimestamp
     data: RecordData
     changes: list[Change]
@@ -741,9 +780,14 @@ class WebhookProperties(NoheadModel):
     url: str
     description: str | None
     event_types: list[str]
-    """The subscribed event types, or `["*"]` for all."""
+    """The subscribed event types and wildcards (`record.*`, or `*` for all)."""
     enabled: bool
-    deleted: bool
+    deleted_at: NullableTimestamp
+    """When the webhook was deleted; null unless it is."""
+    purge_after: NullableTimestamp
+    """When a deleted webhook is removed for good, with its delivery log, unless restored
+    first.
+    """
     created_at: Timestamp
     updated_at: Timestamp
 
@@ -753,14 +797,33 @@ class WebhookWithSecret(WebhookProperties):
     """The signing secret (`whsec_...`). Keep it private."""
 
 
-class BulkRecordsRequest(NoheadModel):
+class WebhookSecretProperties(NoheadModel):
+    id: str
+    object: str
+    webhook_id: str
+    expires_at: NullableTimestamp
+    """When it stops signing deliveries; null for the newest secret."""
+    created_at: Timestamp
+
+
+class WebhookSecretWithValue(WebhookSecretProperties):
+    secret: str
+    """The signing secret (`whsec_...`), shown only when it is added. Keep it private."""
+
+
+class WebhookSecretList(NoheadModel):
+    data: list[WebhookSecret]
+    meta: ListMeta
+
+
+class RecordBatchRequest(NoheadModel):
     action: str
     record_ids: list[str]
     data: dict[str, Any] | None = None
     """For `update`, the fields to set on every record (null clears one)."""
 
 
-class BulkRecordsResultResults(NoheadModel):
+class RecordBatchResults(NoheadModel):
     id: str
     status: str
     changed: bool
@@ -768,12 +831,12 @@ class BulkRecordsResultResults(NoheadModel):
     record: Record
 
 
-class BulkRecordsResult(NoheadModel):
+class RecordBatch(NoheadModel):
     object: str
     action: str
     succeeded: int
     failed: int
-    results: list[BulkRecordsResultResults]
+    results: list[RecordBatchResults]
 
 
 class Billing(NoheadModel):
@@ -962,14 +1025,14 @@ class WebhookCreate(NoheadModel):
     url: str
     """An https URL on the public internet."""
     description: str | None = None
-    event_types: list[WebhookEventType | str]
+    event_types: list[WebhookSubscription]
     enabled: bool | None = None
 
 
 class WebhookUpdate(NoheadModel):
     url: str | None = None
     description: str | None = None
-    event_types: list[WebhookEventType | str] | None = None
+    event_types: list[WebhookSubscription] | None = None
     enabled: bool | None = None
 
 
@@ -1019,22 +1082,33 @@ class WebhookDeliveryList(NoheadModel):
 
 
 class WebhookEventPayload(NoheadModel):
-    """The JSON body of every webhook request."""
+    """The JSON body of every webhook request. It is rendered from the event's history each
+    time it is sent or shown, so redacted values are redacted in it too.
+    """
 
     id: str
+    """The event's ID, also sent as `webhook-id`; dedupe by it."""
     object: str
     type: str
-    """One of the event types, or `webhook.test`."""
+    """One of the event types (`WebhookEventType`), or `webhook.test`."""
     created_at: Timestamp
     project_id: str
+    actor: Actor | None = None
+    """Who made the change. Always sent."""
+    via: Via | None = None
+    """The client the change came through (null when not known). Always sent. An integration
+    that writes back can skip changes made with its own API key (`actor`).
+    """
     data: dict[str, Any]
-    """`record.*`: `record` (the record after the change), `revision` and `revision_id`.
-    `asset.*`: `asset`. `schema.changed`: `collection` and `schema_change`. `webhook.test`:
+    """`record.*`: `record` (as the change's revision left it, or as it is now for events
+    without a revision such as `record.scheduled`; null once it is purged), `revision` and
+    `revision_id`. `asset.*`: `asset` (as it is now). `collection.*` and `field.*`:
+    `collection` and `schema_change`, except `field.alias_removed`: `field`. `webhook.test`:
     `webhook`.
     """
 
 
-class Asset(NoheadModel):
+class AssetProperties(NoheadModel):
     id: str
     object: str
     project_id: str
@@ -1047,7 +1121,10 @@ class Asset(NoheadModel):
     height: int | None
     status: str
     """`pending` until the upload is completed; only `ready` assets can be used in records."""
-    deleted: bool
+    deleted_at: NullableTimestamp
+    """When the asset was deleted; null unless it is."""
+    purge_after: NullableTimestamp
+    """When a deleted asset and its file are removed for good, unless restored or purged first."""
     preview_url: str | None
     """A signed URL of a small rendition (fits in 640×640, WebP), for ready images, deleted
     ones included until they are purged; null otherwise.
@@ -1104,18 +1181,25 @@ class AssetUploadCreate(NoheadModel):
     """Exact size of the file in bytes (at most 100 MB by default)."""
 
 
-class AssetUploadUpload(NoheadModel):
+class FieldOrder(NoheadModel):
+    object: str
+    collection_id: str
+    field_ids: list[str]
+    """The collection's active fields, first to last."""
+
+
+class AssetWithUpload(AssetProperties):
+    """A new asset with where to upload its file, returned only when it is created."""
+
+    upload: AssetUploadTarget
+
+
+class AssetUploadTarget(NoheadModel):
     method: str
     url: str
     headers: dict[str, str]
     """Headers to send with the upload."""
     expires_at: Timestamp
-
-
-class AssetUpload(NoheadModel):
-    object: str
-    asset: Asset
-    upload: AssetUploadUpload
 
 
 class ApiKeyProperties(NoheadModel):
@@ -1187,12 +1271,14 @@ RecordFilterValue: TypeAlias = str | RecordFilterValueObject
 FieldType: TypeAlias = str
 SchemaChange: TypeAlias = SchemaChangeProperties
 Via: TypeAlias = str
-ChangeVia: TypeAlias = str
 RecordData: TypeAlias = dict[str, Any]
 RecordRevision: TypeAlias = RecordRevisionProperties
 WebhookEventType: TypeAlias = str
+WebhookSubscription: TypeAlias = WebhookEventType | str
 Webhook: TypeAlias = WebhookProperties
+WebhookSecret: TypeAlias = WebhookSecretProperties
 WebhookDelivery: TypeAlias = WebhookDeliveryProperties
+Asset: TypeAlias = AssetProperties
 ApiKeyScope: TypeAlias = str
 ApiKey: TypeAlias = ApiKeyProperties
 PublishedOnly: TypeAlias = bool

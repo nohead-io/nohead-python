@@ -24,7 +24,8 @@ def asset(status: str) -> dict[str, object]:
         "width": None,
         "height": None,
         "status": status,
-        "deleted": False,
+        "deleted_at": None,
+        "purge_after": None,
         "preview_url": None,
         "uploaded_at": None,
         "created_at": "2026-10-02T12:00:00.000Z",
@@ -35,8 +36,7 @@ def asset(status: str) -> dict[str, object]:
 CREATED = json_response(
     201,
     {
-        "object": "asset_upload",
-        "asset": asset("pending"),
+        **asset("pending"),
         "upload": {
             "method": "PUT",
             "url": "https://storage.test/uploads/prj_1/ast_1?signature=x",
@@ -56,9 +56,9 @@ async def test_uploads_a_path(make: Make, tmp_path: Path) -> None:
     ready = await resolve(nohead.assets.upload(file))
     assert ready.status == "ready"
     assert [f"{c.method} {c.url.host}{c.url.path}" for c in calls.calls] == [
-        "POST api.test/v1/projects/prj_1/assets/uploads",
+        "POST api.test/v1/projects/prj_1/assets",
         "PUT storage.test/uploads/prj_1/ast_1",
-        "POST api.test/v1/assets/ast_1/complete",
+        "POST api.test/v1/assets/ast_1/completion",
     ]
     assert calls.body(0) == {"filename": "a.png", "content_type": "image/png", "byte_size": 3}
     put = calls.calls[1]

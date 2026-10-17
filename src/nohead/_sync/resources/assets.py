@@ -9,7 +9,7 @@ from typing_extensions import Unpack
 from ..._errors import UploadError
 from ..._pagination import Page
 from ..._uploads import Uploadable, open_upload
-from ...models import Asset, AssetUpload, AssetUsage, DownloadUrl, ImageUrl
+from ...models import Asset, AssetUsage, AssetWithUpload, DownloadUrl, ImageUrl
 from ...params import AssetUploadCreate
 from ._resource import Resource
 
@@ -50,15 +50,15 @@ class Assets(Resource):
                 f"Storage refused the upload of {source.filename} ({response.status_code})",
                 response.status_code,
             )
-        return self.complete(created.asset.id)
+        return self.complete(created.id)
 
     def create_upload(
         self, *, idempotency_key: str | None = None, **params: Unpack[AssetUploadCreate]
-    ) -> AssetUpload:
-        """The first step of an upload: a `pending` asset and a presigned URL to PUT the
-        bytes to (for example from a browser). Then `complete` it."""
+    ) -> AssetWithUpload:
+        """The first step of an upload: a `pending` asset with its `upload`, a presigned
+        URL to PUT the bytes to (for example from a browser). Then `complete` it."""
         return self._client.request(
-            "assets_upload", cast=AssetUpload, body=params, idempotency_key=idempotency_key
+            "assets_upload", cast=AssetWithUpload, body=params, idempotency_key=idempotency_key
         )
 
     def complete(self, asset: str, *, idempotency_key: str | None = None) -> Asset:
@@ -85,8 +85,7 @@ class Assets(Resource):
             "assets_list",
             item=Asset,
             query={
-                "content_type": content_type,
-                "deleted": deleted,
+                "filter": {"content_type": content_type, "deleted": deleted},
                 "limit": limit,
                 "cursor": cursor,
             },
@@ -114,7 +113,7 @@ class Assets(Resource):
         )
 
     def purge(self, asset: str, *, idempotency_key: str | None = None) -> Asset:
-        """Permanently deletes a deleted asset now, instead of 30 days after the delete,
+        """Permanently deletes a deleted asset now, instead of at its `purge_after`,
         and returns it as it was. It can't be restored; records that reference it keep
         the ID. Raises ConflictError if the asset isn't deleted: delete it first."""
         return self._client.request(

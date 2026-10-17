@@ -7,7 +7,7 @@ from nohead import Nohead
 
 nohead = Nohead()  # reads NOHEAD_API_KEY
 
-for post in nohead.records.list("posts", filter={"status": "published"}):
+for post in nohead.records.list("posts", filter={"published_at": {"exists": True}}):
     print(post.data["title"])
 ```
 
@@ -81,10 +81,11 @@ async with AsyncNohead() as nohead:
 ## Records
 
 ```python
-draft = nohead.records.create("posts", data={"title": "Hello", "author": "rec_01J9..."})
-post = nohead.records.get(draft.id, expand=["author"])
+created = nohead.records.create("posts", data={"title": "Hello", "author": "rec_01J9..."})
+post = nohead.records.get(created.id, expand=["author"])
 nohead.records.update(post.id, data={"title": "Hello again"})  # None clears a field
 nohead.records.publish(post.id)
+nohead.records.publication(post.id)  # since when, by whom, which revision
 nohead.records.schedule(post.id, unpublish_at=datetime(2027, 1, 1, tzinfo=UTC))
 nohead.records.delete(post.id)  # soft delete; records.restore() undoes it
 ```
@@ -124,7 +125,7 @@ Filters take a value to equal, or operators: `eq`, `ne`, `gt`, `gte`, `lt`, `lte
 ```python
 nohead.records.list(
     "posts",
-    filter={"status": "published", "featured": True, "author": "rec_01J9..."},
+    filter={"published_at": {"exists": True}, "featured": True, "author": "rec_01J9..."},
     sort="-published_at",
     expand=["author", "tags"],
 )
@@ -222,7 +223,7 @@ url = nohead.assets.image_url(asset.id, width=1200, format="webp").url
 
 **Uploading from a browser:** create the upload on your server with `create_upload`, `PUT` the file from the browser, then `complete` it.
 
-**Deleting:** `usage` shows which records use an asset. `delete` keeps the file for 30 days, during which `restore` undoes it; `purge` removes a deleted asset for good, now.
+**Deleting:** `usage` shows which records use an asset. `delete` keeps the file until its `purge_after` (30 days), during which `restore` undoes it; `purge` removes a deleted asset for good, now.
 
 ## Search
 
@@ -232,7 +233,7 @@ for hit in nohead.records.search("posts", "content model"):
     ...
 
 # Across the project
-results = nohead.search("content model", collections=["posts", "pages"])
+results = nohead.search("content model", collections=["posts", "pages"], published=True)
 results.meta.total_estimate
 ```
 
@@ -269,9 +270,9 @@ if event.type == "record.published" and event.record:
     rebuild(event.record.collection)
 ```
 
-`unwrap` checks the signature and the timestamp (Standard Webhooks), and raises `WebhookVerificationError` if either is off. Pass the raw body: parsing and re-serializing JSON changes the bytes.
+Event types are the activity log's actions (`record.published`, `record.restored`, `field.updated`, `asset.purged`, ...), and a webhook subscribes to types or wildcards (`record.*`, `*`). `unwrap` checks the signature and the timestamp (Standard Webhooks), and raises `WebhookVerificationError` if either is off. After `rotate_secret`, requests carry a signature for the old secret and the new one for 24 hours, so switch the receiver's secret within that day (or end it sooner with `webhooks.secrets.retire`). Pass the raw body: parsing and re-serializing JSON changes the bytes.
 
-`event.data` is the payload. For convenience, `event.record`, `event.asset`, `event.collection`, `event.schema_change` and `event.webhook` parse its parts, and are None when the event has no such part.
+`event.data` is the payload. For convenience, `event.record`, `event.asset`, `event.collection`, `event.schema_change`, `event.field` and `event.webhook` give its parts, and are None when the event has no such part; `event.actor` and `event.via` say who made the change, through which client.
 
 It's also available as `nohead.webhooks.unwrap(...)` on a client. Events can arrive more than once, so deduplicate by the `webhook-id` header.
 
@@ -289,16 +290,17 @@ It's also available as `nohead.webhooks.unwrap(...)` on a client. Events can arr
 
 | Resource | Methods |
 |---|---|
-| `records` | `list`, `get`, `create`, `update`, `delete`, `restore`, `publish`, `unpublish`, `schedule`, `unschedule`, `count`, `bulk`, `diff`, `search` |
+| `records` | `list`, `get`, `create`, `update`, `delete`, `restore`, `publish`, `unpublish`, `publication`, `get_schedule`, `schedule`, `unschedule`, `scheduled_changes`, `count`, `bulk`, `diff`, `search` |
 | `records.revisions` | `list`, `get`, `revert` |
 | `search` | across the project |
 | `collections` | `list`, `get`, `create`, `update`, `delete`, `restore`, `schema` |
 | `collections.schema_changes` | `list`, `get` |
 | `collections.search_index` | `get`, `rebuild` |
-| `fields` | `list`, `create`, `update`, `delete`, `restore`, `reorder`, `remove_alias`, `migrate` |
+| `fields` | `list`, `create`, `update`, `delete`, `restore`, `order`, `reorder`, `remove_alias`, `migrate` |
 | `migrations` | `list`, `get`, `cancel` |
 | `assets` | `upload`, `create_upload`, `complete`, `list`, `get`, `usage`, `delete`, `restore`, `purge`, `image_url`, `download_url` |
-| `webhooks` | `list`, `get`, `create`, `update`, `delete`, `rotate_secret`, `test`, `unwrap` |
+| `webhooks` | `list`, `get`, `create`, `update`, `delete`, `restore`, `rotate_secret`, `test`, `unwrap` |
+| `webhooks.secrets` | `list`, `retire` |
 | `webhooks.deliveries` | `list`, `get`, `retry` |
 | `audit_events` | `list` |
 | `feature_flags` | `list` |
