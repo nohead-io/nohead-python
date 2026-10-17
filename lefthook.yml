@@ -3,6 +3,9 @@
 pre-commit:
   jobs:
     # The staged changes, before they become a commit: this repository is
-    # public, so a committed secret is a published one.
+    # public, so a committed secret is a published one. A false positive goes in
+    # `.gitleaks.toml`, or gets a `gitleaks:allow` comment on its line.
     - name: secrets
-      run: gitleaks git --pre-commit --staged --redact --verbose --no-banner
+      run: >-
+        command -v gitleaks >/dev/null || { echo "gitleaks is missing: brew install gitleaks" >&2; exit 1; };
+        gitleaks git --pre-commit --staged --redact --verbose --no-banner
