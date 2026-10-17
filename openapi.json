@@ -10963,7 +10963,7 @@
           },
           "data": {
             "type": "object",
-            "description": "`record.*`: `record` (as the change's revision left it, or as it is\nnow for events without a revision such as `record.scheduled`; null\nonce it is purged), `revision` and `revision_id`; a merged draft's\n`record.updated` adds its `draft_id`. `draft.*`: `draft` (as it is\nnow; null once merged or discarded), `draft_id` and `record_id`. `asset.*`:\n`asset` (as it is now). `collection.*` and `field.*`: `collection`\nand `schema_change`, except `field.alias_removed`: `field`.\n`webhook.test`: `webhook`.\n"
+            "description": "`record.*`: `record` (as the change's revision left it, or as it is\nnow for events without a revision such as `record.scheduled`; null\nonce it is purged), `revision` and `revision_id`; a merged draft's\n`record.updated` adds its `draft_id`. `draft.*`: `draft` (as it is\nnow; null once merged or discarded, and while its record is\ndeleted), `draft_id` and `record_id`. `asset.*`:\n`asset` (as it is now). `collection.*` and `field.*`: `collection`\nand `schema_change`, except `field.alias_removed`: `field`.\n`webhook.test`: `webhook`.\n"
           }
         }
       },

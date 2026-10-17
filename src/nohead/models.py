@@ -1179,9 +1179,10 @@ class WebhookEventPayload(NoheadModel):
     """`record.*`: `record` (as the change's revision left it, or as it is now for events
     without a revision such as `record.scheduled`; null once it is purged), `revision` and
     `revision_id`; a merged draft's `record.updated` adds its `draft_id`. `draft.*`: `draft`
-    (as it is now; null once merged or discarded), `draft_id` and `record_id`. `asset.*`:
-    `asset` (as it is now). `collection.*` and `field.*`: `collection` and `schema_change`,
-    except `field.alias_removed`: `field`. `webhook.test`: `webhook`.
+    (as it is now; null once merged or discarded, and while its record is deleted),
+    `draft_id` and `record_id`. `asset.*`: `asset` (as it is now). `collection.*` and
+    `field.*`: `collection` and `schema_change`, except `field.alias_removed`: `field`.
+    `webhook.test`: `webhook`.
     """
 
 
