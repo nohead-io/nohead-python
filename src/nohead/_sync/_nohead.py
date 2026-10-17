@@ -13,6 +13,7 @@ from .._pagination import Page
 from ..models import Record, SearchResultsMeta
 from ._client import APIClient
 from .resources.assets import Assets
+from .resources.drafts import Drafts
 from .resources.other import AuditEvents, FeatureFlags, Health, Me
 from .resources.records import Records
 from .resources.schema import Collections, Fields, Migrations
@@ -75,6 +76,7 @@ class Nohead:
     def _setup(self, client: APIClient) -> None:
         self._client = client
         self.records = Records(client)
+        self.drafts = Drafts(client)
         self.collections = Collections(client)
         self.fields = Fields(client)
         self.migrations = Migrations(client)

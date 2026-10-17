@@ -40,6 +40,11 @@
       "description": "Content entries, their revisions and history."
     },
     {
+      "name": "drafts",
+      "x-group": "Drafts",
+      "description": "Changes to a record that wait to be merged into it, now or at a set time."
+    },
+    {
       "name": "collections",
       "x-group": "Collections",
       "description": "User-defined data models and their schema history."
@@ -427,7 +432,7 @@
       "post": {
         "operationId": "records_publish",
         "summary": "Publish a record",
-        "description": "Makes the record's current content live (`records:publish`), as a\n`publish` revision. Publishing a published record changes nothing.\n",
+        "description": "Makes the record's current content live (`records:publish`), as a\n`publish` revision. Publishing a published record changes nothing,\nbut a live record with a pending draft is `409` with detail code\n`draft_pending` and its `draft_id`: publishing never merges a draft\n(`POST /v1/drafts/{id}/merge` does). An unpublished record goes live\nwith its current content and keeps its draft.\n",
         "tags": [
           "records"
         ],
@@ -1107,7 +1112,7 @@
       "post": {
         "operationId": "records_bulk",
         "summary": "Change many records",
-        "description": "Publishes, unpublishes, deletes, restores or updates\n(`update` with `data`, applied to each) up to 100 records. Each record\nis changed as if by its own request: one revision per effective\nchange, with its own audit event, webhook and search update. Records\nthat fail (not found, invalid, over a plan limit) are reported without\nstopping the others. Publishing needs `records:publish`; the rest\n`records:write`.\n",
+        "description": "Publishes, unpublishes, deletes, restores or updates\n(`update` with `data`, applied to each) up to 100 records. Each record\nis changed as if by its own request: one revision per effective\nchange, with its own audit event, webhook and search update. Records\nthat fail (not found, invalid, over a plan limit, a live record with\na pending draft for `publish`) are reported without stopping the\nothers. Publishing needs `records:publish`; the rest `records:write`.\n",
         "tags": [
           "records"
         ],
@@ -1176,7 +1181,7 @@
       "get": {
         "operationId": "scheduled_changes_list",
         "summary": "List scheduled changes",
-        "description": "Every pending scheduled publish and unpublish of the collection's\nrecords, soonest first (`sort=-at` for the latest first): one per\nchange, so a record due to publish and later unpublish appears twice.\nDeleted records have none. Published-only API keys get `403`.\n",
+        "description": "Every pending scheduled change of the collection's records, soonest\nfirst (`sort=-at` for the latest first): publishes and unpublishes\nfrom records' schedules, and merges from drafts' (`draft_id`). One per\nchange, so a record due to publish and later unpublish appears twice.\nDeleted records have none. Published-only API keys get `403`.\n",
         "tags": [
           "records"
         ],
@@ -1222,6 +1227,487 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/records/{record_id}/drafts": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/RecordId"
+        }
+      ],
+      "get": {
+        "operationId": "record_drafts_list",
+        "summary": "List a record's drafts",
+        "description": "The record's draft, as a list: a record has at most one for now. Empty\nwhile the record is deleted, whose draft is hidden until it is\nrestored. Published-only API keys get `403`.\n",
+        "tags": [
+          "drafts"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DraftList"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
+      "post": {
+        "operationId": "drafts_create",
+        "summary": "Start a draft",
+        "description": "Starts the record's draft (`records:write`): changes to its content\nthat wait until they are merged, now or at a set time, while the\nrecord keeps its current values. `data` takes values as a record\nupdate does, validated on what the record would read after the\nmerge. With `from_revision`, the draft starts from that revision's\nvalues (mapped onto the current schema, as a revert is), to bring an\nearlier version back for review. Works on any record, live or not.\n\nOne draft per record: a second is `409` with detail code\n`draft_exists` and its `draft_id`, so change that one instead. `409`\nwith detail code `deleted` while the record is soft-deleted.\n",
+        "tags": [
+          "drafts"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/DraftCreated"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/collections/{collection_id}/drafts": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CollectionRef"
+        }
+      ],
+      "get": {
+        "operationId": "drafts_list",
+        "summary": "List drafts",
+        "description": "The drafts of the collection's records, most recently changed first,\nfor \"changes pending\" badges: a record's representation is only its\ncontent. `filter[record_id]` takes a record ID, or up to 100 with\n`filter[record_id][in]=rec_1,rec_2`. Deleted records' drafts are left\nout. Published-only API keys get `403`.\n",
+        "tags": [
+          "drafts"
+        ],
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "style": "deepObject",
+            "explode": true,
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "record_id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "in"
+                      ],
+                      "properties": {
+                        "in": {
+                          "type": "string",
+                          "description": "Up to 100 comma-separated record IDs."
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "updated_at",
+                "-updated_at"
+              ],
+              "default": "-updated_at"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/DraftList"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/drafts/{draft_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DraftId"
+        }
+      ],
+      "get": {
+        "operationId": "drafts_get",
+        "summary": "Get a draft",
+        "description": "The draft, with `data` as the record would read after the merge, so a\nsite's preview route can render it; `expand` embeds what its relation\nand asset fields point at, as for a record. `404` while the record is\ndeleted. Published-only API keys get `403`.\n",
+        "tags": [
+          "drafts"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Expand"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Draft"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "drafts_update",
+        "summary": "Update a draft",
+        "description": "Changes the draft's values (`records:write`), as a record update\ndoes: keys present in `data` replace their values, and `null` clears\none. A value set back to the record's drops out of the draft.\n",
+        "tags": [
+          "drafts"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Draft"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "drafts_discard",
+        "summary": "Discard a draft",
+        "description": "Discards the draft for good (`records:write`); the record is\nunchanged. Returns the draft as it was. The activity log keeps that\nit existed (`draft.discarded`).\n",
+        "tags": [
+          "drafts"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Draft"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/drafts/{draft_id}/merge": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DraftId"
+        }
+      ],
+      "post": {
+        "operationId": "drafts_merge",
+        "summary": "Merge a draft",
+        "description": "Applies the draft to its record now (`records:write`), as one `merge`\nrevision that names the draft and its authors, then removes the\ndraft; returns the record. Content only: the record stays live or\nunpublished as it was, and `published_at` keeps its date. Fields the\nrecord changed since the draft started (`base_revision`) keep their\nvalues, unless the draft changes them too. The result is validated\nas a record update is, and unique values are checked again (`422`).\nWebhooks get `record.updated` with the `draft_id`.\n",
+        "tags": [
+          "drafts"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          },
+          {
+            "$ref": "#/components/parameters/ChangeNote"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Record"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/drafts/{draft_id}/schedule": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/DraftId"
+        }
+      ],
+      "put": {
+        "operationId": "drafts_schedule",
+        "summary": "Schedule a draft's merge",
+        "description": "Merges the draft at `merge_at`, a future time (`records:write`),\nwithin a minute of it, from the scheduler (`via: scheduler`). The\nmerge uses the draft as it is then. One that can't be made leaves the\ndraft as it is, with `schedule.last_error` (and `draft.schedule_failed`).\nReturns the draft. A merge due while the record is deleted waits;\nonce its time has passed, restoring the record drops it, with\n`last_error`.\n",
+        "tags": [
+          "drafts"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftScheduleUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Draft"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "drafts_unschedule",
+        "summary": "Cancel a draft's merge",
+        "description": "Clears `merge_at` and `last_error`; returns the draft.",
+        "tags": [
+          "drafts"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Draft"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
@@ -6151,6 +6637,15 @@
         },
         "example": "rec_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
       },
+      "DraftId": {
+        "name": "draft_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "example": "drf_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
+      },
       "RevisionNumber": {
         "name": "revision",
         "in": "path",
@@ -6379,7 +6874,7 @@
       "IfMatch": {
         "name": "If-Match",
         "in": "header",
-        "description": "The record revision you last read, e.g. `\"7\"`. Stale writes fail with 412.",
+        "description": "The revision you last read (the record's, or the draft's for a draft), e.g. `\"7\"`. Stale writes fail with 412.",
         "schema": {
           "type": "string"
         }
@@ -6440,7 +6935,7 @@
         }
       },
       "ETag": {
-        "description": "The record's current revision, e.g. `\"7\"`. Send it back as `If-Match`.",
+        "description": "The current revision (the record's, or the draft's), e.g. `\"7\"`. Send it back as `If-Match`.",
         "schema": {
           "type": "string"
         }
@@ -8205,6 +8700,7 @@
           "action",
           "at",
           "record_id",
+          "draft_id",
           "last_error"
         ],
         "properties": {
@@ -8213,9 +8709,11 @@
           },
           "action": {
             "type": "string",
+            "description": "`publish` and `unpublish` are the record's schedule; `merge` is a draft's.",
             "enum": [
               "publish",
-              "unpublish"
+              "unpublish",
+              "merge"
             ]
           },
           "at": {
@@ -8224,12 +8722,19 @@
           "record_id": {
             "type": "string"
           },
+          "draft_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The draft that merges, for `merge`."
+          },
           "last_error": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Why the record's last scheduled change could not be made, as in its schedule."
+            "description": "Why the last scheduled change could not be made, as in the record's (or the draft's) schedule."
           }
         }
       },
@@ -8265,6 +8770,209 @@
           "system",
           "scheduler"
         ]
+      },
+      "Draft": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "object",
+          "record_id",
+          "collection_id",
+          "collection",
+          "base_revision",
+          "revision",
+          "data",
+          "changed_fields",
+          "schedule",
+          "created_by",
+          "edited_by",
+          "created_at",
+          "updated_at"
+        ],
+        "description": "Changes to a record's content that wait until they are merged into\nit, now or at `schedule.merge_at`. Content only: whether the record\nis live is its publication and schedule.\n",
+        "properties": {
+          "id": {
+            "type": "string",
+            "examples": [
+              "drf_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
+            ]
+          },
+          "object": {
+            "const": "draft"
+          },
+          "record_id": {
+            "type": "string"
+          },
+          "collection_id": {
+            "type": "string"
+          },
+          "collection": {
+            "type": "string",
+            "description": "The collection slug."
+          },
+          "base_revision": {
+            "type": "integer",
+            "description": "The record's revision when the draft started. Fields the record\nchanged since keep their values at the merge, unless the draft\nchanges them too; compare with `GET /v1/records/{id}/diff?from=<base_revision>`.\n"
+          },
+          "revision": {
+            "type": "integer",
+            "description": "The draft's own revision, 1 when started and one more per change; also returned as the ETag."
+          },
+          "data": {
+            "description": "The record's values as they read after the merge.",
+            "$ref": "#/components/schemas/RecordData"
+          },
+          "changed_fields": {
+            "type": "array",
+            "description": "API keys of the fields the draft changes.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/DraftSchedule"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "edited_by": {
+            "type": "array",
+            "description": "Everyone who changed it since, in order.",
+            "items": {
+              "$ref": "#/components/schemas/Actor"
+            }
+          },
+          "expanded": {
+            "type": "object",
+            "description": "Only with `expand`, as on a record, for the values after the merge.",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Record"
+                },
+                {
+                  "$ref": "#/components/schemas/Asset"
+                },
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Record"
+                      },
+                      {
+                        "$ref": "#/components/schemas/Asset"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        }
+      },
+      "DraftSchedule": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "merge_at",
+          "last_error"
+        ],
+        "description": "When the draft merges on its own (within a minute of the time), set\nwith `PUT /v1/drafts/{draft_id}/schedule`. `last_error` explains the\nlast scheduled merge that could not be made, until a new one is set.\n",
+        "properties": {
+          "merge_at": {
+            "$ref": "#/components/schemas/NullableTimestamp"
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "DraftScheduleUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "merge_at"
+        ],
+        "properties": {
+          "merge_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        }
+      },
+      "DraftCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RecordData"
+          },
+          "from_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Start from this revision's values instead of the record's current ones."
+          }
+        }
+      },
+      "DraftList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "meta"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Draft"
+            }
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ListMeta"
+          }
+        }
+      },
+      "MergedDraft": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "created_at",
+          "created_by",
+          "edited_by"
+        ],
+        "description": "The draft a `merge` revision merged, which is gone since.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/Actor"
+          },
+          "edited_by": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Actor"
+            }
+          }
+        }
       },
       "RecordData": {
         "type": "object",
@@ -8474,6 +9182,7 @@
           "reverted_to_revision",
           "changed_fields",
           "redacted_fields",
+          "draft",
           "created_at"
         ],
         "properties": {
@@ -8503,7 +9212,8 @@
               "restore",
               "revert",
               "migrate",
-              "import"
+              "import",
+              "merge"
             ]
           },
           "actor": {
@@ -8540,6 +9250,17 @@
             "items": {
               "type": "string"
             }
+          },
+          "draft": {
+            "description": "For a `merge`, the draft it merged, with who started and edited it; null otherwise.",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MergedDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "created_at": {
             "$ref": "#/components/schemas/Timestamp"
@@ -8940,7 +9661,7 @@
       },
       "WebhookEventType": {
         "type": "string",
-        "description": "An event webhooks can subscribe to: the same names as the activity\nlog's actions. A subscription can also be every type of a resource\n(`record.*`, `collection.*`, `field.*`, `asset.*`) or `*` for all.\n",
+        "description": "An event webhooks can subscribe to: the same names as the activity\nlog's actions. A subscription can also be every type of a resource\n(`record.*`, `draft.*`, `collection.*`, `field.*`, `asset.*`) or `*` for all.\n",
         "enum": [
           "record.created",
           "record.imported",
@@ -8954,6 +9675,12 @@
           "record.scheduled",
           "record.unscheduled",
           "record.schedule_failed",
+          "draft.created",
+          "draft.updated",
+          "draft.discarded",
+          "draft.scheduled",
+          "draft.unscheduled",
+          "draft.schedule_failed",
           "collection.created",
           "collection.updated",
           "collection.deleted",
@@ -8980,6 +9707,7 @@
             "type": "string",
             "enum": [
               "record.*",
+              "draft.*",
               "collection.*",
               "field.*",
               "asset.*",
@@ -10235,7 +10963,7 @@
           },
           "data": {
             "type": "object",
-            "description": "`record.*`: `record` (as the change's revision left it, or as it is\nnow for events without a revision such as `record.scheduled`; null\nonce it is purged), `revision` and `revision_id`. `asset.*`:\n`asset` (as it is now). `collection.*` and `field.*`: `collection`\nand `schema_change`, except `field.alias_removed`: `field`.\n`webhook.test`: `webhook`.\n"
+            "description": "`record.*`: `record` (as the change's revision left it, or as it is\nnow for events without a revision such as `record.scheduled`; null\nonce it is purged), `revision` and `revision_id`; a merged draft's\n`record.updated` adds its `draft_id`. `draft.*`: `draft` (as it is\nnow; null once merged or discarded, and while its record is\ndeleted), `draft_id` and `record_id`. `asset.*`:\n`asset` (as it is now). `collection.*` and `field.*`: `collection`\nand `schema_change`, except `field.alias_removed`: `field`.\n`webhook.test`: `webhook`.\n"
           }
         }
       },
@@ -10808,6 +11536,10 @@
           "record_id": {
             "type": "string",
             "description": "The record that already has the value, for `taken` details."
+          },
+          "draft_id": {
+            "type": "string",
+            "description": "The record's draft, for `draft_exists` and `draft_pending` details."
           }
         }
       },
@@ -10869,6 +11601,46 @@
           "application/json": {
             "schema": {
               "$ref": "#/components/schemas/Record"
+            }
+          }
+        }
+      },
+      "Draft": {
+        "description": "The draft.",
+        "headers": {
+          "ETag": {
+            "$ref": "#/components/headers/ETag"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Draft"
+            }
+          }
+        }
+      },
+      "DraftCreated": {
+        "description": "The started draft.",
+        "headers": {
+          "ETag": {
+            "$ref": "#/components/headers/ETag"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Draft"
+            }
+          }
+        }
+      },
+      "DraftList": {
+        "description": "A page of drafts.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/DraftList"
             }
           }
         }

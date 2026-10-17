@@ -8,6 +8,7 @@ from typing_extensions import Unpack
 
 from ..._pagination import AsyncPaginator
 from ...models import (
+    Draft,
     Record,
     RecordBatch,
     RecordCount,
@@ -152,6 +153,8 @@ class AsyncRecords(AsyncResource):
         idempotency_key: str | None = None,
         change_note: str | None = None,
     ) -> Record:
+        """A live record with a pending draft is a ConflictError (detail code
+        `draft_pending`): publishing never merges a draft (`drafts.merge` does)."""
         return await self._client.request(
             "records_publish",
             cast=Record,
@@ -242,6 +245,17 @@ class AsyncRecords(AsyncResource):
             item=ScheduledChange,
             path={"collection_id": collection},
             query={"sort": sort, "limit": limit, "cursor": cursor},
+        )
+
+    def drafts(
+        self, record: str, *, limit: int | None = None, cursor: str | None = None
+    ) -> AsyncPaginator[Draft]:
+        """The record's drafts: at most one for now."""
+        return self._client.paginate(
+            "record_drafts_list",
+            item=Draft,
+            path={"record_id": record},
+            query={"limit": limit, "cursor": cursor},
         )
 
     async def count(self, collection: str, *, filter: RecordFilter | None = None) -> RecordCount:
