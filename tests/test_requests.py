@@ -125,6 +125,8 @@ def test_change_note_in_any_language_percent_encoded() -> None:
     nohead.records.delete("rec_1", change_note="Rettet på forsiden ✓")
     assert calls.calls[0].headers["nohead-change-note"] == "Duplicate"
     assert calls.calls[1].headers["nohead-change-note"] == "Rettet%20p%C3%A5%20forsiden%20%E2%9C%93"
+    nohead.records.delete("rec_1", change_note="Cut \ud83d")
+    assert calls.calls[2].headers["nohead-change-note"] == "Cut%20%EF%BF%BD"
 
 
 @pytest.mark.filterwarnings("ignore::nohead.NoheadWarning")

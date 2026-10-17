@@ -6,6 +6,7 @@ import json
 import os
 import platform
 import random
+import re
 import typing
 import urllib.parse
 import uuid
@@ -168,8 +169,10 @@ def headers(
         out["If-Match"] = f'"{revision}"'
     if change_note:
         # Percent-encoded UTF-8, as encodeURIComponent: header values are
-        # bytes (the API decodes it).
-        out["Nohead-Change-Note"] = urllib.parse.quote(change_note, safe="-_.!~*'()")
+        # bytes (the API decodes it). A lone surrogate becomes U+FFFD.
+        # (A Python string holds surrogates only unpaired.)
+        well_formed = re.sub("[\ud800-\udfff]", "\ufffd", change_note)
+        out["Nohead-Change-Note"] = urllib.parse.quote(well_formed, safe="-_.!~*'()")
     return out
 
 
