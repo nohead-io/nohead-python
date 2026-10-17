@@ -65,6 +65,8 @@ def test_lists_drafts_by_record() -> None:
     nohead.drafts.list("posts", record_id=["rec_1", "rec_2"]).data  # noqa: B018
     assert calls.calls[0].url.params["filter[record_id]"] == "rec_1"
     assert calls.calls[1].url.params["filter[record_id][in]"] == "rec_1,rec_2"
+    with pytest.raises(ValueError, match="at least one"):
+        nohead.drafts.list("posts", record_id=[])
 
 
 async def test_async_iterates_across_pages() -> None:

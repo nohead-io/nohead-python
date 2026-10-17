@@ -50,11 +50,14 @@ class Drafts(Resource):
         cursor: str | None = None,
     ) -> Page[Draft]:
         """A collection's drafts, most recently changed first. `record_id` narrows
-        them to one record, or to several (up to 100)."""
+        them to one record, or to several (1 to 100; an empty list is a ValueError,
+        since it would match no record)."""
         filter: dict[str, Any] | None = None
         if isinstance(record_id, str):
             filter = {"record_id": record_id}
         elif record_id is not None:
+            if not record_id:
+                raise ValueError("record_id needs at least one record ID")
             filter = {"record_id": {"in": list(record_id)}}
         return self._client.paginate(
             "drafts_list",
