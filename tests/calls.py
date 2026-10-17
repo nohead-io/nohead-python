@@ -55,7 +55,7 @@ def every_call(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.records.get_schedule("rec_01J9ZQ3F8X"),
         lambda: nohead.records.schedule("rec_01J9ZQ3F8X", publish_at="2027-01-01T00:00:00Z"),
         lambda: nohead.records.unschedule("rec_01J9ZQ3F8X"),
-        lambda: nohead.records.scheduled_changes("posts", sort="at"),
+        lambda: nohead.records.scheduled_changes("posts", sort="-at"),
         lambda: nohead.records.count("posts", filter={"published_at": {"exists": False}}),
         lambda: nohead.records.bulk("posts", action="publish", record_ids=["rec_01J9ZQ3F8X"]),
         lambda: nohead.records.diff("rec_01J9ZQ3F8X", 1, 2),
