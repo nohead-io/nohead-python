@@ -311,6 +311,7 @@ The SDK covers every operation an API key can call. Organizations, projects, mem
 
 ```bash
 uv sync                                  # Python 3.11+ and the dev tools
+lefthook install                         # a pre-commit secret scan (brew install lefthook gitleaks)
 uv run pytest                            # unit and contract tests, both clients
 uv run ruff format . && uv run ruff check . && uv run pyright
 uv run python scripts/generate.py        # after updating openapi.json

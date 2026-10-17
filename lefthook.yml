@@ -1,0 +1,8 @@
+# Installed with `lefthook install`; needs lefthook and gitleaks
+# (`brew install lefthook gitleaks`).
+pre-commit:
+  jobs:
+    # The staged changes, before they become a commit: this repository is
+    # public, so a committed secret is a published one.
+    - name: secrets
+      run: gitleaks git --pre-commit --staged --redact --verbose --no-banner

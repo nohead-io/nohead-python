@@ -1,0 +1,9 @@
+# gitleaks' default rules, minus a known false positive.
+[extend]
+useDefault = true
+
+# The webhook tests verify the Standard Webhooks specification's example,
+# which signs with this published secret.
+[[allowlists]]
+description = "The Standard Webhooks specification's example secret"
+regexes = ['''^whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw$''']
