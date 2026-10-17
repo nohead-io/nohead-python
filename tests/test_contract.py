@@ -97,6 +97,7 @@ def every_parameter(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.records.search("posts", "hello", limit=5, cursor="cur_x"),
         lambda: nohead.search("hello", limit=5, cursor="cur_x"),
         lambda: nohead.collections.list(limit=5, cursor="cur_x"),
+        lambda: nohead.records.scheduled_changes("posts", limit=5, cursor="cur_x"),
         lambda: nohead.collections.schema_changes.list("posts", limit=5, cursor="cur_x"),
         lambda: nohead.fields.list("posts", limit=5, cursor="cur_x"),
         lambda: nohead.migrations.list("posts", limit=5, cursor="cur_x"),
@@ -104,6 +105,7 @@ def every_parameter(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.assets.image_url("ast_01J9ZQ3F8X", height=100, fit="cover", quality=80),
         lambda: nohead.webhooks.list(limit=5, cursor="cur_x"),
         lambda: nohead.webhooks.deliveries.list("wh_01J9ZQ3F8X", limit=5, cursor="cur_x"),
+        lambda: nohead.webhooks.secrets.list("wh_01J9ZQ3F8X", limit=5, cursor="cur_x"),
         lambda: nohead.audit_events.list(limit=5, cursor="cur_x"),
     ]
 
