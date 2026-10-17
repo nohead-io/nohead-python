@@ -69,6 +69,17 @@ def test_returns_the_event() -> None:
     assert event.asset is None
 
 
+def test_draft_events_name_the_draft_once_it_is_gone() -> None:
+    body = (
+        '{"id":"wev_2","object":"event","type":"draft.discarded",'
+        '"created_at":"2026-10-18T12:00:00.000Z","project_id":"prj_1",'
+        '"data":{"draft":null,"draft_id":"drf_1","record_id":"rec_1"}}'
+    )
+    event = unwrap(body, sign(body), secret=SECRET)
+    assert event.draft is None
+    assert event.draft_id == "drf_1"
+
+
 def test_any_header_case_bytes_and_several_signatures() -> None:
     headers = {k.title(): v for k, v in sign(BODY).items()}
     headers["Webhook-Signature"] = "v1,bm90LWl0 " + headers["Webhook-Signature"]

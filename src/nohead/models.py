@@ -582,15 +582,89 @@ class RecordPublication(NoheadModel):
 class ScheduledChange(NoheadModel):
     object: str
     action: str
+    """`publish` and `unpublish` are the record's schedule; `merge` is a draft's."""
     at: Timestamp
     record_id: str
+    draft_id: str | None
+    """The draft that merges, for `merge`."""
     last_error: str | None
-    """Why the record's last scheduled change could not be made, as in its schedule."""
+    """Why the last scheduled change could not be made, as in the record's (or the draft's)
+    schedule.
+    """
 
 
 class ScheduledChangeList(NoheadModel):
     data: list[ScheduledChange]
     meta: ListMeta
+
+
+class Draft(NoheadModel):
+    """Changes to a record's content that wait until they are merged into it, now or at
+    `schedule.merge_at`. Content only: whether the record is live is its publication and
+    schedule.
+    """
+
+    id: str
+    object: str
+    record_id: str
+    collection_id: str
+    collection: str
+    """The collection slug."""
+    base_revision: int
+    """The record's revision when the draft started. Fields the record changed since keep their
+    values at the merge, unless the draft changes them too; compare with `GET
+    /v1/records/{id}/diff?from=<base_revision>`.
+    """
+    revision: int
+    """The draft's own revision, 1 when started and one more per change; also returned as the
+    ETag.
+    """
+    data: RecordData
+    """The record's values as they read after the merge."""
+    changed_fields: list[str]
+    """API keys of the fields the draft changes."""
+    schedule: DraftSchedule
+    created_by: Actor
+    edited_by: list[Actor]
+    """Everyone who changed it since, in order."""
+    expanded: dict[str, Record | Asset | list[Record | Asset] | None] | None = None
+    """Only with `expand`, as on a record, for the values after the merge."""
+    created_at: Timestamp
+    updated_at: Timestamp
+
+
+class DraftSchedule(NoheadModel):
+    """When the draft merges on its own (within a minute of the time), set with `PUT
+    /v1/drafts/{draft_id}/schedule`. `last_error` explains the last scheduled merge that
+    could not be made, until a new one is set.
+    """
+
+    merge_at: NullableTimestamp
+    last_error: str | None
+
+
+class DraftScheduleUpdate(NoheadModel):
+    merge_at: Timestamp
+
+
+class DraftCreate(NoheadModel):
+    data: RecordData | None = None
+    from_revision: int | None = None
+    """Start from this revision's values instead of the record's current ones."""
+
+
+class DraftList(NoheadModel):
+    data: list[Draft]
+    meta: ListMeta
+
+
+class MergedDraft(NoheadModel):
+    """The draft a `merge` revision merged, which is gone since."""
+
+    id: str
+    created_at: Timestamp
+    created_by: Actor
+    edited_by: list[Actor]
 
 
 class Record(NoheadModel):
@@ -665,6 +739,8 @@ class RecordRevisionProperties(NoheadModel):
     """API keys of fields whose values in this revision were redacted (`POST
     /v1/records/{id}/redactions`); those values read `{"$redacted": true}`.
     """
+    draft: MergedDraft | None
+    """For a `merge`, the draft it merged, with who started and edited it; null otherwise."""
     created_at: Timestamp
 
 
@@ -1102,9 +1178,10 @@ class WebhookEventPayload(NoheadModel):
     data: dict[str, Any]
     """`record.*`: `record` (as the change's revision left it, or as it is now for events
     without a revision such as `record.scheduled`; null once it is purged), `revision` and
-    `revision_id`. `asset.*`: `asset` (as it is now). `collection.*` and `field.*`:
-    `collection` and `schema_change`, except `field.alias_removed`: `field`. `webhook.test`:
-    `webhook`.
+    `revision_id`; a merged draft's `record.updated` adds its `draft_id`. `draft.*`: `draft`
+    (as it is now; null once merged or discarded), `draft_id` and `record_id`. `asset.*`:
+    `asset` (as it is now). `collection.*` and `field.*`: `collection` and `schema_change`,
+    except `field.alias_removed`: `field`. `webhook.test`: `webhook`.
     """
 
 
@@ -1249,6 +1326,8 @@ class ErrorDetail(NoheadModel):
     """The resource's current revision, for `revision_mismatch` details."""
     record_id: str | None = None
     """The record that already has the value, for `taken` details."""
+    draft_id: str | None = None
+    """The record's draft, for `draft_exists` and `draft_pending` details."""
 
 
 class ErrorError(NoheadModel):

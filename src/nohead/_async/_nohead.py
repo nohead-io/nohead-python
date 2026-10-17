@@ -12,6 +12,7 @@ from .._pagination import AsyncPaginator
 from ..models import Record, SearchResultsMeta
 from ._client import AsyncAPIClient
 from .resources.assets import AsyncAssets
+from .resources.drafts import AsyncDrafts
 from .resources.other import AsyncAuditEvents, AsyncFeatureFlags, AsyncHealth, AsyncMe
 from .resources.records import AsyncRecords
 from .resources.schema import AsyncCollections, AsyncFields, AsyncMigrations
@@ -74,6 +75,7 @@ class AsyncNohead:
     def _setup(self, client: AsyncAPIClient) -> None:
         self._client = client
         self.records = AsyncRecords(client)
+        self.drafts = AsyncDrafts(client)
         self.collections = AsyncCollections(client)
         self.fields = AsyncFields(client)
         self.migrations = AsyncMigrations(client)

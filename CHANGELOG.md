@@ -7,6 +7,12 @@ section is its GitHub release's notes.
 
 ## 0.3.0
 
+- Drafts: changes to a record that wait until they are merged into it, now
+  or at a set time. `drafts.create`, `list`, `get` (with `expand`, for
+  previews), `update`, `discard`, `merge`, `schedule` and `unschedule`, and
+  `records.drafts`. `records.publish` on a live record with a pending draft
+  is a `ConflictError` (`draft_pending`). Webhook events have `event.draft`
+  and `event.draft_id` (`draft.*`, and a merge's `record.updated`).
 - **Breaking:** the API is resource-oriented. Method names stay; what they
   return and take follows it:
   - Records have no `status`, `schedule` or `deleted`: a record is published

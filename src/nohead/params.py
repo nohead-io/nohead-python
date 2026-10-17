@@ -29,6 +29,16 @@ class CollectionUpdate(TypedDict):
     description: NotRequired[str | None]
 
 
+class DraftCreate(TypedDict):
+    data: NotRequired[RecordData]
+    from_revision: NotRequired[int]
+    """Start from this revision's values instead of the record's current ones."""
+
+
+class DraftScheduleUpdate(TypedDict):
+    merge_at: Timestamp
+
+
 class FieldCreate(TypedDict):
     name: str
     api_key: str
@@ -138,6 +148,7 @@ FieldType: TypeAlias = Literal[
 ]
 NullableTimestamp: TypeAlias = str | datetime | None
 RecordData: TypeAlias = dict[str, Any]
+Timestamp: TypeAlias = str | datetime
 WebhookEventType: TypeAlias = Literal[
     "record.created",
     "record.imported",
@@ -151,6 +162,12 @@ WebhookEventType: TypeAlias = Literal[
     "record.scheduled",
     "record.unscheduled",
     "record.schedule_failed",
+    "draft.created",
+    "draft.updated",
+    "draft.discarded",
+    "draft.scheduled",
+    "draft.unscheduled",
+    "draft.schedule_failed",
     "collection.created",
     "collection.updated",
     "collection.deleted",
@@ -168,5 +185,5 @@ WebhookEventType: TypeAlias = Literal[
     "asset.purged",
 ]
 WebhookSubscription: TypeAlias = (
-    WebhookEventType | Literal["record.*", "collection.*", "field.*", "asset.*", "*"]
+    WebhookEventType | Literal["record.*", "draft.*", "collection.*", "field.*", "asset.*", "*"]
 )

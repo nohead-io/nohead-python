@@ -85,6 +85,17 @@ def sync_flow() -> str:
         expect(published.published_at, "publish publishes")
         publication = nohead.records.publication(first.id)
         expect(publication.revision == published.revision, "the publication says what is live")
+        draft = nohead.drafts.create(first.id, data={"title": "Uno, revised"})
+        expect(
+            nohead.records.get(first.id).data["title"] == "Uno",
+            "a draft leaves the live record as it is",
+        )
+        merged = nohead.drafts.merge(draft.id, if_match=draft)
+        expect(
+            merged.data["title"] == "Uno, revised"
+            and merged.published_at == published.published_at,
+            "merging a draft changes the content, not the publication",
+        )
         unpublished = nohead.records.unpublish(first.id)
         expect(unpublished.published_at is None, "unpublish takes it back")
 

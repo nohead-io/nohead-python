@@ -19,6 +19,7 @@ for post in nohead.records.list("posts", filter={"published_at": {"exists": True
 - [Configuration](#configuration)
 - [Async](#async)
 - [Records](#records)
+- [Drafts](#drafts)
 - [Pagination](#pagination)
 - [Errors](#errors)
 - [Retries and idempotency](#retries-and-idempotency)
@@ -97,6 +98,22 @@ Methods return models and raise on failure. Field values are in `record.data`, a
 - `count`, and `bulk` (up to 100 records at once)
 - `diff(record, from_revision, to_revision)`
 - `revisions.list`, `revisions.get` and `revisions.revert` (with `dry_run=True` for a preview)
+
+## Drafts
+
+A draft holds changes to a record until they are merged, now or at a set time, while the record keeps its current content: changes to review before they go live, or changes due later.
+
+```python
+draft = nohead.drafts.create(post.id, data={"title": "Hello, revised"})
+nohead.drafts.update(draft.id, data={"summary": "..."}, if_match=draft)
+preview = nohead.drafts.get(draft.id, expand=["author"])  # data as it would read
+nohead.drafts.merge(draft.id)  # or drafts.schedule(draft.id, merge_at=...)
+```
+
+- A record has at most one draft; starting a second is a `ConflictError` (detail code `draft_exists`, with its `draft_id`).
+- A merge changes content only: a live record stays live, an unpublished one unpublished. Publishing a live record with a pending draft is a `ConflictError` (`draft_pending`).
+- `records.drafts(id)` lists a record's draft, and `drafts.list(collection, record_id=...)` a collection's (`record_id` takes up to 100 IDs).
+- `drafts.discard` deletes one for good.
 
 ## Pagination
 
@@ -272,7 +289,7 @@ if event.type == "record.published" and event.record:
 
 Event types are the activity log's actions (`record.published`, `record.restored`, `field.updated`, `asset.purged`, ...), and a webhook subscribes to types or wildcards (`record.*`, `*`). `unwrap` checks the signature and the timestamp (Standard Webhooks), and raises `WebhookVerificationError` if either is off. After `rotate_secret`, requests carry a signature for the old secret and the new one for 24 hours, so switch the receiver's secret within that day (or end it sooner with `webhooks.secrets.retire`). Pass the raw body: parsing and re-serializing JSON changes the bytes.
 
-`event.data` is the payload. For convenience, `event.record`, `event.asset`, `event.collection`, `event.schema_change`, `event.field` and `event.webhook` give its parts, and are None when the event has no such part; `event.actor` and `event.via` say who made the change, through which client.
+`event.data` is the payload. For convenience, `event.record`, `event.asset`, `event.collection`, `event.schema_change`, `event.field`, `event.draft` and `event.webhook` give its parts, and are None when the event has no such part; `event.actor` and `event.via` say who made the change, through which client.
 
 It's also available as `nohead.webhooks.unwrap(...)` on a client. Events can arrive more than once, so deduplicate by the `webhook-id` header.
 
@@ -290,7 +307,8 @@ It's also available as `nohead.webhooks.unwrap(...)` on a client. Events can arr
 
 | Resource | Methods |
 |---|---|
-| `records` | `list`, `get`, `create`, `update`, `delete`, `restore`, `publish`, `unpublish`, `publication`, `get_schedule`, `schedule`, `unschedule`, `scheduled_changes`, `count`, `bulk`, `diff`, `search` |
+| `records` | `list`, `get`, `create`, `update`, `delete`, `restore`, `publish`, `unpublish`, `publication`, `get_schedule`, `schedule`, `unschedule`, `scheduled_changes`, `drafts`, `count`, `bulk`, `diff`, `search` |
+| `drafts` | `create`, `list`, `get`, `update`, `discard`, `merge`, `schedule`, `unschedule` |
 | `records.revisions` | `list`, `get`, `revert` |
 | `search` | across the project |
 | `collections` | `list`, `get`, `create`, `update`, `delete`, `restore`, `schema` |

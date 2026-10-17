@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import Any, TypeVar, cast
 
 from ._errors import WebhookVerificationError
-from .models import Actor, Asset, Field, NoheadModel, Record, Webhook
+from .models import Actor, Asset, Draft, Field, NoheadModel, Record, Webhook
 
 __all__ = ["WebhookEvent", "unwrap"]
 
@@ -35,8 +35,8 @@ class WebhookEvent(NoheadModel):
     object: str
     type: str
     """The activity log's action: `record.*` (`record.created`, `record.published`,
-    `record.restored`, `record.scheduled`, ...), `collection.*`, `field.*`,
-    `asset.*`, or `webhook.test`."""
+    `record.restored`, `record.scheduled`, ...), `draft.*`, `collection.*`,
+    `field.*`, `asset.*`, or `webhook.test`."""
     created_at: datetime
     project_id: str
     actor: Actor | None = None
@@ -61,6 +61,19 @@ class WebhookEvent(NoheadModel):
     @property
     def revision_id(self) -> str | None:
         value = self.data.get("revision_id")
+        return value if isinstance(value, str) else None
+
+    @property
+    def draft(self) -> Draft | None:
+        """`draft.*` events: the draft as it is now, or None once merged or
+        discarded."""
+        return self._part("draft", Draft)
+
+    @property
+    def draft_id(self) -> str | None:
+        """`draft.*` events: the draft's ID (also once it is gone); a merged draft's
+        `record.updated`: the draft it merged."""
+        value = self.data.get("draft_id")
         return value if isinstance(value, str) else None
 
     @property

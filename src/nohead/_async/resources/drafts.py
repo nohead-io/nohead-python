@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+from datetime import datetime
+from typing import Any, Literal
+
+from ..._pagination import AsyncPaginator
+from ...models import Draft, Record
+from ...params import RecordData
+from ...types import IfMatch
+from ._resource import AsyncResource
+
+
+class AsyncDrafts(AsyncResource):
+    """Drafts: changes to a record's content that wait until they are merged into
+    it, now or at a set time, while the record keeps its current content. A record
+    has at most one. `draft` is a draft ID (`drf_...`), `record` a record ID and
+    `collection` a collection ID or slug."""
+
+    async def create(
+        self,
+        record: str,
+        *,
+        data: RecordData | None = None,
+        from_revision: int | None = None,
+        idempotency_key: str | None = None,
+    ) -> Draft:
+        """Starts the record's draft: `data` over the record's values, or with
+        `from_revision`, over an earlier revision's. A second draft is a
+        ConflictError (detail code `draft_exists`, with its `draft_id`)."""
+        body: dict[str, Any] = {"data": data or {}}
+        if from_revision is not None:
+            body["from_revision"] = from_revision
+        return await self._client.request(
+            "drafts_create",
+            cast=Draft,
+            path={"record_id": record},
+            body=body,
+            idempotency_key=idempotency_key,
+        )
+
+    def list(
+        self,
+        collection: str,
+        *,
+        record_id: str | Sequence[str] | None = None,
+        sort: Literal["updated_at", "-updated_at"] | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
+    ) -> AsyncPaginator[Draft]:
+        """A collection's drafts, most recently changed first. `record_id` narrows
+        them to one record, or to several (up to 100)."""
+        filter: dict[str, Any] | None = None
+        if isinstance(record_id, str):
+            filter = {"record_id": record_id}
+        elif record_id is not None:
+            filter = {"record_id": {"in": list(record_id)}}
+        return self._client.paginate(
+            "drafts_list",
+            item=Draft,
+            path={"collection_id": collection},
+            query={"filter": filter, "sort": sort, "limit": limit, "cursor": cursor},
+        )
+
+    async def get(self, draft: str, *, expand: Sequence[str] | None = None) -> Draft:
+        """With `data` as the record reads after the merge, for previews."""
+        return await self._client.request(
+            "drafts_get", cast=Draft, path={"draft_id": draft}, query={"expand": expand}
+        )
+
+    async def update(
+        self,
+        draft: str,
+        *,
+        data: RecordData,
+        if_match: IfMatch | None = None,
+        idempotency_key: str | None = None,
+    ) -> Draft:
+        """Sets the given fields (None clears one), as a record update does."""
+        return await self._client.request(
+            "drafts_update",
+            cast=Draft,
+            path={"draft_id": draft},
+            body={"data": data},
+            if_match=if_match,
+            idempotency_key=idempotency_key,
+        )
+
+    async def discard(
+        self,
+        draft: str,
+        *,
+        if_match: IfMatch | None = None,
+        idempotency_key: str | None = None,
+    ) -> Draft:
+        """Deletes the draft for good; returns it as it was."""
+        return await self._client.request(
+            "drafts_discard",
+            cast=Draft,
+            path={"draft_id": draft},
+            if_match=if_match,
+            idempotency_key=idempotency_key,
+        )
+
+    async def merge(
+        self,
+        draft: str,
+        *,
+        if_match: IfMatch | None = None,
+        idempotency_key: str | None = None,
+        change_note: str | None = None,
+    ) -> Record:
+        """Applies the draft to its record now, as one `merge` revision, and returns
+        the record. Content only: the record stays live or not."""
+        return await self._client.request(
+            "drafts_merge",
+            cast=Record,
+            path={"draft_id": draft},
+            if_match=if_match,
+            idempotency_key=idempotency_key,
+            change_note=change_note,
+        )
+
+    async def schedule(
+        self, draft: str, *, merge_at: datetime | str, idempotency_key: str | None = None
+    ) -> Draft:
+        """Merges the draft at `merge_at`, a future time; returns the draft."""
+        return await self._client.request(
+            "drafts_schedule",
+            cast=Draft,
+            path={"draft_id": draft},
+            body={"merge_at": merge_at},
+            idempotency_key=idempotency_key,
+        )
+
+    async def unschedule(self, draft: str, *, idempotency_key: str | None = None) -> Draft:
+        return await self._client.request(
+            "drafts_unschedule",
+            cast=Draft,
+            path={"draft_id": draft},
+            idempotency_key=idempotency_key,
+        )

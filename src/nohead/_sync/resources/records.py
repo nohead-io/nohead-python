@@ -9,6 +9,7 @@ from typing_extensions import Unpack
 
 from ..._pagination import Page
 from ...models import (
+    Draft,
     Record,
     RecordBatch,
     RecordCount,
@@ -153,6 +154,8 @@ class Records(Resource):
         idempotency_key: str | None = None,
         change_note: str | None = None,
     ) -> Record:
+        """A live record with a pending draft is a ConflictError (detail code
+        `draft_pending`): publishing never merges a draft (`drafts.merge` does)."""
         return self._client.request(
             "records_publish",
             cast=Record,
@@ -241,6 +244,17 @@ class Records(Resource):
             item=ScheduledChange,
             path={"collection_id": collection},
             query={"sort": sort, "limit": limit, "cursor": cursor},
+        )
+
+    def drafts(
+        self, record: str, *, limit: int | None = None, cursor: str | None = None
+    ) -> Page[Draft]:
+        """The record's drafts: at most one for now."""
+        return self._client.paginate(
+            "record_drafts_list",
+            item=Draft,
+            path={"record_id": record},
+            query={"limit": limit, "cursor": cursor},
         )
 
     def count(self, collection: str, *, filter: RecordFilter | None = None) -> RecordCount:
