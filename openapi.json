@@ -6902,10 +6902,9 @@
       "ChangeNote": {
         "name": "Nohead-Change-Note",
         "in": "header",
-        "description": "Optional reason for the change, shown in history (max 500 characters).",
+        "description": "Optional reason for the change, shown in history (at most 500\ncharacters once decoded). Percent-encoded UTF-8, as\n`encodeURIComponent` encodes it, so any language fits in a header:\n`Rettet%20stavefejl%20p%C3%A5%20forsiden`. Plain ASCII may be sent\nas is. Other bytes are `400`.\n",
         "schema": {
-          "type": "string",
-          "maxLength": 500
+          "type": "string"
         }
       }
     },

@@ -117,10 +117,14 @@ def test_if_match_from_a_revision_or_a_record() -> None:
     assert [c.headers["if-match"] for c in calls.calls] == ['"3"', '"1"']
 
 
-def test_change_note() -> None:
-    nohead, calls = make_sync([json_response(200, record("rec_1"))])
+def test_change_note_in_any_language_percent_encoded() -> None:
+    nohead, calls = make_sync(
+        [json_response(200, record("rec_1")), json_response(200, record("rec_1"))]
+    )
     nohead.records.delete("rec_1", change_note="Duplicate")
+    nohead.records.delete("rec_1", change_note="Rettet på forsiden ✓")
     assert calls.calls[0].headers["nohead-change-note"] == "Duplicate"
+    assert calls.calls[1].headers["nohead-change-note"] == "Rettet%20p%C3%A5%20forsiden%20%E2%9C%93"
 
 
 @pytest.mark.filterwarnings("ignore::nohead.NoheadWarning")

@@ -7,6 +7,8 @@ section is its GitHub release's notes.
 
 ## 0.3.0
 
+- `change_note` is sent percent-encoded (UTF-8), so change notes work in any
+  language: a note outside ASCII used to fail the request.
 - Drafts: changes to a record that wait until they are merged into it, now
   or at a set time. `drafts.create`, `list`, `get` (with `expand`, for
   previews), `update`, `discard`, `merge`, `schedule` and `unschedule`, and

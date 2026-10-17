@@ -7,6 +7,7 @@ import os
 import platform
 import random
 import typing
+import urllib.parse
 import uuid
 import warnings as _warnings
 from collections.abc import Mapping
@@ -166,7 +167,9 @@ def headers(
         revision = if_match if isinstance(if_match, int) else if_match.revision
         out["If-Match"] = f'"{revision}"'
     if change_note:
-        out["Nohead-Change-Note"] = change_note
+        # Percent-encoded UTF-8, as encodeURIComponent: header values are
+        # bytes (the API decodes it).
+        out["Nohead-Change-Note"] = urllib.parse.quote(change_note, safe="-_.!~*'()")
     return out
 
 
