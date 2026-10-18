@@ -1,7 +1,7 @@
 """Writes samples.json: for each API-key operation, a Python code sample that calls
 it, from the calls in tests/calls.py (which the contract test checks against the
-contract). The Nohead API repository puts them in the docs site's API reference
-(x-codeSamples).
+contract). The docs repository's daily samples workflow pulls them into the API
+reference (x-codeSamples).
 
 Run with `uv run python scripts/samples.py`.
 """

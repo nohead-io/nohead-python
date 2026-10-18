@@ -7,42 +7,69 @@ section is its GitHub release's notes.
 
 ## 0.3.0
 
+- **Breaking:** 0.1 and 0.2 no longer work with the current API: its paths
+  changed, so upgrading is required.
 - `change_note` is sent percent-encoded (UTF-8), so change notes work in any
   language: a note outside ASCII used to fail the request.
 - Drafts: changes to a record that wait until they are merged into it, now
   or at a set time. `drafts.create`, `list`, `get` (with `expand`, for
   previews), `update`, `discard`, `merge`, `schedule` and `unschedule`, and
   `records.drafts`. `records.publish` on a live record with a pending draft
-  is a `ConflictError` (`draft_pending`). Webhook events have `event.draft`
-  and `event.draft_id` (`draft.*`, and a merge's `record.updated`).
+  is a `ConflictError` (`draft_pending`). Webhook events have `event.draft`,
+  `event.draft_id` (`draft.*`, and a merge's `record.updated`) and
+  `event.record_id` (`draft.*`). `Draft` is importable from `nohead`.
 - **Breaking:** the models for what only the web app can do (organizations,
   projects, members and invitations, billing, API keys, usage, account
-  changes and redaction, such as `Organization`, `Project`, `ApiKeyWithToken`, `Billing`) are gone. Those
-  operations need a signed-in person, so an API key could never call them,
-  and the API reference no longer lists them.
+  changes and redaction, such as `Organization`, `Project`, `ApiKeyWithToken`,
+  `Billing`) are gone. Those operations need a signed-in person, so an API
+  key could never call them, and the API reference no longer lists them.
 - **Breaking:** the API is resource-oriented. Method names stay; what they
   return and take follows it:
   - Records have no `status`, `schedule` or `deleted`: a record is published
     when `published_at` is set, and has `deleted_at` and `purge_after`.
     Filter with `{"published_at": {"exists": True}}`. `records.get` returns
     deleted records too (no `include_deleted`).
-  - `records.schedule` and `unschedule` return the schedule, and
+  - `records.schedule` sets the whole schedule: a time left out is cleared,
+    and `clear=` is gone. It and `unschedule` return the schedule, and
     `records.get_schedule`, `records.publication` and
-    `records.scheduled_changes` are new. `records.bulk` returns a
-    `RecordBatch`.
-  - `search` takes `published=True` instead of `status="published"`.
+    `records.scheduled_changes` are new.
+  - `records.bulk` returns a `RecordBatch`, whose `results` are each a
+    `RecordBatchResultsSucceeded` (with the `record`) or a
+    `RecordBatchResultsFailed` (with the `error`), by `status`.
+  - `search` takes `filter={"published_at": {"exists": True}}` instead of
+    `status="published"`, as record lists do.
+  - `records.diff` takes `from_revision=` and `to_revision=` as keywords, and
+    `fields.reorder` takes `field_ids=`.
+  - `audit_events.list` filters by `type` (was `action`), `resource_type` (one,
+    or a list of several), `resource_id`, `actor_type`, `actor_id` and a
+    `created_at` range (`{"gte": ..., "lt": ...}`, was `since` and `until`),
+    and events have `type` instead of `action`. `records.revisions.list`
+    filters by a `created_at` range too, and revisions' `operation` can be
+    `merge`. The filters are typed (`AuditEventFilter`, `RevisionFilter` in
+    `nohead.types`); an unknown filter is an `InvalidRequestError`.
   - Collections, fields, assets and webhooks have `deleted_at` and
     `purge_after` instead of `deleted`, and migrations
-    `cancel_requested_at`.
+    `cancel_requested_at`. `ScheduledChange` has no `last_error`, and
+    `SchemaChange` no `status`.
   - `assets.create_upload` returns the asset with its `upload`.
-  - `fields.reorder` returns the `FieldOrder`; `fields.order` reads it.
-  - Webhook event types are the activity log's actions (`record.restored`,
-    `field.updated`, ..., and wildcards such as `record.*`), and events carry
-    `actor` and `via`; `event.collection` and `event.schema_change` are
-    dicts, and `event.field` is new. `webhooks.rotate_secret` returns a
+  - `fields.reorder` returns the `FieldOrder`; `fields.order` reads it, and
+    `fields.get` reads one field, deleted ones too.
+  - `records.restore` takes `if_match`, and `records.revisions.revert`
+    `change_note`.
+  - Webhook event types are the activity log's (`record.restored`,
+    `field.updated`, ..., and wildcards such as `record.*`; no
+    `record.imported`), and events carry `actor` and `via`;
+    `event.collection` (now with `object`) and `event.schema_change` are
+    dicts, and `event.field` and `event.field_id` (`field.*`) are new. A
+    purged asset's `event.asset` is only its `id` and `object`, an
+    `AssetEventDataAsset`. `webhooks.rotate_secret` returns a
     `WebhookSecretWithValue`; the old secret signs for 24 hours more.
     `webhooks.secrets.list`, `webhooks.secrets.retire`, `webhooks.restore`
     and `webhooks.list(deleted=True)` are new.
+  - Models renamed with the API's schemas: `AssetUpload` is
+    `AssetWithUpload` (its `upload` an `AssetUploadTarget`),
+    `BulkRecordsRequest` and `BulkRecordsResult` are `RecordBatchRequest` and
+    `RecordBatch`, and `ChangeVia` is `Via`.
 - **Breaking:** the `datetime` field type is now `date`. A plain date field holds
   `YYYY-MM-DD`; with `include_time` it holds a moment, written in the field's
   `time_zone` when it has one. Field migrations take `time_zone`, the zone
@@ -60,12 +87,22 @@ section is its GitHub release's notes.
 - `assets.usage()`: where an asset is used, as counts of the records that use
   it (and of those, the published ones) and the 10 most recently updated with
   the fields that use it. Needs the `records:read` scope too.
-- `assets.purge()`: permanently deletes a deleted asset now, instead of 30
-  days after the delete, and frees its storage.
+- `assets.purge()`: permanently deletes a deleted asset now, instead of at
+  its `purge_after`, and frees its storage.
+- `assets.upload()` with an `idempotency_key` resumes: run again, it returns
+  an asset that is already `ready` without sending the bytes again.
+- Webhook events are lenient, as responses are: an event, or a part of one
+  (`event.record`, `event.asset`, ...), that doesn't match the models is
+  returned unvalidated with a `NoheadWarning`, instead of raising
+  (`WebhookVerificationError` or a Pydantic error).
+- An unvalidated response is built as the variant of a union it says it is
+  (a failed batch result stays a `RecordBatchResultsFailed`), and a list in
+  an optional field no longer raises a `ValueError` while it is built.
 - An error reads only the fields of the API's error envelope that have the
   right type, so JSON from a proxy or gateway that merely looks like one no
   longer gives it a non-string `message`, `type` or `request_id`, nor raises
-  a `TypeError` while the error is built.
+  a `TypeError` while the error is built. An error detail that doesn't match
+  the model keeps its fields, so a `code` such as `in_progress` still counts.
 
 ## 0.2.0
 
