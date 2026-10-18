@@ -32,156 +32,6 @@ class ListMeta(NoheadModel):
     has_more: bool
 
 
-class Organization(NoheadModel):
-    id: str
-    object: str
-    name: str
-    slug: str
-    plan: str
-    role: str | None
-    """The current user's role in the organization."""
-    permissions: list[Permission]
-    """What the current user's role allows in the organization (empty without a membership).
-    Clients use it to show only the actions that will succeed; the API enforces it either
-    way.
-    """
-    grantable_scopes: list[ApiKeyScope]
-    """API key scopes the current user may put on new keys: those whose permissions their role
-    holds.
-    """
-    deleted_at: NullableTimestamp
-    """When it was scheduled for deletion (`DELETE /v1/organizations/{id}`); null unless it is."""
-    purge_after: NullableTimestamp
-    """When a scheduled deletion becomes permanent; null otherwise."""
-    created_at: Timestamp
-    updated_at: Timestamp
-
-
-class MembershipUser(NoheadModel):
-    id: str
-    email: str
-    name: str | None
-
-
-class Membership(NoheadModel):
-    id: str
-    object: str
-    organization_id: str
-    user: MembershipUser
-    role: Role
-    created_at: Timestamp
-    updated_at: Timestamp
-
-
-class MembershipUpdate(NoheadModel):
-    role: Role
-
-
-class MembershipList(NoheadModel):
-    data: list[Membership]
-    meta: ListMeta
-
-
-class InvitationOrganization(NoheadModel):
-    id: str
-    name: str
-    slug: str
-
-
-class InvitationInvitedBy(NoheadModel):
-    id: str
-    name: str
-
-
-class InvitationEmailDelivery(NoheadModel):
-    status: str
-    at: Timestamp
-
-
-class Invitation(NoheadModel):
-    id: str
-    object: str
-    organization: InvitationOrganization
-    email: str
-    role: Role
-    status: str
-    invited_by: InvitationInvitedBy
-    email_delivery: InvitationEmailDelivery | None
-    """What became of the invitation email, or null while it has not been sent (or when sending
-    is off). `sent`: accepted for delivery. `not_sent`: no email went out, because the
-    address had bounced or been marked as spam before, or had already received several
-    invitation emails that day. `bounced`: the email could not be delivered; check the
-    address. `complained`: the invitee marked it as spam. Either way the invitation still
-    works when the invitee signs in with the address.
-    """
-    expires_at: Timestamp
-    responded_at: NullableTimestamp
-    created_at: Timestamp
-
-
-class InvitationCreate(NoheadModel):
-    email: str
-    role: Role
-
-
-class InvitationList(NoheadModel):
-    data: list[Invitation]
-    meta: ListMeta
-
-
-class OrganizationCreate(NoheadModel):
-    name: str
-    slug: str
-
-
-class MeUpdate(NoheadModel):
-    name: str | None
-    """Shown to the members of your organizations; `null` removes it."""
-
-
-class OrganizationUpdate(NoheadModel):
-    name: str | None = None
-    slug: str | None = None
-
-
-class OrganizationList(NoheadModel):
-    data: list[Organization]
-    meta: ListMeta
-
-
-class Project(NoheadModel):
-    id: str
-    object: str
-    organization_id: str
-    name: str
-    slug: str
-    settings: dict[str, Any]
-    deleted_at: NullableTimestamp
-    """When it was scheduled for deletion (`DELETE /v1/projects/{id}`); null unless it is."""
-    purge_after: NullableTimestamp
-    """When a scheduled deletion becomes permanent; null otherwise."""
-    created_at: Timestamp
-    updated_at: Timestamp
-
-
-class ProjectCreate(NoheadModel):
-    organization_id: str
-    name: str
-    slug: str
-    settings: dict[str, Any] | None = None
-
-
-class ProjectUpdate(NoheadModel):
-    name: str | None = None
-    slug: str | None = None
-    settings: dict[str, Any] | None = None
-
-
-class ProjectList(NoheadModel):
-    data: list[Project]
-    meta: ListMeta
-
-
 class RecordFilterValueObject(NoheadModel):
     eq: str | None = None
     ne: str | None = None
@@ -736,25 +586,12 @@ class RecordRevisionProperties(NoheadModel):
     changed_fields: list[str]
     """API keys of changed fields, and changed attributes."""
     redacted_fields: list[str]
-    """API keys of fields whose values in this revision were redacted (`POST
-    /v1/records/{id}/redactions`); those values read `{"$redacted": true}`.
+    """API keys of fields whose values in this revision were redacted (owners and admins redact
+    them in the web app); those values read `{"$redacted": true}`.
     """
     draft: MergedDraft | None
     """For a `merge`, the draft it merged, with who started and edited it; null otherwise."""
     created_at: Timestamp
-
-
-class Redaction(NoheadModel):
-    object: str
-    record_id: str
-    field: str
-    """The field's API key."""
-    field_id: str
-    revisions: list[int]
-    """Revision numbers whose snapshot or changes were (or would be) rewritten."""
-    values: int
-    """How many distinct past values were (or would be) redacted."""
-    dry_run: bool
 
 
 class RecordRevisionDetail(RecordRevisionProperties):
@@ -790,13 +627,6 @@ class FeatureFlags(NoheadModel):
     project_id: str | None
     flags: dict[str, bool]
     """Flag name to enabled, for every registered flag the caller may see."""
-
-
-class AccountDeletion(NoheadModel):
-    object: str
-    user_id: str
-    """The deleted user, as history still refers to it."""
-    deleted_at: datetime
 
 
 class PrincipalUser(NoheadModel):
@@ -913,144 +743,6 @@ class RecordBatch(NoheadModel):
     succeeded: int
     failed: int
     results: list[RecordBatchResults]
-
-
-class Billing(NoheadModel):
-    object: str
-    organization_id: str
-    enabled: bool
-    """Whether checkout and the billing portal are available."""
-    plan: str
-    subscription: BillingSubscription | None
-    """The Stripe subscription behind a paid plan, or null."""
-    plans: list[BillingPlan]
-
-
-class BillingSubscription(NoheadModel):
-    status: str
-    """Stripe's subscription status; `past_due` keeps the plan while Stripe retries payment."""
-    interval: str | None
-    current_period_end: datetime | None
-    cancel_at_period_end: bool
-
-
-class BillingPlanPrices(NoheadModel):
-    interval: str
-    amount: float
-    """In whole currency units, before tax."""
-    currency: str
-
-
-class BillingPlan(NoheadModel):
-    key: str
-    name: str
-    limits: dict[str, int | None]
-    """The plan's limits; null values are unlimited."""
-    prices: list[BillingPlanPrices]
-    """Empty for free and custom plans."""
-
-
-class BillingCheckout(NoheadModel):
-    plan: str
-    interval: str | None = None
-    return_path: str | None = None
-    """A path in the web app to come back to, e.g. `/organizations/org_.../usage`."""
-
-
-class BillingPortal(NoheadModel):
-    return_path: str | None = None
-
-
-class BillingSession(NoheadModel):
-    object: str
-    url: str
-
-
-class AccessReviewApiKeys(NoheadModel):
-    api_key: ApiKey
-    reason: str
-    """`creator_left`: its creator is no longer a member. `exceeds_creator_role`: it holds a
-    scope the creator's current role cannot grant.
-    """
-
-
-class AccessReviewInvitations(NoheadModel):
-    invitation: Invitation
-    reason: str
-    """`inviter_left`: whoever sent it is no longer a member. `inviter_cannot_invite`: their
-    current role cannot invite to this role.
-    """
-
-
-class AccessReview(NoheadModel):
-    object: str
-    organization_id: str
-    api_keys: list[AccessReviewApiKeys]
-    invitations: list[AccessReviewInvitations]
-
-
-class UsagePlan(NoheadModel):
-    key: str
-    name: str
-
-
-class UsagePeriod(NoheadModel):
-    """The current period; `end` is exclusive."""
-
-    start: str
-    end: str
-
-
-class Usage(NoheadModel):
-    object: str
-    organization_id: str
-    plan: UsagePlan
-    period: UsagePeriod
-    """The current period; `end` is exclusive."""
-    metrics: list[UsageMetric]
-    retention: UsageRetention
-
-
-class UsageRetention(NoheadModel):
-    """How long the plan keeps record revisions (beyond each record's first and latest 10) and
-    audit events, in days; null keeps everything.
-    """
-
-    revision_days: int | None
-    audit_days: int | None
-    grace: UsageRetentionGrace | None
-    """After a downgrade, all history is kept for 30 days; history past the plan's retention is
-    removed after `ends_at`. Null otherwise.
-    """
-
-
-class UsageRetentionGrace(NoheadModel):
-    ends_at: datetime
-    revision_days: int | None
-    """Days of revisions kept until `ends_at`; null keeps everything (as a downgrade's grace
-    does).
-    """
-    audit_days: int | None
-    """Days of audit events kept until `ends_at`; null keeps everything (as a downgrade's grace
-    does).
-    """
-
-
-class UsageMetricDaily(NoheadModel):
-    date: str
-    value: int
-
-
-class UsageMetric(NoheadModel):
-    metric: str
-    kind: str
-    usage: int
-    limit: int | None
-    """The plan's limit, or null when unlimited or not limited."""
-    enforcement: str
-    """`hard` refuses changes over the limit (402), `soft` warns, `off` only meters."""
-    daily: list[UsageMetricDaily] | None = None
-    """Counters only, one entry per day with usage."""
 
 
 class AuditEventProject(NoheadModel):
@@ -1280,39 +972,6 @@ class AssetUploadTarget(NoheadModel):
     expires_at: Timestamp
 
 
-class ApiKeyProperties(NoheadModel):
-    id: str
-    object: str
-    project_id: str
-    name: str
-    scopes: list[ApiKeyScope]
-    published_only: PublishedOnly
-    token_hint: str
-    """The non-secret start of the token, to recognize it."""
-    expires_at: NullableTimestamp
-    last_used_at: NullableTimestamp
-    revoked_at: NullableTimestamp
-    created_by: str | None
-    created_at: Timestamp
-
-
-class ApiKeyWithToken(ApiKeyProperties):
-    token: str
-    """The secret token. Returned only once, at creation."""
-
-
-class ApiKeyCreate(NoheadModel):
-    name: str
-    scopes: list[ApiKeyScope]
-    published_only: PublishedOnly | None = None
-    expires_at: NullableTimestamp | None = None
-
-
-class ApiKeyList(NoheadModel):
-    data: list[ApiKey]
-    meta: ListMeta
-
-
 class ErrorDetail(NoheadModel):
     field: str | None = None
     """API key of the offending field or parameter, when applicable."""
@@ -1345,8 +1004,6 @@ class Error(NoheadModel):
 RequestId: TypeAlias = str
 Timestamp: TypeAlias = datetime
 NullableTimestamp: TypeAlias = datetime | None
-Role: TypeAlias = str
-Permission: TypeAlias = str
 RecordFilterValue: TypeAlias = str | RecordFilterValueObject
 FieldType: TypeAlias = str
 SchemaChange: TypeAlias = SchemaChangeProperties
@@ -1360,7 +1017,6 @@ WebhookSecret: TypeAlias = WebhookSecretProperties
 WebhookDelivery: TypeAlias = WebhookDeliveryProperties
 Asset: TypeAlias = AssetProperties
 ApiKeyScope: TypeAlias = str
-ApiKey: TypeAlias = ApiKeyProperties
 PublishedOnly: TypeAlias = bool
 ErrorType: TypeAlias = str
 

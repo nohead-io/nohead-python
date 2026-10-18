@@ -37,7 +37,17 @@
     {
       "name": "records",
       "x-group": "Records",
-      "description": "Content entries, their revisions and history."
+      "description": "Content entries, one at a time or many at once."
+    },
+    {
+      "name": "publishing",
+      "x-group": "Publishing",
+      "description": "Making records live, now or at a set time, and taking them down."
+    },
+    {
+      "name": "revisions",
+      "x-group": "Revisions",
+      "description": "A record's history, comparing two revisions, and going back to one."
     },
     {
       "name": "drafts",
@@ -47,7 +57,12 @@
     {
       "name": "collections",
       "x-group": "Collections",
-      "description": "User-defined data models and their schema history."
+      "description": "User-defined data models."
+    },
+    {
+      "name": "schema-changes",
+      "x-group": "Schema changes",
+      "description": "A collection's schema history, and its schema at any version."
     },
     {
       "name": "fields",
@@ -72,32 +87,12 @@
     {
       "name": "webhooks",
       "x-group": "Webhooks",
-      "description": "Event notifications sent to your URLs, with delivery logs and retries."
+      "description": "Event notifications sent to your URLs, and the secrets that sign them."
     },
     {
-      "name": "api-keys",
-      "x-group": "API keys",
-      "description": "Project-scoped machine credentials. Session only."
-    },
-    {
-      "name": "projects",
-      "x-group": "Projects",
-      "description": "Application/site/data boundaries inside an organization. Session only."
-    },
-    {
-      "name": "organizations",
-      "x-group": "Organizations",
-      "description": "Billing and collaboration boundaries. Session only."
-    },
-    {
-      "name": "members",
-      "x-group": "Members",
-      "description": "Organization members, their roles, and invitations. Session only."
-    },
-    {
-      "name": "billing",
-      "x-group": "Billing",
-      "description": "Plan subscriptions, paid through Stripe. Session only; owners only."
+      "name": "deliveries",
+      "x-group": "Webhook deliveries",
+      "description": "Each event sent to a webhook, its attempts, and retrying it."
     },
     {
       "name": "audit",
@@ -107,7 +102,7 @@
     {
       "name": "system",
       "x-group": "System",
-      "description": "Service status and metadata."
+      "description": "Service status, the caller, and its feature flags."
     }
   ],
   "paths": {
@@ -388,269 +383,6 @@
         }
       }
     },
-    "/v1/records/{record_id}/publication": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/RecordId"
-        }
-      ],
-      "get": {
-        "operationId": "records_get_publication",
-        "summary": "Get a record's publication",
-        "description": "What is live: since when, by whom, and the revision. `404` with detail\ncode `not_published` while the record is unpublished or deleted.\nPublished-only API keys get `403`: who published is not content.\n",
-        "tags": [
-          "records"
-        ],
-        "responses": {
-          "200": {
-            "description": "The record's publication.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RecordPublication"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "post": {
-        "operationId": "records_publish",
-        "summary": "Publish a record",
-        "description": "Makes the record's current content live (`records:publish`), as a\n`publish` revision. Publishing a published record changes nothing,\nbut a live record with a pending draft is `409` with detail code\n`draft_pending` and its `draft_id`: publishing never merges a draft\n(`POST /v1/drafts/{id}/merge` does). An unpublished record goes live\nwith its current content and keeps its draft.\n",
-        "tags": [
-          "records"
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "$ref": "#/components/parameters/IfMatch"
-          },
-          {
-            "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Record"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "records_unpublish",
-        "summary": "Unpublish a record",
-        "description": "Takes the record offline (`records:publish`), as an `unpublish`\nrevision; its content is kept. Unpublishing an unpublished record\nchanges nothing.\n",
-        "tags": [
-          "records"
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "$ref": "#/components/parameters/IfMatch"
-          },
-          {
-            "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Record"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/records/{record_id}/schedule": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/RecordId"
-        }
-      ],
-      "get": {
-        "operationId": "records_get_schedule",
-        "summary": "Get a record's schedule",
-        "description": "When the record publishes or unpublishes on its own. `404` with detail\ncode `not_scheduled` when it has no schedule and no `last_error`.\nPublished-only API keys get `403`.\n",
-        "tags": [
-          "records"
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/RecordSchedule"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "put": {
-        "operationId": "records_schedule",
-        "summary": "Schedule publishing or unpublishing",
-        "description": "Publishes (`publish_at`) or unpublishes (`unpublish_at`) the record at\na future time (`records:publish`). The change is made within a minute of\nthe time, like a manual publish from the scheduler: it has its own\nrevision (`via: scheduler`), webhooks and audit event. `publish_at`\nneeds an unpublished record; `unpublish_at` needs a published record or a\n`publish_at` before it. Setting or cancelling a schedule is audited but\nmakes no revision. `409` with detail code `deleted` while the record is\nsoft-deleted.\n",
-        "tags": [
-          "records"
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "$ref": "#/components/parameters/NoheadClient"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RecordScheduleUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/RecordSchedule"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "records_unschedule",
-        "summary": "Cancel a record's schedule",
-        "tags": [
-          "records"
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "$ref": "#/components/parameters/NoheadClient"
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/RecordSchedule"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
     "/v1/records/{record_id}/restore": {
       "parameters": [
         {
@@ -702,353 +434,6 @@
           },
           "412": {
             "$ref": "#/components/responses/PreconditionFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/records/{record_id}/revisions": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/RecordId"
-        }
-      ],
-      "get": {
-        "operationId": "record_revisions_list",
-        "summary": "List a record's revisions",
-        "description": "The record's history, newest first. Available while the record is soft-deleted.",
-        "tags": [
-          "records"
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/Limit"
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          },
-          {
-            "$ref": "#/components/parameters/RecordRevisionFilter"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of revisions.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RecordRevisionList"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/records/{record_id}/revisions/{revision}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/RecordId"
-        },
-        {
-          "$ref": "#/components/parameters/RevisionNumber"
-        }
-      ],
-      "get": {
-        "operationId": "record_revisions_get",
-        "summary": "Get a revision",
-        "tags": [
-          "records"
-        ],
-        "responses": {
-          "200": {
-            "description": "The revision with its snapshot and changes.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RecordRevisionDetail"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/records/{record_id}/revisions/{revision}/revert": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/RecordId"
-        },
-        {
-          "$ref": "#/components/parameters/RevisionNumber"
-        }
-      ],
-      "post": {
-        "operationId": "record_revisions_revert",
-        "summary": "Revert to a revision",
-        "description": "Writes a new `revert` revision whose data is the target revision mapped\nonto the current schema. With `dry_run=true`, returns a preview and\nwrites nothing; the preview shows the old revision's data, so it also\nneeds `records:read`.\n",
-        "tags": [
-          "records"
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "name": "dry_run",
-            "in": "query",
-            "schema": {
-              "type": "boolean",
-              "default": false
-            }
-          },
-          {
-            "$ref": "#/components/parameters/IfMatch"
-          },
-          {
-            "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The reverted record, or a preview for dry runs.",
-            "headers": {
-              "ETag": {
-                "$ref": "#/components/headers/ETag"
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Record"
-                    },
-                    {
-                      "$ref": "#/components/schemas/RevertPreview"
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/records/{record_id}/diff": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/RecordId"
-        }
-      ],
-      "get": {
-        "operationId": "records_diff",
-        "summary": "Compare two revisions",
-        "tags": [
-          "records"
-        ],
-        "parameters": [
-          {
-            "name": "from",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "minimum": 1
-            }
-          },
-          {
-            "name": "to",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "minimum": 1
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Changes from one revision to another.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RecordDiff"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/records/{record_id}/redactions": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/RecordId"
-        }
-      ],
-      "post": {
-        "operationId": "records_redact",
-        "summary": "Redact a field from a record's history",
-        "description": "Removes every past value of a field from the record's revisions, for\nexample personal data or a secret that should never have been stored.\nEach value the field had in earlier revisions (or only in the given\n`revisions`), other than its current value, becomes\n`{\"$redacted\": true}` wherever it appears in revision snapshots and changes;\ncopies in stored webhook payloads are replaced too. The current value\nis never touched: to remove a live value, update the record first.\n\nThe only operation that rewrites history. It cannot be undone, needs\n`confirm: true` (preview with `dry_run=true`), is audited as\n`record.redacted`, and is limited to owners and admins with a\nuser session. Reverting to a redacted revision keeps the field's\ncurrent value.\n",
-        "tags": [
-          "records"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "name": "dry_run",
-            "in": "query",
-            "description": "Report what would be redacted without changing anything.",
-            "schema": {
-              "type": "boolean",
-              "default": false
-            }
-          },
-          {
-            "$ref": "#/components/parameters/NoheadClient"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "field"
-                ],
-                "properties": {
-                  "field": {
-                    "type": "string",
-                    "description": "The field's API key, or its ID (`fld_...`, also for deleted fields)."
-                  },
-                  "revisions": {
-                    "type": "array",
-                    "description": "Redact only the values the field had in these revisions\n(wherever they appear in history). Omit to redact every\npast value.\n",
-                    "items": {
-                      "type": "integer"
-                    }
-                  },
-                  "confirm": {
-                    "type": "boolean",
-                    "description": "Must be true to redact (not needed for a dry run)."
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "What was (or, for a dry run, would be) redacted.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Redaction"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
@@ -1172,6 +557,269 @@
         }
       }
     },
+    "/v1/records/{record_id}/publication": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/RecordId"
+        }
+      ],
+      "get": {
+        "operationId": "records_get_publication",
+        "summary": "Get a record's publication",
+        "description": "What is live: since when, by whom, and the revision. `404` with detail\ncode `not_published` while the record is unpublished or deleted.\nPublished-only API keys get `403`: who published is not content.\n",
+        "tags": [
+          "publishing"
+        ],
+        "responses": {
+          "200": {
+            "description": "The record's publication.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordPublication"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
+      "post": {
+        "operationId": "records_publish",
+        "summary": "Publish a record",
+        "description": "Makes the record's current content live (`records:publish`), as a\n`publish` revision. Publishing a published record changes nothing,\nbut a live record with a pending draft is `409` with detail code\n`draft_pending` and its `draft_id`: publishing never merges a draft\n(`POST /v1/drafts/{id}/merge` does). An unpublished record goes live\nwith its current content and keeps its draft.\n",
+        "tags": [
+          "publishing"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          },
+          {
+            "$ref": "#/components/parameters/ChangeNote"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Record"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "records_unpublish",
+        "summary": "Unpublish a record",
+        "description": "Takes the record offline (`records:publish`), as an `unpublish`\nrevision; its content is kept. Unpublishing an unpublished record\nchanges nothing.\n",
+        "tags": [
+          "publishing"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          },
+          {
+            "$ref": "#/components/parameters/ChangeNote"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Record"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/records/{record_id}/schedule": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/RecordId"
+        }
+      ],
+      "get": {
+        "operationId": "records_get_schedule",
+        "summary": "Get a record's schedule",
+        "description": "When the record publishes or unpublishes on its own. `404` with detail\ncode `not_scheduled` when it has no schedule and no `last_error`.\nPublished-only API keys get `403`.\n",
+        "tags": [
+          "publishing"
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RecordSchedule"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
+      "put": {
+        "operationId": "records_schedule",
+        "summary": "Schedule publishing or unpublishing",
+        "description": "Publishes (`publish_at`) or unpublishes (`unpublish_at`) the record at\na future time (`records:publish`). The change is made within a minute of\nthe time, like a manual publish from the scheduler: it has its own\nrevision (`via: scheduler`), webhooks and audit event. `publish_at`\nneeds an unpublished record; `unpublish_at` needs a published record or a\n`publish_at` before it. Setting or cancelling a schedule is audited but\nmakes no revision. `409` with detail code `deleted` while the record is\nsoft-deleted.\n",
+        "tags": [
+          "publishing"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordScheduleUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RecordSchedule"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "records_unschedule",
+        "summary": "Cancel a record's schedule",
+        "tags": [
+          "publishing"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RecordSchedule"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
     "/v1/collections/{collection_id}/scheduled-changes": {
       "parameters": [
         {
@@ -1183,7 +831,7 @@
         "summary": "List scheduled changes",
         "description": "Every pending scheduled change of the collection's records, soonest\nfirst (`sort=-at` for the latest first): publishes and unpublishes\nfrom records' schedules, and merges from drafts' (`draft_id`). One per\nchange, so a record due to publish and later unpublish appears twice.\nDeleted records have none. Published-only API keys get `403`.\n",
         "tags": [
-          "records"
+          "publishing"
         ],
         "parameters": [
           {
@@ -1233,6 +881,259 @@
           }
         }
       }
+    },
+    "/v1/records/{record_id}/revisions": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/RecordId"
+        }
+      ],
+      "get": {
+        "operationId": "record_revisions_list",
+        "summary": "List a record's revisions",
+        "description": "The record's history, newest first. Available while the record is soft-deleted.",
+        "tags": [
+          "revisions"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "$ref": "#/components/parameters/RecordRevisionFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of revisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordRevisionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/records/{record_id}/revisions/{revision}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/RecordId"
+        },
+        {
+          "$ref": "#/components/parameters/RevisionNumber"
+        }
+      ],
+      "get": {
+        "operationId": "record_revisions_get",
+        "summary": "Get a revision",
+        "tags": [
+          "revisions"
+        ],
+        "responses": {
+          "200": {
+            "description": "The revision with its snapshot and changes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordRevisionDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/records/{record_id}/revisions/{revision}/revert": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/RecordId"
+        },
+        {
+          "$ref": "#/components/parameters/RevisionNumber"
+        }
+      ],
+      "post": {
+        "operationId": "record_revisions_revert",
+        "summary": "Revert to a revision",
+        "description": "Writes a new `revert` revision whose data is the target revision mapped\nonto the current schema. With `dry_run=true`, returns a preview and\nwrites nothing; the preview shows the old revision's data, so it also\nneeds `records:read`.\n",
+        "tags": [
+          "revisions"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "name": "dry_run",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          },
+          {
+            "$ref": "#/components/parameters/ChangeNote"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The reverted record, or a preview for dry runs.",
+            "headers": {
+              "ETag": {
+                "$ref": "#/components/headers/ETag"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Record"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RevertPreview"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/records/{record_id}/diff": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/RecordId"
+        }
+      ],
+      "get": {
+        "operationId": "records_diff",
+        "summary": "Compare two revisions",
+        "tags": [
+          "revisions"
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Changes from one revision to another.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordDiff"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/records/{record_id}/redact": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/RecordId"
+        }
+      ]
     },
     "/v1/records/{record_id}/drafts": {
       "parameters": [
@@ -2058,7 +1959,7 @@
         "summary": "Get the schema at a version",
         "description": "Published-only API keys read only the current version; earlier ones are `403`.",
         "tags": [
-          "collections"
+          "schema-changes"
         ],
         "parameters": [
           {
@@ -2111,7 +2012,7 @@
         "summary": "List schema changes",
         "description": "The collection's schema history, newest first. Published-only API keys get `403`.",
         "tags": [
-          "collections"
+          "schema-changes"
         ],
         "parameters": [
           {
@@ -2169,7 +2070,7 @@
         "summary": "Get a schema change",
         "description": "Published-only API keys get `403`.",
         "tags": [
-          "collections"
+          "schema-changes"
         ],
         "responses": {
           "200": {
@@ -2834,7 +2735,7 @@
         }
       }
     },
-    "/v1/migrations/{migration_id}/cancellation": {
+    "/v1/migrations/{migration_id}/cancel": {
       "parameters": [
         {
           "$ref": "#/components/parameters/MigrationId"
@@ -2939,7 +2840,7 @@
       "post": {
         "operationId": "assets_upload",
         "summary": "Start an upload",
-        "description": "Step 1 of uploading a file. Returns the pending asset with its `upload`:\nsend the file's bytes with `upload.method` to `upload.url`, with\n`upload.headers`, before `upload.expires_at`. The bytes go directly to\nstorage, not through this API. Then call\n`POST /v1/assets/{asset_id}/completion`.\n\n`content_type` and `byte_size` must be the file's; storage refuses another\ncontent type and completion refuses another size.\n\nThe file counts toward the organization's storage from here on, while it\nuploads too. On plans where storage is a hard limit (Free), a file that\nwould go over it is refused with `402 plan_limit_exceeded`; on others,\n`Nohead-Usage-Warning` reports going over.\n\nA project can have at most 100 uploads in progress (started within the\nupload's lifetime, not yet completed or deleted); past that, `409` with\n`too_many_uploads`. Uploads never completed are removed after a day.\n",
+        "description": "Step 1 of uploading a file. Returns the pending asset with its `upload`:\nsend the file's bytes with `upload.method` to `upload.url`, with\n`upload.headers`, before `upload.expires_at`. The bytes go directly to\nstorage, not through this API. Then call\n`POST /v1/assets/{asset_id}/complete`.\n\n`content_type` and `byte_size` must be the file's; storage refuses another\ncontent type and completion refuses another size.\n\nThe file counts toward the organization's storage from here on, while it\nuploads too. On plans where storage is a hard limit (Free), a file that\nwould go over it is refused with `402 plan_limit_exceeded`; on others,\n`Nohead-Usage-Warning` reports going over.\n\nA project can have at most 100 uploads in progress (started within the\nupload's lifetime, not yet completed or deleted); past that, `409` with\n`too_many_uploads`. Uploads never completed are removed after a day.\n",
         "tags": [
           "assets"
         ],
@@ -3098,7 +2999,7 @@
         }
       }
     },
-    "/v1/assets/{asset_id}/completion": {
+    "/v1/assets/{asset_id}/complete": {
       "parameters": [
         {
           "$ref": "#/components/parameters/AssetId"
@@ -4314,7 +4215,7 @@
         "summary": "List deliveries",
         "description": "The webhook's deliveries, newest first. Kept for 30 days.\n",
         "tags": [
-          "webhooks"
+          "deliveries"
         ],
         "parameters": [
           {
@@ -4384,7 +4285,7 @@
         "summary": "Get a delivery",
         "description": "The delivery with its payload and every attempt.\n",
         "tags": [
-          "webhooks"
+          "deliveries"
         ],
         "responses": {
           "200": {
@@ -4426,7 +4327,7 @@
         "summary": "Retry a delivery",
         "description": "Attempts the delivery again now, whatever its status; the attempt runs\nin the background, and the delivery's `attempts` show it. `409` with\ndetail code `deleted` if the webhook was deleted.\n",
         "tags": [
-          "webhooks"
+          "deliveries"
         ],
         "parameters": [
           {
@@ -4471,1696 +4372,12 @@
         }
       }
     },
-    "/v1/projects/{project_id}/api-keys": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/ProjectId"
-        }
-      ],
-      "get": {
-        "operationId": "api_keys_list",
-        "summary": "List API keys",
-        "tags": [
-          "api-keys"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/Limit"
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of API keys. Tokens are never returned.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiKeyList"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "post": {
-        "operationId": "api_keys_create",
-        "summary": "Create an API key",
-        "description": "Returns the token exactly once. Store it securely. A project has at most 25 usable keys (`409` past that; revoke one first).",
-        "tags": [
-          "api-keys"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiKeyCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "The created key, including its one-time token.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiKeyWithToken"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/api-keys/{api_key_id}": {
-      "parameters": [
-        {
-          "name": "api_key_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
-        }
-      ],
-      "delete": {
-        "operationId": "api_keys_revoke",
-        "summary": "Revoke an API key",
-        "tags": [
-          "api-keys"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The revoked key.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiKey"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/projects": {
-      "get": {
-        "operationId": "projects_list",
-        "summary": "List projects",
-        "description": "Projects in organizations the current user can read.",
-        "tags": [
-          "projects"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "filter",
-            "in": "query",
-            "style": "deepObject",
-            "explode": true,
-            "description": "`filter[organization_id]=org_...` limits the list to one\norganization; `filter[deleted]=true` lists those scheduled for\ndeletion instead (to restore them).\n",
-            "schema": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "organization_id": {
-                  "type": "string"
-                },
-                "deleted": {
-                  "type": "string",
-                  "enum": [
-                    "true",
-                    "false"
-                  ]
-                }
-              }
-            }
-          },
-          {
-            "$ref": "#/components/parameters/Limit"
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of projects.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProjectList"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "post": {
-        "operationId": "projects_create",
-        "summary": "Create a project",
-        "tags": [
-          "projects"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProjectCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "The created project.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "402": {
-            "$ref": "#/components/responses/PlanLimitExceeded"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/projects/{project_id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/ProjectId"
-        }
-      ],
-      "get": {
-        "operationId": "projects_get",
-        "summary": "Get a project",
-        "description": "Also one scheduled for deletion, with `deleted_at` and `purge_after`,\nso it can be restored. Everything in it is `404` meanwhile.\n",
-        "tags": [
-          "projects"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The project.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "patch": {
-        "operationId": "projects_update",
-        "summary": "Update a project",
-        "tags": [
-          "projects"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProjectUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The updated project.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "projects_delete",
-        "summary": "Delete a project",
-        "description": "Schedules the project for deletion. It disappears at\nonce (its API keys stop working) and can be restored until\n`purge_after`, 30 days later; then everything in it is permanently\npurged. Owners and admins. Deleting it again changes nothing.\n",
-        "tags": [
-          "projects"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The project, now scheduled for deletion.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/projects/{project_id}/restore": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/ProjectId"
-        }
-      ],
-      "post": {
-        "operationId": "projects_restore",
-        "summary": "Restore a project",
-        "description": "Cancels a scheduled deletion before `purge_after`, bringing the\nproject back as it was. Counts against the plan's project limit again (402).\n",
-        "tags": [
-          "projects"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The restored project.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Project"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "402": {
-            "$ref": "#/components/responses/PlanLimitExceeded"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/organizations": {
-      "get": {
-        "operationId": "organizations_list",
-        "summary": "List organizations",
-        "description": "Organizations the current user is a member of, with their role.",
-        "tags": [
-          "organizations"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/DeletedFilter"
-          },
-          {
-            "$ref": "#/components/parameters/Limit"
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of organizations.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OrganizationList"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "post": {
-        "operationId": "organizations_create",
-        "summary": "Create an organization",
-        "description": "Creates an organization on the Free plan, with the current user as its owner.\nOne person owns at most 2 Free organizations, counting those scheduled for\ndeletion until they are purged: past that, `409` with the detail code\n`free_organization_limit`. Paid organizations don't count.\n",
-        "tags": [
-          "organizations"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OrganizationCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "The created organization.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Organization"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/organizations/{organization_id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ],
-      "get": {
-        "operationId": "organizations_get",
-        "summary": "Get an organization",
-        "description": "Also one scheduled for deletion, with `deleted_at` and `purge_after`,\nso it can be restored. Everything in it is `404` meanwhile.\n",
-        "tags": [
-          "organizations"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The organization.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Organization"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "patch": {
-        "operationId": "organizations_update",
-        "summary": "Update an organization",
-        "tags": [
-          "organizations"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OrganizationUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The updated organization.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Organization"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "organizations_delete",
-        "summary": "Delete an organization",
-        "description": "Schedules the organization for deletion with all its projects. It disappears at\nonce (its API keys stop working) and can be restored until\n`purge_after`, 30 days later; then everything in it is permanently\npurged. Owners only; refused (409) while a paid subscription is active.\nDeleting it again changes nothing.\n",
-        "tags": [
-          "organizations"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The organization, now scheduled for deletion.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Organization"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/organizations/{organization_id}/restore": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ],
-      "post": {
-        "operationId": "organizations_restore",
-        "summary": "Restore an organization",
-        "description": "Cancels a scheduled deletion before `purge_after`, bringing the\norganization back as it was. Invitations revoked by the deletion stay revoked.\n",
-        "tags": [
-          "organizations"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The restored organization.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Organization"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/organizations/{organization_id}/usage": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ],
-      "get": {
-        "operationId": "usage_get",
-        "summary": "Get an organization's usage",
-        "description": "Usage in the current period (the calendar month, UTC) against the plan.\nCounters (`api_requests`, `search_requests`, ...) add up over the period,\nwith a daily breakdown; gauges (`records`, `asset_storage_bytes`, ...)\nare current values. `api_requests` counts requests made with API keys.\n",
-        "tags": [
-          "organizations"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The organization's usage.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Usage"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/organizations/{organization_id}/members": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ],
-      "get": {
-        "operationId": "members_list",
-        "summary": "List members",
-        "description": "The organization's members and their roles.\n",
-        "tags": [
-          "members"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/Limit"
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of members.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MembershipList"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/members/{membership_id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/MembershipId"
-        }
-      ],
-      "patch": {
-        "operationId": "members_update",
-        "summary": "Change a member's role",
-        "description": "Requires `members:write`. Only owners can grant the owner role or change an\nowner's role, and the last owner cannot be demoted (`last_owner`).\n",
-        "tags": [
-          "members"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MembershipUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The updated membership.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Membership"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "members_remove",
-        "summary": "Remove a member",
-        "description": "Requires `members:write`, except that every member may remove themselves\n(leave). Only owners can remove an owner, and the last owner cannot leave\n(`last_owner`). API keys in the organization's projects keep working.\n",
-        "tags": [
-          "members"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The removed membership.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Membership"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/organizations/{organization_id}/invitations": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ],
-      "get": {
-        "operationId": "invitations_list",
-        "summary": "List pending invitations",
-        "description": "Invitations not yet accepted, declined or revoked, including expired ones.\n",
-        "tags": [
-          "members"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/Limit"
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of invitations.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InvitationList"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "post": {
-        "operationId": "invitations_create",
-        "summary": "Invite someone",
-        "description": "Invites an email address with a role (`members:write`; only owners can\ninvite owners). The invitee sees it after signing in with that verified\naddress and accepts it with `POST /v1/me/invitations/{invitation_id}/acceptance`,\nand is emailed about it (see `email_delivery`). Invitations expire after\n14 days. `409` if one is already pending for the address. Each\ninvitation is an email sent on your behalf, so they are limited per\ninviting user (`429`), and revoking one does not give it back. One\naddress gets only a few invitation emails a day;\npast that the invitation is still made, with `email_delivery.status`\n`not_sent`.\n",
-        "tags": [
-          "members"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InvitationCreate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "The invitation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Invitation"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "402": {
-            "$ref": "#/components/responses/PlanLimitExceeded"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/invitations/{invitation_id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/InvitationId"
-        }
-      ],
-      "delete": {
-        "operationId": "invitations_revoke",
-        "summary": "Revoke an invitation",
-        "tags": [
-          "members"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The revoked invitation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Invitation"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/organizations/{organization_id}/access-review": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ],
-      "get": {
-        "operationId": "organizations_access_review",
-        "summary": "Review access left by former and demoted members",
-        "description": "What outlives a member's access (`members:write`): usable API keys\nwhose creator left the organization, or whose scopes are beyond what\nthe creator's current role could grant, and pending invitations whose\ninviter left or can no longer invite. Revoke them with\n`DELETE /v1/api-keys/{api_key_id}` and\n`DELETE /v1/invitations/{invitation_id}`.\nKeys are never revoked automatically: they belong to projects, and\nremoving their creator must not break a deploy.\n",
-        "tags": [
-          "members"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "What to review; empty lists when nothing is left behind.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AccessReview"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/me/invitations": {
-      "get": {
-        "operationId": "me_invitations_list",
-        "summary": "List my invitations",
-        "description": "Pending, unexpired invitations addressed to the signed-in user's email.\n",
-        "tags": [
-          "members"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/Limit"
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of invitations.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InvitationList"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/me/invitations/{invitation_id}/acceptance": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/InvitationId"
-        }
-      ],
-      "post": {
-        "operationId": "me_invitations_accept",
-        "summary": "Accept an invitation",
-        "description": "Joins the organization with the invited role (an existing member keeps\ntheir role). Only the invited address can accept, by signing in with it\n(`403` otherwise). `409` if the invitation is no longer pending.\n",
-        "tags": [
-          "members"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The new membership.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Membership"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/me/invitations/{invitation_id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/InvitationId"
-        }
-      ],
-      "delete": {
-        "operationId": "me_invitations_decline",
-        "summary": "Decline an invitation",
-        "description": "The invitee's answer; the organization revokes one with\n`DELETE /v1/invitations/{invitation_id}`. `409` if it is no longer\npending.\n",
-        "tags": [
-          "members"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The declined invitation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Invitation"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/organizations/{organization_id}/billing": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ],
-      "get": {
-        "operationId": "billing_get",
-        "summary": "Get an organization's billing",
-        "description": "The plan, the Stripe subscription behind it (if any), and the plans on\noffer with their prices. `enabled` is false until billing is set up on\nthe platform. Owners only.\n",
-        "tags": [
-          "billing"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The organization's billing.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Billing"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/organizations/{organization_id}/billing/checkout-sessions": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ],
-      "post": {
-        "operationId": "billing_checkout_sessions_create",
-        "summary": "Start a checkout for a paid plan",
-        "description": "Returns a Stripe Checkout URL to send the owner to. The plan changes\nonce Stripe confirms the subscription; the owner comes back to\n`return_path` in the web app with `billing=success` or\n`billing=cancelled`. Organizations with a subscription change plans in\nthe billing portal instead (409).\n",
-        "tags": [
-          "billing"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "$ref": "#/components/parameters/NoheadClient"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BillingCheckout"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Where to send the owner.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BillingSession"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
-          }
-        }
-      }
-    },
-    "/v1/organizations/{organization_id}/billing/portal-sessions": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ],
-      "post": {
-        "operationId": "billing_portal_sessions_create",
-        "summary": "Open the billing portal",
-        "description": "Returns a Stripe customer portal URL, where owners change plan and\npayment method, see invoices and cancel.\n",
-        "tags": [
-          "billing"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "$ref": "#/components/parameters/NoheadClient"
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BillingPortal"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Where to send the owner.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BillingSession"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
-          }
-        }
-      }
-    },
     "/v1/organizations/{organization_id}/audit-events": {
       "parameters": [
         {
           "$ref": "#/components/parameters/OrganizationId"
         }
-      ],
-      "get": {
-        "operationId": "audit_events_list",
-        "summary": "List an organization's audit events",
-        "description": "Who changed what across the organization, newest first. Events hold\nreferences (and a revision ID for record changes), never content. How far\nback events go depends on the plan. Requires the `audit:read` permission\n(admins and owners). `filter[project_id]` narrows to one project.\n",
-        "tags": [
-          "audit"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/Limit"
-          },
-          {
-            "$ref": "#/components/parameters/Cursor"
-          },
-          {
-            "$ref": "#/components/parameters/AuditEventFilter"
-          },
-          {
-            "$ref": "#/components/parameters/AuditEventSort"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of audit events.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuditEventList"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
+      ]
     },
     "/v1/projects/{project_id}/audit-events": {
       "parameters": [
@@ -6280,109 +4497,6 @@
             "$ref": "#/components/responses/RateLimited"
           }
         }
-      },
-      "patch": {
-        "operationId": "me_update",
-        "summary": "Update my profile",
-        "description": "Sets the signed-in user's name, which their organizations' members\nsee. Sign-in asks only for an email, so a new user has none until\nthey set it. Session only.\n",
-        "tags": [
-          "system"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MeUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The signed-in user, updated.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Principal"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "delete": {
-        "operationId": "me_delete",
-        "summary": "Delete my account",
-        "description": "Deletes the signed-in user's account. It needs a session started in\nthe last 10 minutes (a fresh sign-in with an emailed code), so a\nsession alone cannot do it: otherwise 403 with detail code\n`recent_sign_in_required`, and the web app asks for a code. Their\nname and email are removed, every session ends, and their\nmemberships and the pending\ninvitations they sent are revoked. Changes they made stay in their\norganizations' history, by \"Deleted user\". Organizations they are\nthe only member of are deleted with it (restorable for 30 days, as\nwith `DELETE /v1/organizations/{organization_id}`). API keys they\ncreated belong to their projects and keep working; the access\nreview lists them. The same address can sign up again as a new\nuser.\n\nRefused (409) while they are the only owner of an organization\nwith other members, or an organization only they belong to has a\npaid subscription, checked before the sign-in's age. Session only.\n",
-        "tags": [
-          "system"
-        ],
-        "security": [
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The account is deleted, and the session cookie cleared.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AccountDeletion"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
       }
     },
     "/v1/feature-flags": {
@@ -6453,6 +4567,130 @@
           }
         }
       }
+    },
+    "/v1/projects/{project_id}/api-keys": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ]
+    },
+    "/v1/api-keys/{api_key_id}": {
+      "parameters": [
+        {
+          "name": "api_key_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "/v1/projects/{project_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ]
+    },
+    "/v1/projects/{project_id}/restore": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/ProjectId"
+        }
+      ]
+    },
+    "/v1/organizations/{organization_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OrganizationId"
+        }
+      ]
+    },
+    "/v1/organizations/{organization_id}/restore": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OrganizationId"
+        }
+      ]
+    },
+    "/v1/organizations/{organization_id}/usage": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OrganizationId"
+        }
+      ]
+    },
+    "/v1/organizations/{organization_id}/members": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OrganizationId"
+        }
+      ]
+    },
+    "/v1/members/{membership_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/MembershipId"
+        }
+      ]
+    },
+    "/v1/organizations/{organization_id}/invitations": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OrganizationId"
+        }
+      ]
+    },
+    "/v1/invitations/{invitation_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/InvitationId"
+        }
+      ]
+    },
+    "/v1/organizations/{organization_id}/access-review": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OrganizationId"
+        }
+      ]
+    },
+    "/v1/me/invitations/{invitation_id}/accept": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/InvitationId"
+        }
+      ]
+    },
+    "/v1/me/invitations/{invitation_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/InvitationId"
+        }
+      ]
+    },
+    "/v1/organizations/{organization_id}/billing": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OrganizationId"
+        }
+      ]
+    },
+    "/v1/organizations/{organization_id}/billing/checkout-sessions": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OrganizationId"
+        }
+      ]
+    },
+    "/v1/organizations/{organization_id}/billing/portal-sessions": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/OrganizationId"
+        }
+      ]
     }
   },
   "webhooks": {
@@ -7014,549 +5252,6 @@
           },
           "has_more": {
             "type": "boolean"
-          }
-        }
-      },
-      "Organization": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "id",
-          "object",
-          "name",
-          "slug",
-          "plan",
-          "role",
-          "permissions",
-          "grantable_scopes",
-          "deleted_at",
-          "purge_after",
-          "created_at",
-          "updated_at"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "examples": [
-              "org_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
-            ]
-          },
-          "object": {
-            "const": "organization"
-          },
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "plan": {
-            "type": "string",
-            "enum": [
-              "free",
-              "pro",
-              "business",
-              "enterprise"
-            ]
-          },
-          "role": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The current user's role in the organization.",
-            "enum": [
-              "owner",
-              "admin",
-              "developer",
-              "editor",
-              "viewer",
-              null
-            ]
-          },
-          "permissions": {
-            "type": "array",
-            "description": "What the current user's role allows in the organization (empty without a membership). Clients use it to show only the actions that will succeed; the API enforces it either way.",
-            "items": {
-              "$ref": "#/components/schemas/Permission"
-            }
-          },
-          "grantable_scopes": {
-            "type": "array",
-            "description": "API key scopes the current user may put on new keys: those whose permissions their role holds.",
-            "items": {
-              "$ref": "#/components/schemas/ApiKeyScope"
-            }
-          },
-          "deleted_at": {
-            "description": "When it was scheduled for deletion (`DELETE /v1/organizations/{id}`); null unless it is.",
-            "$ref": "#/components/schemas/NullableTimestamp"
-          },
-          "purge_after": {
-            "$ref": "#/components/schemas/NullableTimestamp",
-            "description": "When a scheduled deletion becomes permanent; null otherwise."
-          },
-          "created_at": {
-            "$ref": "#/components/schemas/Timestamp"
-          },
-          "updated_at": {
-            "$ref": "#/components/schemas/Timestamp"
-          }
-        }
-      },
-      "Role": {
-        "type": "string",
-        "enum": [
-          "owner",
-          "admin",
-          "developer",
-          "editor",
-          "viewer"
-        ]
-      },
-      "Permission": {
-        "type": "string",
-        "enum": [
-          "organization:read",
-          "organization:write",
-          "organization:delete",
-          "billing:write",
-          "members:read",
-          "members:write",
-          "projects:read",
-          "projects:create",
-          "projects:write",
-          "projects:delete",
-          "schema:read",
-          "schema:write",
-          "records:read",
-          "records:write",
-          "records:publish",
-          "search:read",
-          "assets:read",
-          "assets:write",
-          "api_keys:read",
-          "api_keys:write",
-          "webhooks:read",
-          "webhooks:write",
-          "audit:read",
-          "records:redact"
-        ]
-      },
-      "Membership": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "id",
-          "object",
-          "organization_id",
-          "user",
-          "role",
-          "created_at",
-          "updated_at"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "examples": [
-              "mem_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
-            ]
-          },
-          "object": {
-            "const": "membership"
-          },
-          "organization_id": {
-            "type": "string"
-          },
-          "user": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "id",
-              "email",
-              "name"
-            ],
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "email": {
-                "type": "string"
-              },
-              "name": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            }
-          },
-          "role": {
-            "$ref": "#/components/schemas/Role"
-          },
-          "created_at": {
-            "$ref": "#/components/schemas/Timestamp"
-          },
-          "updated_at": {
-            "$ref": "#/components/schemas/Timestamp"
-          }
-        }
-      },
-      "MembershipUpdate": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "role"
-        ],
-        "properties": {
-          "role": {
-            "$ref": "#/components/schemas/Role"
-          }
-        }
-      },
-      "MembershipList": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "data",
-          "meta"
-        ],
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Membership"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/ListMeta"
-          }
-        }
-      },
-      "Invitation": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "id",
-          "object",
-          "organization",
-          "email",
-          "role",
-          "status",
-          "invited_by",
-          "email_delivery",
-          "expires_at",
-          "responded_at",
-          "created_at"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "examples": [
-              "inv_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
-            ]
-          },
-          "object": {
-            "const": "invitation"
-          },
-          "organization": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "id",
-              "name",
-              "slug"
-            ],
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "slug": {
-                "type": "string"
-              }
-            }
-          },
-          "email": {
-            "type": "string"
-          },
-          "role": {
-            "$ref": "#/components/schemas/Role"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "accepted",
-              "declined",
-              "revoked",
-              "expired"
-            ]
-          },
-          "invited_by": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "id",
-              "name"
-            ],
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              }
-            }
-          },
-          "email_delivery": {
-            "description": "What became of the invitation email, or null while it has not been sent (or when sending is off). `sent`: accepted for delivery. `not_sent`: no email went out, because the address had bounced or been marked as spam before, or had already received several invitation emails that day. `bounced`: the email could not be delivered; check the address. `complained`: the invitee marked it as spam. Either way the invitation still works when the invitee signs in with the address.",
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "status",
-                  "at"
-                ],
-                "properties": {
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "sent",
-                      "not_sent",
-                      "bounced",
-                      "complained"
-                    ]
-                  },
-                  "at": {
-                    "$ref": "#/components/schemas/Timestamp"
-                  }
-                }
-              }
-            ]
-          },
-          "expires_at": {
-            "$ref": "#/components/schemas/Timestamp"
-          },
-          "responded_at": {
-            "$ref": "#/components/schemas/NullableTimestamp"
-          },
-          "created_at": {
-            "$ref": "#/components/schemas/Timestamp"
-          }
-        }
-      },
-      "InvitationCreate": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "email",
-          "role"
-        ],
-        "properties": {
-          "email": {
-            "type": "string"
-          },
-          "role": {
-            "$ref": "#/components/schemas/Role"
-          }
-        }
-      },
-      "InvitationList": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "data",
-          "meta"
-        ],
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Invitation"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/ListMeta"
-          }
-        }
-      },
-      "OrganizationCreate": {
-        "type": "object",
-        "required": [
-          "name",
-          "slug"
-        ],
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          }
-        }
-      },
-      "MeUpdate": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "name"
-        ],
-        "properties": {
-          "name": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "maxLength": 200,
-            "description": "Shown to the members of your organizations; `null` removes it.",
-            "examples": [
-              "Ada Lovelace"
-            ]
-          }
-        }
-      },
-      "OrganizationUpdate": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          }
-        }
-      },
-      "OrganizationList": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "data",
-          "meta"
-        ],
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Organization"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/ListMeta"
-          }
-        }
-      },
-      "Project": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "id",
-          "object",
-          "organization_id",
-          "name",
-          "slug",
-          "settings",
-          "deleted_at",
-          "purge_after",
-          "created_at",
-          "updated_at"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "examples": [
-              "prj_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
-            ]
-          },
-          "object": {
-            "const": "project"
-          },
-          "organization_id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "settings": {
-            "type": "object"
-          },
-          "deleted_at": {
-            "description": "When it was scheduled for deletion (`DELETE /v1/projects/{id}`); null unless it is.",
-            "$ref": "#/components/schemas/NullableTimestamp"
-          },
-          "purge_after": {
-            "$ref": "#/components/schemas/NullableTimestamp",
-            "description": "When a scheduled deletion becomes permanent; null otherwise."
-          },
-          "created_at": {
-            "$ref": "#/components/schemas/Timestamp"
-          },
-          "updated_at": {
-            "$ref": "#/components/schemas/Timestamp"
-          }
-        }
-      },
-      "ProjectCreate": {
-        "type": "object",
-        "required": [
-          "organization_id",
-          "name",
-          "slug"
-        ],
-        "properties": {
-          "organization_id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "settings": {
-            "type": "object"
-          }
-        }
-      },
-      "ProjectUpdate": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "settings": {
-            "type": "object"
-          }
-        }
-      },
-      "ProjectList": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "data",
-          "meta"
-        ],
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Project"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/ListMeta"
           }
         }
       },
@@ -9245,7 +6940,7 @@
           },
           "redacted_fields": {
             "type": "array",
-            "description": "API keys of fields whose values in this revision were redacted\n(`POST /v1/records/{id}/redactions`); those values read `{\"$redacted\": true}`.\n",
+            "description": "API keys of fields whose values in this revision were redacted (owners\nand admins redact them in the web app); those values read\n`{\"$redacted\": true}`.\n",
             "items": {
               "type": "string"
             }
@@ -9263,48 +6958,6 @@
           },
           "created_at": {
             "$ref": "#/components/schemas/Timestamp"
-          }
-        }
-      },
-      "Redaction": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "object",
-          "record_id",
-          "field",
-          "field_id",
-          "revisions",
-          "values",
-          "dry_run"
-        ],
-        "properties": {
-          "object": {
-            "const": "redaction"
-          },
-          "record_id": {
-            "type": "string"
-          },
-          "field": {
-            "type": "string",
-            "description": "The field's API key."
-          },
-          "field_id": {
-            "type": "string"
-          },
-          "revisions": {
-            "type": "array",
-            "description": "Revision numbers whose snapshot or changes were (or would be) rewritten.",
-            "items": {
-              "type": "integer"
-            }
-          },
-          "values": {
-            "type": "integer",
-            "description": "How many distinct past values were (or would be) redacted."
-          },
-          "dry_run": {
-            "type": "boolean"
           }
         }
       },
@@ -9450,28 +7103,6 @@
             "additionalProperties": {
               "type": "boolean"
             }
-          }
-        }
-      },
-      "AccountDeletion": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "object",
-          "user_id",
-          "deleted_at"
-        ],
-        "properties": {
-          "object": {
-            "const": "account_deletion"
-          },
-          "user_id": {
-            "type": "string",
-            "description": "The deleted user, as history still refers to it."
-          },
-          "deleted_at": {
-            "type": "string",
-            "format": "date-time"
           }
         }
       },
@@ -10018,498 +7649,6 @@
                   }
                 }
               ]
-            }
-          }
-        }
-      },
-      "Billing": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "object",
-          "organization_id",
-          "enabled",
-          "plan",
-          "subscription",
-          "plans"
-        ],
-        "properties": {
-          "object": {
-            "const": "billing"
-          },
-          "organization_id": {
-            "type": "string"
-          },
-          "enabled": {
-            "type": "boolean",
-            "description": "Whether checkout and the billing portal are available."
-          },
-          "plan": {
-            "type": "string",
-            "examples": [
-              "pro"
-            ]
-          },
-          "subscription": {
-            "description": "The Stripe subscription behind a paid plan, or null.",
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/BillingSubscription"
-              }
-            ]
-          },
-          "plans": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/BillingPlan"
-            }
-          }
-        }
-      },
-      "BillingSubscription": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "status",
-          "interval",
-          "current_period_end",
-          "cancel_at_period_end"
-        ],
-        "properties": {
-          "status": {
-            "type": "string",
-            "description": "Stripe's subscription status; `past_due` keeps the plan while Stripe retries payment.",
-            "examples": [
-              "active",
-              "past_due"
-            ]
-          },
-          "interval": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "enum": [
-              "month",
-              "year",
-              null
-            ]
-          },
-          "current_period_end": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
-          },
-          "cancel_at_period_end": {
-            "type": "boolean"
-          }
-        }
-      },
-      "BillingPlan": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "key",
-          "name",
-          "limits",
-          "prices"
-        ],
-        "properties": {
-          "key": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "limits": {
-            "type": "object",
-            "description": "The plan's limits; null values are unlimited.",
-            "additionalProperties": {
-              "type": [
-                "integer",
-                "null"
-              ]
-            }
-          },
-          "prices": {
-            "type": "array",
-            "description": "Empty for free and custom plans.",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "interval",
-                "amount",
-                "currency"
-              ],
-              "properties": {
-                "interval": {
-                  "type": "string",
-                  "enum": [
-                    "month",
-                    "year"
-                  ]
-                },
-                "amount": {
-                  "type": "number",
-                  "description": "In whole currency units, before tax."
-                },
-                "currency": {
-                  "type": "string",
-                  "examples": [
-                    "usd"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      },
-      "BillingCheckout": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "plan"
-        ],
-        "properties": {
-          "plan": {
-            "type": "string",
-            "examples": [
-              "pro"
-            ]
-          },
-          "interval": {
-            "type": "string",
-            "enum": [
-              "month",
-              "year"
-            ],
-            "default": "month"
-          },
-          "return_path": {
-            "type": "string",
-            "description": "A path in the web app to come back to, e.g. `/organizations/org_.../usage`."
-          }
-        }
-      },
-      "BillingPortal": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "return_path": {
-            "type": "string"
-          }
-        }
-      },
-      "BillingSession": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "object",
-          "url"
-        ],
-        "properties": {
-          "object": {
-            "const": "billing_session"
-          },
-          "url": {
-            "type": "string",
-            "format": "uri"
-          }
-        }
-      },
-      "AccessReview": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "object",
-          "organization_id",
-          "api_keys",
-          "invitations"
-        ],
-        "properties": {
-          "object": {
-            "const": "access_review"
-          },
-          "organization_id": {
-            "type": "string"
-          },
-          "api_keys": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "api_key",
-                "reason"
-              ],
-              "properties": {
-                "api_key": {
-                  "$ref": "#/components/schemas/ApiKey"
-                },
-                "reason": {
-                  "type": "string",
-                  "enum": [
-                    "creator_left",
-                    "exceeds_creator_role"
-                  ],
-                  "description": "`creator_left`: its creator is no longer a member.\n`exceeds_creator_role`: it holds a scope the creator's current role cannot grant.\n"
-                }
-              }
-            }
-          },
-          "invitations": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "invitation",
-                "reason"
-              ],
-              "properties": {
-                "invitation": {
-                  "$ref": "#/components/schemas/Invitation"
-                },
-                "reason": {
-                  "type": "string",
-                  "enum": [
-                    "inviter_left",
-                    "inviter_cannot_invite"
-                  ],
-                  "description": "`inviter_left`: whoever sent it is no longer a member.\n`inviter_cannot_invite`: their current role cannot invite to this role.\n"
-                }
-              }
-            }
-          }
-        }
-      },
-      "Usage": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "object",
-          "organization_id",
-          "plan",
-          "period",
-          "metrics",
-          "retention"
-        ],
-        "properties": {
-          "object": {
-            "const": "usage"
-          },
-          "organization_id": {
-            "type": "string"
-          },
-          "plan": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "key",
-              "name"
-            ],
-            "properties": {
-              "key": {
-                "type": "string",
-                "examples": [
-                  "free"
-                ]
-              },
-              "name": {
-                "type": "string",
-                "examples": [
-                  "Free"
-                ]
-              }
-            }
-          },
-          "period": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "start",
-              "end"
-            ],
-            "description": "The current period; `end` is exclusive.",
-            "properties": {
-              "start": {
-                "type": "string",
-                "format": "date"
-              },
-              "end": {
-                "type": "string",
-                "format": "date"
-              }
-            }
-          },
-          "metrics": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UsageMetric"
-            }
-          },
-          "retention": {
-            "$ref": "#/components/schemas/UsageRetention"
-          }
-        }
-      },
-      "UsageRetention": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "revision_days",
-          "audit_days",
-          "grace"
-        ],
-        "description": "How long the plan keeps record revisions (beyond each record's first and latest 10) and audit events, in days; null keeps everything.",
-        "properties": {
-          "revision_days": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "examples": [
-              365
-            ]
-          },
-          "audit_days": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "examples": [
-              90
-            ]
-          },
-          "grace": {
-            "description": "After a downgrade, all history is kept for 30 days; history past the plan's retention is removed after `ends_at`. Null otherwise.",
-            "oneOf": [
-              {
-                "type": "null"
-              },
-              {
-                "$ref": "#/components/schemas/UsageRetentionGrace"
-              }
-            ]
-          }
-        }
-      },
-      "UsageRetentionGrace": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "ends_at",
-          "revision_days",
-          "audit_days"
-        ],
-        "properties": {
-          "ends_at": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "revision_days": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "description": "Days of revisions kept until `ends_at`; null keeps everything (as a downgrade's grace does).",
-            "examples": [
-              null
-            ]
-          },
-          "audit_days": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "description": "Days of audit events kept until `ends_at`; null keeps everything (as a downgrade's grace does).",
-            "examples": [
-              null
-            ]
-          }
-        }
-      },
-      "UsageMetric": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "metric",
-          "kind",
-          "usage",
-          "limit",
-          "enforcement"
-        ],
-        "properties": {
-          "metric": {
-            "type": "string",
-            "enum": [
-              "api_requests",
-              "search_requests",
-              "image_transformations",
-              "asset_uploads",
-              "asset_downloads",
-              "webhook_deliveries",
-              "record_revisions",
-              "projects",
-              "collections",
-              "records",
-              "members",
-              "webhooks",
-              "asset_storage_bytes",
-              "indexed_records"
-            ]
-          },
-          "kind": {
-            "type": "string",
-            "enum": [
-              "counter",
-              "gauge"
-            ]
-          },
-          "usage": {
-            "type": "integer"
-          },
-          "limit": {
-            "type": [
-              "integer",
-              "null"
-            ],
-            "description": "The plan's limit, or null when unlimited or not limited."
-          },
-          "enforcement": {
-            "type": "string",
-            "enum": [
-              "hard",
-              "soft",
-              "off"
-            ],
-            "description": "`hard` refuses changes over the limit (402), `soft` warns, `off` only meters."
-          },
-          "daily": {
-            "type": "array",
-            "description": "Counters only, one entry per day with usage.",
-            "items": {
-              "type": "object",
-              "additionalProperties": false,
-              "required": [
-                "date",
-                "value"
-              ],
-              "properties": {
-                "date": {
-                  "type": "string",
-                  "format": "date"
-                },
-                "value": {
-                  "type": "integer"
-                }
-              }
             }
           }
         }
@@ -11344,146 +8483,10 @@
           "audit:read"
         ]
       },
-      "ApiKey": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/ApiKeyProperties"
-          }
-        ],
-        "unevaluatedProperties": false
-      },
-      "ApiKeyProperties": {
-        "type": "object",
-        "required": [
-          "id",
-          "object",
-          "project_id",
-          "name",
-          "scopes",
-          "published_only",
-          "token_hint",
-          "expires_at",
-          "last_used_at",
-          "revoked_at",
-          "created_by",
-          "created_at"
-        ],
-        "properties": {
-          "id": {
-            "type": "string",
-            "examples": [
-              "key_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
-            ]
-          },
-          "object": {
-            "const": "api_key"
-          },
-          "project_id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "scopes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ApiKeyScope"
-            }
-          },
-          "published_only": {
-            "$ref": "#/components/schemas/PublishedOnly"
-          },
-          "token_hint": {
-            "type": "string",
-            "description": "The non-secret start of the token, to recognize it."
-          },
-          "expires_at": {
-            "$ref": "#/components/schemas/NullableTimestamp"
-          },
-          "last_used_at": {
-            "$ref": "#/components/schemas/NullableTimestamp"
-          },
-          "revoked_at": {
-            "$ref": "#/components/schemas/NullableTimestamp"
-          },
-          "created_by": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "created_at": {
-            "$ref": "#/components/schemas/Timestamp"
-          }
-        }
-      },
       "PublishedOnly": {
         "type": "boolean",
         "default": false,
         "description": "The key sees published records only, for sites and apps: lists, reads, search and expanded relations leave out unpublished and deleted records, and history is not available. Only read scopes (records:read, schema:read, assets:read, search:read) are allowed."
-      },
-      "ApiKeyWithToken": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/ApiKeyProperties"
-          },
-          {
-            "type": "object",
-            "required": [
-              "token"
-            ],
-            "properties": {
-              "token": {
-                "type": "string",
-                "description": "The secret token. Returned only once, at creation."
-              }
-            }
-          }
-        ],
-        "unevaluatedProperties": false
-      },
-      "ApiKeyCreate": {
-        "type": "object",
-        "required": [
-          "name",
-          "scopes"
-        ],
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "scopes": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ApiKeyScope"
-            }
-          },
-          "published_only": {
-            "$ref": "#/components/schemas/PublishedOnly"
-          },
-          "expires_at": {
-            "$ref": "#/components/schemas/NullableTimestamp"
-          }
-        }
-      },
-      "ApiKeyList": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "data",
-          "meta"
-        ],
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ApiKey"
-            }
-          },
-          "meta": {
-            "$ref": "#/components/schemas/ListMeta"
-          }
-        }
       },
       "ErrorType": {
         "type": "string",
