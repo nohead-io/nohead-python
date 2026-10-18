@@ -10,6 +10,7 @@ OPERATIONS: dict[str, tuple[str, str]] = {
     "assets_list": ("GET", "/v1/projects/{project_id}/assets"),
     "assets_purge": ("POST", "/v1/assets/{asset_id}/purge"),
     "assets_restore": ("POST", "/v1/assets/{asset_id}/restore"),
+    "assets_update": ("PATCH", "/v1/assets/{asset_id}"),
     "assets_upload": ("POST", "/v1/projects/{project_id}/assets"),
     "assets_usage": ("GET", "/v1/assets/{asset_id}/usage"),
     "audit_events_list": ("GET", "/v1/projects/{project_id}/audit-events"),

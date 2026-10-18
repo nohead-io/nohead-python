@@ -256,6 +256,17 @@ def test_builds_responses_that_do_not_match_the_models() -> None:
     assert post.id == "rec_1"
     assert post.revision == "not a number"  # pyright: ignore[reportUnnecessaryComparison]
     assert post.published_at == "not a time"  # pyright: ignore[reportUnnecessaryComparison]
+    # The fields that do match keep their types.
+    assert post.created_at == datetime(2026, 10, 2, 12, tzinfo=UTC)
+
+
+def test_parses_what_it_can_of_a_response_missing_a_field() -> None:
+    # An older API, without a field this SDK expects.
+    body = {key: value for key, value in record("rec_1").items() if key != "revision"}
+    nohead, _ = make_sync([json_response(200, body)])
+    with pytest.warns(nohead_warning()):
+        post = nohead.records.get("rec_1")
+    assert post.created_at == datetime(2026, 10, 2, 12, tzinfo=UTC)
 
 
 def nohead_warning() -> type[Warning]:

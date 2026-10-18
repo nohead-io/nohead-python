@@ -20,6 +20,7 @@ def asset(status: str) -> dict[str, object]:
         "object": "asset",
         "project_id": "prj_1",
         "filename": "a.png",
+        "alt": None,
         "content_type": "image/png",
         "byte_size": 3,
         "width": None,

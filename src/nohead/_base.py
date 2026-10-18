@@ -221,12 +221,24 @@ def _unvalidated(kind: Any, data: Any) -> Any:
         key = info.alias or name
         known.add(key)
         if key in raw:
-            values[name] = _unvalidated(info.annotation, raw[key])
+            values[name] = _field(info.annotation, raw[key])
     extra = {key: value for key, value in raw.items() if key not in known}
     built = model.model_construct(**values)
     if extra:
         object.__setattr__(built, "__pydantic_extra__", extra)
     return built
+
+
+def _field(kind: Any, value: Any) -> Any:
+    """One field of an unvalidated model: nested models and lists as `_unvalidated`
+    builds them, and other values validated on their own (a timestamp becomes a
+    `datetime`), kept as they came only when that field itself does not match."""
+    if isinstance(value, (dict, list)):
+        return _unvalidated(kind, value)
+    try:
+        return _adapter(kind).validate_python(value)
+    except PydanticValidationError:
+        return value
 
 
 def _item_of(kind: Any) -> Any:

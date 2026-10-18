@@ -52,6 +52,13 @@ class AssetFieldCreate(FieldCreateProperties):
     configuration: NotRequired[AssetFieldConfiguration]
 
 
+class AssetUpdate(TypedDict):
+    filename: NotRequired[str]
+    """Control characters are removed and path separators become `_`, as on upload."""
+    alt: NotRequired[str | None]
+    """Surrounding whitespace is removed; empty or null clears it."""
+
+
 class AssetUploadCreate(TypedDict):
     filename: str
     content_type: str
@@ -475,6 +482,7 @@ WebhookEventType: TypeAlias = Literal[
     "field.migrated",
     "field.alias_removed",
     "asset.created",
+    "asset.updated",
     "asset.deleted",
     "asset.restored",
     "asset.purged",

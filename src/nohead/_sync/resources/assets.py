@@ -11,7 +11,7 @@ from ..._errors import UploadError
 from ..._pagination import Page
 from ..._uploads import Uploadable, open_upload
 from ...models import Asset, AssetUsage, AssetWithUpload, DownloadUrl, ImageUrl
-from ...params import AssetUploadCreate
+from ...params import AssetUpdate, AssetUploadCreate
 from ._resource import Resource
 
 
@@ -115,6 +115,20 @@ class Assets(Resource):
 
     def get(self, asset: str) -> Asset:
         return self._client.request("assets_get", cast=Asset, path={"asset_id": asset})
+
+    def update(
+        self, asset: str, *, idempotency_key: str | None = None, **params: Unpack[AssetUpdate]
+    ) -> Asset:
+        """Renames the asset (`filename`) or sets its `alt` text (`None` or `""` clears it).
+        The file itself can't change: upload a new asset for that. `alt` is the default
+        wherever the asset is used. A deleted asset is a `ConflictError`: restore it first."""
+        return self._client.request(
+            "assets_update",
+            cast=Asset,
+            path={"asset_id": asset},
+            body=params,
+            idempotency_key=idempotency_key,
+        )
 
     def delete(self, asset: str, *, idempotency_key: str | None = None) -> Asset:
         """Soft-deletes the asset; the file is purged at its `purge_after` (or sooner with

@@ -7,6 +7,7 @@
   "assets_list": "from nohead import Nohead\n\nnohead = Nohead()\n\nfor asset in nohead.assets.list(deleted=True):\n    print(asset)\n",
   "assets_purge": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.assets.purge(\"ast_01J9ZQ3F8X\")\n",
   "assets_restore": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.assets.restore(\"ast_01J9ZQ3F8X\")\n",
+  "assets_update": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.assets.update(\n    \"ast_01J9ZQ3F8X\", filename=\"Spring menu.jpg\", alt=\"The spring menu, on a chalkboard\"\n)\n",
   "assets_upload": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.assets.upload(b\"Hello\", filename=\"hello.txt\")\n",
   "assets_usage": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.assets.usage(\"ast_01J9ZQ3F8X\")\n",
   "audit_events_list": "from nohead import Nohead\n\nnohead = Nohead()\n\nfor event in nohead.audit_events.list(filter={\"type\": \"record.*\"}, sort=\"-created_at\"):\n    print(event)\n",
