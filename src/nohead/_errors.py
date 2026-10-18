@@ -190,4 +190,8 @@ def _detail(raw: Any) -> ErrorDetail:
     try:
         return ErrorDetail.model_validate(raw)
     except Exception:
-        return ErrorDetail.model_construct(code="unknown", message=str(raw))
+        if not isinstance(raw, dict):
+            return ErrorDetail.model_construct(code="unknown", message=str(raw))
+        # What it says, unvalidated: a `code` such as `in_progress` still counts.
+        fields: dict[str, Any] = {"code": "unknown", "message": "", **cast("dict[str, Any]", raw)}
+        return ErrorDetail.model_construct(**fields)

@@ -63,6 +63,16 @@ async def test_details(make: Make) -> None:
     assert error.details[0].code == "required"
 
 
+async def test_details_that_do_not_match_keep_what_they_say(make: Make) -> None:
+    detail = {"code": "in_progress", "message": None, "retry": "soon"}
+    error = await failure(make, api_error(409, "conflict", details=[detail, "odd"]))
+    assert (error.details[0].code, error.details[0].model_extra) == (
+        "in_progress",
+        {"retry": "soon"},
+    )
+    assert (error.details[1].code, error.details[1].message) == ("unknown", "odd")
+
+
 async def test_current_revision(make: Make) -> None:
     detail = {
         "code": "revision_mismatch",
