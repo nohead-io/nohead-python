@@ -3,7 +3,7 @@
 from nohead import Nohead
 
 nohead = Nohead()  # NOHEAD_API_KEY
-for post in nohead.records.list("posts", filter={"status": "published"}):
+for post in nohead.records.list("posts", filter={"published_at": {"exists": True}}):
     print(post.data["title"])
 """
 
@@ -33,7 +33,7 @@ from ._pagination import AsyncPage, AsyncPaginator, Page
 from ._sync._nohead import Nohead
 from ._uploads import Uploadable
 from ._version import __version__
-from .models import Asset, Collection, Field, Record, Schema, Webhook
+from .models import Asset, Collection, Draft, Field, Record, Schema, Webhook
 from .webhooks import WebhookEvent
 
 __all__ = [
@@ -49,6 +49,7 @@ __all__ = [
     "AuthorizationError",
     "Collection",
     "ConflictError",
+    "Draft",
     "Field",
     "InternalServerError",
     "InvalidRequestError",

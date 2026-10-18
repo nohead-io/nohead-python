@@ -3,13 +3,14 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from types import TracebackType
-from typing import Self
+from typing import Any, Self
 
 import httpx
 
 from .. import _base
 from .._pagination import AsyncPaginator
 from ..models import Record, SearchResultsMeta
+from ..types import SearchFilter
 from ._client import AsyncAPIClient
 from .resources.assets import AsyncAssets
 from .resources.drafts import AsyncDrafts
@@ -28,6 +29,7 @@ class AsyncNohead:
     """
 
     records: AsyncRecords
+    drafts: AsyncDrafts
     collections: AsyncCollections
     fields: AsyncFields
     migrations: AsyncMigrations
@@ -114,23 +116,23 @@ class AsyncNohead:
         query: str,
         *,
         collections: Sequence[str] | None = None,
-        published: bool | None = None,
+        filter: SearchFilter | None = None,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> AsyncPaginator[Record, SearchResultsMeta]:
         """Full-text search across the key's project (or some of its collections),
-        most relevant first, through the first 1,000 hits. `published=True` finds
-        published records only, `False` unpublished ones."""
+        most relevant first, through the first 1,000 hits.
+        `filter={"published_at": {"exists": True}}` finds published records only."""
+        search_filter: dict[str, Any] = dict(filter or {})
+        if collections is not None:
+            search_filter["collection"] = {"in": collections}
         return self._client.paginate(
             "projects_search",
             item=Record,
             meta=SearchResultsMeta,
             query={
                 "q": query,
-                "filter": {
-                    "collection": {"in": collections} if collections is not None else None,
-                    "published_at": {"exists": published} if published is not None else None,
-                },
+                "filter": search_filter,
                 "limit": limit,
                 "cursor": cursor,
             },

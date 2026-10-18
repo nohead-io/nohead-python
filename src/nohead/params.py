@@ -42,6 +42,11 @@ class DraftScheduleUpdate(TypedDict):
 class FieldCreate(TypedDict):
     name: str
     api_key: str
+    """The field's key in records' `data`, filters and sorts. Reserved for records' own
+    attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`,
+    `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`,
+    `revision` and `schema_version`.
+    """
     type: FieldType
     required: NotRequired[bool]
     """Every record must have a value. Not available for boolean fields (a boolean is true or
@@ -87,6 +92,11 @@ class FieldMigrationRequest(TypedDict):
 class FieldUpdate(TypedDict):
     name: NotRequired[str]
     api_key: NotRequired[str]
+    """The field's key in records' `data`, filters and sorts. Reserved for records' own
+    attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`,
+    `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`,
+    `revision` and `schema_version`.
+    """
     type: NotRequired[FieldType]
     required: NotRequired[bool]
     """Every record must have a value. Not available for boolean fields (a boolean is true or
@@ -108,7 +118,7 @@ class RecordBatchRequest(TypedDict):
 
 
 class RecordScheduleUpdate(TypedDict):
-    """A time in the future, or null for none. Omitted keys keep their value."""
+    """The whole schedule. A time in the future, or null for none; a time left out is none too."""
 
     publish_at: NotRequired[NullableTimestamp]
     unpublish_at: NotRequired[NullableTimestamp]
@@ -151,7 +161,6 @@ RecordData: TypeAlias = dict[str, Any]
 Timestamp: TypeAlias = str | datetime
 WebhookEventType: TypeAlias = Literal[
     "record.created",
-    "record.imported",
     "record.updated",
     "record.published",
     "record.unpublished",

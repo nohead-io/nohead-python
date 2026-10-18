@@ -2,7 +2,8 @@
 
 - src/nohead/models.py: Pydantic models of the API's schemas, for responses.
   They are lenient on purpose: unknown fields are kept and enums are plain
-  strings, because the API adds fields and enum values without notice.
+  strings, because the API adds fields and enum values without notice. Only
+  the property that tells a union's variants apart is a Literal.
 - src/nohead/params.py: TypedDicts of the request bodies, for type checkers.
   Enums are Literals here: what the SDK sends should be checked.
 - src/nohead/_generated/operations.py: the method and path of every
@@ -64,6 +65,8 @@ class Generator:
         self.classes: list[list[str]] = []
         self.class_names: list[str] = []
         self.aliases: dict[str, tuple[str, set[str]]] = {}
+        # Union variants' classes: the property and value that tell them apart.
+        self.discriminators: dict[str, tuple[str, str]] = {}
 
     # Types ------------------------------------------------------------------
 
@@ -72,7 +75,11 @@ class Generator:
             return name
         for key in ("oneOf", "anyOf"):
             if key in schema:
-                return self.union([self.type_of(s, parent) for s in schema[key]])
+                variants = schema[key]
+                names = self.variant_names(variants, parent)
+                return self.union(
+                    [self.type_of(s, n) for s, n in zip(variants, names, strict=True)]
+                )
         if "allOf" in schema and len(schema["allOf"]) == 1:
             return self.type_of(schema["allOf"][0], parent)
         if "const" in schema:
@@ -115,6 +122,26 @@ class Generator:
                 return "dict[str, Any]"
             case _:
                 return "Any"
+
+    def variant_names(self, variants: list[Schema], parent: str) -> list[str]:
+        """The class names of a union's variants. One object variant is named after its
+        parent; several each get their own name, after the property that tells them apart
+        (a `const` in each, such as `status`: RecordBatchResultsSucceeded), else their
+        position. In models, that property is a Literal, so a reply validates as the
+        variant it is."""
+        inline = [v for v in variants if not ref_name(v) and "properties" in v]
+        if len(inline) < 2:
+            return [parent] * len(variants)
+        suffixes = [str(index) for index in range(1, len(inline) + 1)]
+        for prop in sorted(set.intersection(*(set(v["properties"]) for v in inline))):
+            values = [v["properties"][prop].get("const") for v in inline]
+            if all(isinstance(value, str) for value in values) and len(set(values)) == len(values):
+                suffixes = [pascal(value) for value in values]
+                for value, suffix in zip(values, suffixes, strict=True):
+                    self.discriminators[parent + suffix] = (prop, value)
+                break
+        named = {id(v): parent + suffix for v, suffix in zip(inline, suffixes, strict=True)}
+        return [named.get(id(v), parent) for v in variants]
 
     def union(self, types: list[str]) -> str:
         parts: list[str] = []
@@ -161,6 +188,8 @@ class Generator:
 
     def field(self, parent: str, prop: str, schema: Schema, required: bool) -> list[str]:
         annotation = self.type_of(schema, parent + pascal(prop))
+        if self.discriminators.get(parent, (None,))[0] == prop:
+            annotation = f"Literal[{json.dumps(self.discriminators[parent][1])}]"
         attribute = prop
         if self.mode == "model":
             clash = keyword.iskeyword(prop) or hasattr(BaseModel, prop) or not prop.isidentifier()
@@ -259,7 +288,7 @@ def main() -> None:
             '"""The API\'s resources, as the SDK returns them."""\n\n'
             "from __future__ import annotations\n\n"
             "from datetime import datetime\n"
-            "from typing import Any, TypeAlias\n\n"
+            "from typing import Any, Literal, TypeAlias\n\n"
             "from pydantic import BaseModel as _BaseModel\n"
             "from pydantic import ConfigDict as _ConfigDict\n"
             "from pydantic import Field as _Field\n\n\n"

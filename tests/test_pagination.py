@@ -29,10 +29,10 @@ def test_iterates_across_pages_keeping_the_parameters() -> None:
     nohead, calls = make_sync(
         [page([record("rec_1"), record("rec_2")], "c2"), page([record("rec_3")], None)]
     )
-    ids = [r.id for r in nohead.records.list("posts", filter={"status": "draft"})]
+    ids = [r.id for r in nohead.records.list("posts", filter={"published_at": {"exists": False}})]
     assert ids == ["rec_1", "rec_2", "rec_3"]
     assert calls.calls[1].url.params["cursor"] == "c2"
-    assert calls.calls[1].url.params["filter[status]"] == "draft"
+    assert calls.calls[1].url.params["filter[published_at][exists]"] == "false"
 
 
 def test_stops_fetching_once_it_has_enough() -> None:

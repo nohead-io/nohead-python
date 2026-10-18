@@ -23,7 +23,7 @@ from ...models import (
     SearchResultsMeta,
 )
 from ...params import RecordBatchRequest, RecordWrite
-from ...types import IfMatch, RecordFilter, RecordSort
+from ...types import IfMatch, RecordFilter, RecordSort, RevisionFilter
 from .._client import APIClient
 from ._resource import Resource
 
@@ -135,6 +135,7 @@ class Records(Resource):
         self,
         record: str,
         *,
+        if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
     ) -> Record:
@@ -142,6 +143,7 @@ class Records(Resource):
             "records_restore",
             cast=Record,
             path={"record_id": record},
+            if_match=if_match,
             idempotency_key=idempotency_key,
             change_note=change_note,
         )
@@ -202,12 +204,11 @@ class Records(Resource):
         *,
         publish_at: datetime | str | None = None,
         unpublish_at: datetime | str | None = None,
-        clear: Sequence[Literal["publish_at", "unpublish_at"]] = (),
         idempotency_key: str | None = None,
     ) -> RecordSchedule:
-        """Publishes and/or unpublishes the record later. Times left out keep their
-        value; name them in `clear` to remove them."""
-        body: dict[str, Any] = {name: None for name in clear}
+        """Publishes and/or unpublishes the record later. This sets the whole schedule:
+        a time left out is cleared (with neither, it is `unschedule`)."""
+        body: dict[str, Any] = {}
         if publish_at is not None:
             body["publish_at"] = publish_at
         if unpublish_at is not None:
@@ -284,7 +285,7 @@ class Records(Resource):
             change_note=change_note,
         )
 
-    def diff(self, record: str, from_revision: int, to_revision: int) -> RecordDiff:
+    def diff(self, record: str, *, from_revision: int, to_revision: int) -> RecordDiff:
         """The changes between two revisions."""
         return self._client.request(
             "records_diff",
@@ -329,11 +330,12 @@ class Revisions(Resource):
         self,
         record: str,
         *,
-        filter: RecordFilter | None = None,
+        filter: RevisionFilter | None = None,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> Page[RecordRevision]:
-        """Newest first. `filter` takes `operation`, `actor_id`, `since` and `until`."""
+        """Newest first. `filter` takes `operation`, `actor_id` and a `created_at` range:
+        `filter={"created_at": {"gte": datetime(2026, 10, 1, tzinfo=UTC)}}`."""
         return self._client.paginate(
             "record_revisions_list",
             item=RecordRevision,
@@ -357,6 +359,7 @@ class Revisions(Resource):
         dry_run: Literal[True],
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
+        change_note: str | None = None,
     ) -> RevertPreview: ...
     @overload
     def revert(
@@ -367,6 +370,7 @@ class Revisions(Resource):
         dry_run: Literal[False] = False,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
+        change_note: str | None = None,
     ) -> Record: ...
     def revert(
         self,
@@ -376,6 +380,7 @@ class Revisions(Resource):
         dry_run: bool = False,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
+        change_note: str | None = None,
     ) -> Record | RevertPreview:
         """Restores the record's data as of `revision`, as a new revision. With
         `dry_run=True`, previews it."""
@@ -386,4 +391,5 @@ class Revisions(Resource):
             query={"dry_run": dry_run or None},
             if_match=if_match,
             idempotency_key=idempotency_key,
+            change_note=change_note,
         )

@@ -89,7 +89,8 @@ class Collections(Resource):
     def delete(
         self, collection: str, *, idempotency_key: str | None = None, change_note: str | None = None
     ) -> Collection:
-        """Soft-deletes the collection and its records for 30 days."""
+        """Soft-deletes the collection and its records: `restore` brings them back until
+        its `purge_after`."""
         return self._client.request(
             "collections_delete",
             cast=Collection,
@@ -176,6 +177,10 @@ class Fields(Resource):
             query={"filter": {"deleted": deleted}, "limit": limit, "cursor": cursor},
         )
 
+    def get(self, field: str) -> Field:
+        """A deleted field too, with `deleted_at` and `purge_after`."""
+        return self._client.request("fields_get", cast=Field, path={"field_id": field})
+
     def create(
         self,
         collection: str,
@@ -215,7 +220,8 @@ class Fields(Resource):
     def delete(
         self, field: str, *, idempotency_key: str | None = None, change_note: str | None = None
     ) -> Field:
-        """Soft-deletes the field: its values return with `restore` for 30 days."""
+        """Soft-deletes the field: `restore` brings it back, with its values, until its
+        `purge_after`."""
         return self._client.request(
             "fields_delete",
             cast=Field,
@@ -244,8 +250,8 @@ class Fields(Resource):
     def reorder(
         self,
         collection: str,
-        field_ids: Sequence[str],
         *,
+        field_ids: Sequence[str],
         idempotency_key: str | None = None,
         change_note: str | None = None,
     ) -> FieldOrder:

@@ -204,11 +204,11 @@ def validate(kind: Any, data: Any) -> Any:
 def _unvalidated(kind: Any, data: Any) -> Any:
     """`data` built into `kind` without validation, nested models included."""
     if isinstance(data, list):
-        (item,) = typing.get_args(kind) or (Any,)
+        item = _item_of(kind)
         return [_unvalidated(item, value) for value in data]  # pyright: ignore[reportUnknownVariableType]
     if not isinstance(data, dict):
         return data
-    model = _model_of(kind)
+    model = _model_of(kind, data)  # pyright: ignore[reportUnknownArgumentType]
     if model is None:
         return data  # pyright: ignore[reportUnknownVariableType]
     raw: dict[str, Any] = data  # pyright: ignore[reportUnknownVariableType]
@@ -226,14 +226,37 @@ def _unvalidated(kind: Any, data: Any) -> Any:
     return built
 
 
-def _model_of(kind: Any) -> type[BaseModel] | None:
-    """The model class in `kind`, also inside `X | None` and `list[X]`."""
+def _item_of(kind: Any) -> Any:
+    """The item type of `list[X]`, also inside `list[X] | None`; else Any."""
+    if typing.get_origin(kind) is list:
+        return typing.get_args(kind)[0]
+    lists = [arg for arg in typing.get_args(kind) if typing.get_origin(arg) is list]
+    return typing.get_args(lists[0])[0] if lists else Any
+
+
+def _model_of(kind: Any, data: dict[str, Any]) -> type[BaseModel] | None:
+    """The model class in `kind`, also inside `X | None` and `list[X]`. Of a union of
+    models, the one `data` fits best: its Literal fields match, and its required ones
+    are there."""
     if isinstance(kind, type) and issubclass(kind, BaseModel):
         return kind
-    for arg in typing.get_args(kind):
-        if isinstance(arg, type) and issubclass(arg, BaseModel):
-            return arg
-    return None
+    models = [
+        arg for arg in typing.get_args(kind) if isinstance(arg, type) and issubclass(arg, BaseModel)
+    ]
+    if not models:
+        return None
+    return max(models, key=lambda model: _fit(model, data))
+
+
+def _fit(model: type[BaseModel], data: dict[str, Any]) -> tuple[bool, bool]:
+    literals = required = True
+    for name, info in model.model_fields.items():
+        key = info.alias or name
+        if typing.get_origin(info.annotation) is typing.Literal:
+            literals = literals and data.get(key) in typing.get_args(info.annotation)
+        if info.is_required():
+            required = required and key in data
+    return literals, required
 
 
 def parse(response: httpx.Response) -> Any:

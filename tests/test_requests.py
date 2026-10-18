@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import warnings
 from datetime import UTC, date, datetime
 
 import pytest
+
+from nohead.models import RecordBatchResultsFailed, RecordBatchResultsSucceeded
 
 from .conftest import json_response, make_async, make_sync, page, record
 
@@ -18,7 +21,7 @@ def test_serializes_filters_sorts_and_expansions() -> None:
     nohead.records.list(
         "posts",
         filter={
-            "status": "published",
+            "category": "news",
             "featured": True,
             "views": 3,
             "published_after": datetime(2026, 1, 1, tzinfo=UTC),
@@ -29,7 +32,7 @@ def test_serializes_filters_sorts_and_expansions() -> None:
         limit=50,
     )
     params = calls.calls[0].url.params
-    assert params["filter[status]"] == "published"
+    assert params["filter[category]"] == "news"
     assert params["filter[featured]"] == "true"
     assert params["filter[views]"] == "3"
     assert params["filter[published_after]"] == "2026-01-01T00:00:00Z"
@@ -45,7 +48,7 @@ def test_serializes_filter_operators_escaping_commas_in_lists() -> None:
     nohead.records.list(
         "products",
         filter={
-            "status": {"ne": "draft"},
+            "brand": {"ne": "acme"},
             "price": {"gte": 10, "lt": 50},
             "category": {"in": ["shoes", "hats, caps", "a\\b"]},
             "cover": {"exists": True},
@@ -54,7 +57,7 @@ def test_serializes_filter_operators_escaping_commas_in_lists() -> None:
         sort="-price",
     )
     params = calls.calls[0].url.params
-    assert params["filter[status][ne]"] == "draft"
+    assert params["filter[brand][ne]"] == "acme"
     assert params["filter[price][gte]"] == "10"
     assert params["filter[price][lt]"] == "50"
     assert params["filter[category][in]"] == "shoes,hats\\, caps,a\\\\b"
@@ -87,10 +90,13 @@ def test_serializes_dates_in_bodies() -> None:
     assert calls.body(0) == {"publish_at": "2027-01-01T09:00:00Z"}
 
 
-def test_clears_scheduled_times() -> None:
+def test_sets_the_whole_schedule() -> None:
     nohead, calls = make_sync([json_response(200, SCHEDULE)])
-    nohead.records.schedule("rec_1", clear=["unpublish_at"])
-    assert calls.body(0) == {"unpublish_at": None}
+    nohead.records.schedule("rec_1", unpublish_at="2027-02-01T00:00:00Z")
+    nohead.records.schedule("rec_1")
+    # A time left out is cleared, so only the given ones are sent.
+    assert calls.body(0) == {"unpublish_at": "2027-02-01T00:00:00Z"}
+    assert calls.body(1) == {}
 
 
 def test_idempotency_keys_on_writes_only() -> None:
@@ -114,7 +120,75 @@ def test_if_match_from_a_revision_or_a_record() -> None:
     nohead, calls = make_sync([json_response(200, record("rec_1"))])
     post = nohead.records.update("rec_1", data={"title": None}, if_match=3)
     nohead.records.publish("rec_1", if_match=post)
-    assert [c.headers["if-match"] for c in calls.calls] == ['"3"', '"1"']
+    nohead.records.restore("rec_1", if_match=4)
+    assert [c.headers["if-match"] for c in calls.calls] == ['"3"', '"1"', '"4"']
+
+
+def test_search_filters_and_collections() -> None:
+    nohead, calls = make_sync([page([], None, total_estimate=0)])
+    nohead.search("hi", collections=["posts", "pages"], filter={"published_at": {"exists": True}})
+    params = calls.calls[0].url.params
+    assert params["filter[collection][in]"] == "posts,pages"
+    assert params["filter[published_at][exists]"] == "true"
+
+
+def test_audit_events_filter_several_resource_types_and_a_time_range() -> None:
+    nohead, calls = make_sync([page([], None)])
+    nohead.audit_events.list(
+        filter={
+            "type": "field.*",
+            "resource_type": ["collection", "field"],
+            "created_at": {"gte": datetime(2026, 10, 1, tzinfo=UTC)},
+        }
+    )
+    nohead.audit_events.list(filter={"resource_type": "record"})
+    assert dict(calls.calls[0].url.params) == {
+        "filter[type]": "field.*",
+        "filter[resource_type][in]": "collection,field",
+        "filter[created_at][gte]": "2026-10-01T00:00:00Z",
+    }
+    assert dict(calls.calls[1].url.params) == {"filter[resource_type]": "record"}
+
+
+def test_record_batch_results_that_failed() -> None:
+    batch = {
+        "object": "record_batch",
+        "action": "publish",
+        "succeeded": 1,
+        "failed": 1,
+        "results": [
+            {"id": "rec_1", "status": "succeeded", "changed": True, "record": record("rec_1")},
+            {
+                "id": "rec_2",
+                "status": "failed",
+                "error": {"type": "not_found", "message": "Record not found"},
+            },
+        ],
+    }
+    nohead, _ = make_sync([json_response(200, batch)])
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        result = nohead.records.bulk("posts", action="publish", record_ids=["rec_1", "rec_2"])
+    succeeded, failed = result.results
+    assert isinstance(succeeded, RecordBatchResultsSucceeded)
+    assert succeeded.record.id == "rec_1"
+    assert isinstance(failed, RecordBatchResultsFailed)
+    assert (failed.id, failed.error.type) == ("rec_2", "not_found")
+
+
+def test_record_batch_results_a_newer_api_changed() -> None:
+    batch = {
+        "object": "record_batch",
+        "action": "publish",
+        "succeeded": 0,
+        "failed": 1,
+        "results": [{"id": "rec_2", "status": "failed", "error": {"code": 7}}],
+    }
+    nohead, _ = make_sync([json_response(200, batch)])
+    with pytest.warns(nohead_warning()):
+        result = nohead.records.bulk("posts", action="publish", record_ids=["rec_2"])
+    # Unvalidated, it is still the variant it says it is.
+    assert isinstance(result.results[0], RecordBatchResultsFailed)
 
 
 def test_change_note_in_any_language_percent_encoded() -> None:
@@ -141,7 +215,7 @@ def test_dry_runs_are_query_parameters() -> None:
 def test_diff_names_its_revisions() -> None:
     diff = {"object": "record_diff", "record_id": "rec_1", "from": 1, "to": 2, "changes": []}
     nohead, calls = make_sync([json_response(200, diff)])
-    result = nohead.records.diff("rec_1", 1, 2)
+    result = nohead.records.diff("rec_1", from_revision=1, to_revision=2)
     assert (result.from_, result.to) == (1, 2)
     assert dict(calls.calls[0].url.params) == {"from": "1", "to": "2"}
 
