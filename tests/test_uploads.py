@@ -70,11 +70,25 @@ async def test_uploads_a_path(make: Make, tmp_path: Path) -> None:
 
 
 async def test_uses_an_idempotency_key_only_to_start_the_upload(make: Make) -> None:
-    nohead, calls = make([CREATED, STORED, READY])
+    pending = json_response(200, asset("pending"))
+    nohead, calls = make([CREATED, pending, STORED, READY])
     await resolve(nohead.assets.upload(b"x", idempotency_key="k1"))
+    assert [f"{c.method} {c.url.path}" for c in calls.calls] == [
+        "POST /v1/projects/prj_1/assets",
+        "GET /v1/assets/ast_1",
+        "PUT /uploads/prj_1/ast_1",
+        "POST /v1/assets/ast_1/complete",
+    ]
     keys = [c.headers.get("idempotency-key") for c in calls.calls]
     assert keys[0] == "k1"
-    assert keys[2] and len(keys[2]) == 36
+    assert keys[3] and len(keys[3]) == 36
+
+
+async def test_returns_an_asset_a_replayed_upload_already_finished(make: Make) -> None:
+    nohead, calls = make([CREATED, READY])
+    ready = await resolve(nohead.assets.upload(b"x", idempotency_key="k1"))
+    assert ready.status == "ready"
+    assert [c.method for c in calls.calls] == ["POST", "GET"]
 
 
 async def test_uploads_bytes_with_a_name(make: Make) -> None:
