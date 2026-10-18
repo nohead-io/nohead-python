@@ -58,7 +58,7 @@ async def test_uploads_a_path(make: Make, tmp_path: Path) -> None:
     assert [f"{c.method} {c.url.host}{c.url.path}" for c in calls.calls] == [
         "POST api.test/v1/projects/prj_1/assets",
         "PUT storage.test/uploads/prj_1/ast_1",
-        "POST api.test/v1/assets/ast_1/completion",
+        "POST api.test/v1/assets/ast_1/complete",
     ]
     assert calls.body(0) == {"filename": "a.png", "content_type": "image/png", "byte_size": 3}
     put = calls.calls[1]
