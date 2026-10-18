@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from typing import Literal
 
 from typing_extensions import Unpack
@@ -33,7 +34,8 @@ class AsyncAssets(AsyncResource):
 
         With an `idempotency_key`, running the same upload again resumes it: the key
         starts the upload, and an asset that is already `ready` is returned without
-        sending the bytes again.
+        sending the bytes again. Once the upload's URL has expired
+        (`upload.expires_at`), it raises UploadError: start over with a new key.
         """
         source = open_upload(file, filename, content_type, byte_size)
         try:
@@ -48,6 +50,12 @@ class AsyncAssets(AsyncResource):
                 current = await self.get(created.id)
                 if current.status == "ready":
                     return current
+                # The key replays the first run's upload URL, which expires sooner.
+                if created.upload.expires_at <= datetime.now(UTC):
+                    raise UploadError(
+                        f"The upload of {source.filename} expired: "
+                        "start it again with a new idempotency_key"
+                    )
             response = await self._client.put_upload(
                 created.upload.url, created.upload.method, created.upload.headers, source
             )

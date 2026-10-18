@@ -90,7 +90,9 @@ section is its GitHub release's notes.
 - `assets.purge()`: permanently deletes a deleted asset now, instead of at
   its `purge_after`, and frees its storage.
 - `assets.upload()` with an `idempotency_key` resumes: run again, it returns
-  an asset that is already `ready` without sending the bytes again.
+  an asset that is already `ready` without sending the bytes again, and
+  raises `UploadError` once the upload's URL has expired (start over with a
+  new key).
 - Webhook events are lenient, as responses are: an event, or a part of one
   (`event.record`, `event.asset`, ...), that doesn't match the models is
   returned unvalidated with a `NoheadWarning`, instead of raising

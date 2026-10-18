@@ -239,7 +239,7 @@ url = nohead.assets.image_url(asset.id, width=1200, format="webp").url
 
 **Errors:** `UploadError` if storage refuses the bytes; `ValidationError` if the file fails the checks.
 
-**Resuming:** with an `idempotency_key`, running the same upload again resumes it, and an asset that is already `ready` is returned without sending the bytes again.
+**Resuming:** with an `idempotency_key`, running the same upload again resumes it: an asset that is already `ready` is returned without sending the bytes again. Once the upload's URL has expired (its `upload.expires_at`), it raises `UploadError`: start over with a new key.
 
 **Uploading from a browser:** create the upload on your server with `create_upload`, `PUT` the file from the browser, then `complete` it.
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -33,18 +34,22 @@ def asset(status: str) -> dict[str, object]:
     }
 
 
-CREATED = json_response(
-    201,
-    {
-        **asset("pending"),
-        "upload": {
-            "method": "PUT",
-            "url": "https://storage.test/uploads/prj_1/ast_1?signature=x",
-            "headers": {"Content-Type": "image/png"},
-            "expires_at": "2026-10-02T13:00:00.000Z",
+def created(expires_at: str) -> httpx.Response:
+    return json_response(
+        201,
+        {
+            **asset("pending"),
+            "upload": {
+                "method": "PUT",
+                "url": "https://storage.test/uploads/prj_1/ast_1?signature=x",
+                "headers": {"Content-Type": "image/png"},
+                "expires_at": expires_at,
+            },
         },
-    },
-)
+    )
+
+
+CREATED = created((datetime.now(UTC) + timedelta(minutes=15)).isoformat())
 STORED = httpx.Response(200)
 READY = json_response(200, asset("ready"))
 
@@ -88,6 +93,14 @@ async def test_returns_an_asset_a_replayed_upload_already_finished(make: Make) -
     nohead, calls = make([CREATED, READY])
     ready = await resolve(nohead.assets.upload(b"x", idempotency_key="k1"))
     assert ready.status == "ready"
+    assert [c.method for c in calls.calls] == ["POST", "GET"]
+
+
+async def test_refuses_to_resume_once_the_upload_url_expired(make: Make) -> None:
+    pending = json_response(200, asset("pending"))
+    nohead, calls = make([created("2026-10-02T13:00:00.000Z"), pending])
+    with pytest.raises(UploadError, match="new idempotency_key"):
+        await resolve(nohead.assets.upload(b"x", idempotency_key="k1"))
     assert [c.method for c in calls.calls] == ["POST", "GET"]
 
 
