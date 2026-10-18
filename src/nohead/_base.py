@@ -78,6 +78,9 @@ def settings(
 
 
 def url(settings: Settings, template: str, values: Mapping[str, str | int]) -> str:
+    # A value the template doesn't take is a method out of step with its operation.
+    if unknown := set(values) - set(re.findall(r"\{(\w+)\}", template)):
+        raise TypeError(f"{', '.join(sorted(unknown))} is not a path parameter of {template}")
     path = template
     for name, value in values.items():
         path = path.replace("{" + name + "}", quote(str(value), safe=""))
