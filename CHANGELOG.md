@@ -5,7 +5,7 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
-## Unreleased
+## 0.5.0
 
 - **Breaking:** a field migration is created under its collection:
   `migrations.create(collection, field_id=..., ..., dry_run=...)`
