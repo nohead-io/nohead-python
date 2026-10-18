@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, TypeAlias
+from typing import Any, Literal, TypeAlias
 
 from pydantic import BaseModel as _BaseModel
 from pydantic import ConfigDict as _ConfigDict
@@ -124,6 +124,11 @@ class RecordCount(NoheadModel):
 class FieldCreate(NoheadModel):
     name: str
     api_key: str
+    """The field's key in records' `data`, filters and sorts. Reserved for records' own
+    attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`,
+    `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`,
+    `revision` and `schema_version`.
+    """
     type: FieldType
     required: bool | None = None
     """Every record must have a value. Not available for boolean fields (a boolean is true or
@@ -140,6 +145,11 @@ class FieldCreate(NoheadModel):
 class FieldUpdate(NoheadModel):
     name: str | None = None
     api_key: str | None = None
+    """The field's key in records' `data`, filters and sorts. Reserved for records' own
+    attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`,
+    `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`,
+    `revision` and `schema_version`.
+    """
     type: FieldType | None = None
     required: bool | None = None
     """Every record must have a value. Not available for boolean fields (a boolean is true or
@@ -257,7 +267,6 @@ class SchemaChangeProperties(NoheadModel):
     via: Via
     note: str | None
     request_id: str | None
-    status: str
     created_at: Timestamp
 
 
@@ -398,9 +407,10 @@ class FieldMigrationList(NoheadModel):
 
 class RecordSchedule(NoheadModel):
     """When the record publishes or unpublishes on its own (within a minute of the time), set
-    with `PUT /v1/records/{record_id}/schedule`. A time is cleared once it has run.
-    `last_error` explains the last scheduled change that could not be made, until a new
-    schedule is set.
+    with `PUT /v1/records/{record_id}/schedule`. A time is cleared once it has run, or once
+    the record is published or unpublished by hand or deleted. `last_error` explains the
+    last scheduled change that could not be made, until a new schedule is set or a scheduled
+    change is made.
     """
 
     object: str
@@ -411,7 +421,7 @@ class RecordSchedule(NoheadModel):
 
 
 class RecordScheduleUpdate(NoheadModel):
-    """A time in the future, or null for none. Omitted keys keep their value."""
+    """The whole schedule. A time in the future, or null for none; a time left out is none too."""
 
     publish_at: NullableTimestamp | None = None
     unpublish_at: NullableTimestamp | None = None
@@ -424,7 +434,9 @@ class RecordPublication(NoheadModel):
     record_id: str
     published_at: Timestamp
     revision: int
-    """The revision that is live."""
+    """The revision that is live, the record's current one (a live record's edits are live; a
+    draft keeps changes back).
+    """
     published_by: Actor | None
     """Who published it last; null when that revision is no longer kept."""
 
@@ -437,15 +449,22 @@ class ScheduledChange(NoheadModel):
     record_id: str
     draft_id: str | None
     """The draft that merges, for `merge`."""
-    last_error: str | None
-    """Why the last scheduled change could not be made, as in the record's (or the draft's)
-    schedule.
-    """
 
 
 class ScheduledChangeList(NoheadModel):
     data: list[ScheduledChange]
     meta: ListMeta
+
+
+class TimeFilter(NoheadModel):
+    """A time range, as record lists filter times
+    (`filter[created_at][gte]=2026-10-01T00:00:00Z`).
+    """
+
+    gte: datetime | None = None
+    gt: datetime | None = None
+    lte: datetime | None = None
+    lt: datetime | None = None
 
 
 class Draft(NoheadModel):
@@ -577,7 +596,7 @@ class RecordRevisionProperties(NoheadModel):
     object: str
     record_id: str
     revision: int
-    operation: str
+    operation: RecordRevisionOperation
     actor: Actor
     via: Via
     note: str | None
@@ -685,7 +704,7 @@ class WebhookProperties(NoheadModel):
     project_id: str
     url: str
     description: str | None
-    event_types: list[str]
+    event_types: list[WebhookSubscription]
     """The subscribed event types and wildcards (`record.*`, or `*` for all)."""
     enabled: bool
     deleted_at: NullableTimestamp
@@ -729,12 +748,24 @@ class RecordBatchRequest(NoheadModel):
     """For `update`, the fields to set on every record (null clears one)."""
 
 
-class RecordBatchResults(NoheadModel):
+class RecordBatchResultsSucceeded(NoheadModel):
     id: str
-    status: str
+    status: Literal["succeeded"]
     changed: bool
     """False when the record was already in that state (no revision)."""
     record: Record
+
+
+class RecordBatchResultsFailedError(NoheadModel):
+    type: ErrorType
+    message: str
+    details: list[ErrorDetail] | None = None
+
+
+class RecordBatchResultsFailed(NoheadModel):
+    id: str
+    status: Literal["failed"]
+    error: RecordBatchResultsFailedError
 
 
 class RecordBatch(NoheadModel):
@@ -742,7 +773,7 @@ class RecordBatch(NoheadModel):
     action: str
     succeeded: int
     failed: int
-    results: list[RecordBatchResults]
+    results: list[RecordBatchResultsSucceeded | RecordBatchResultsFailed]
 
 
 class AuditEventProject(NoheadModel):
@@ -752,6 +783,9 @@ class AuditEventProject(NoheadModel):
 
 class AuditEventResource(NoheadModel):
     type: str
+    """What the event is about, such as `record`, `draft`, `collection`, `field`, `asset` or
+    `webhook`; a field's change names its collection in `metadata.collection_id`.
+    """
     id: str
     """The resource's public ID (or key, for feature flags)."""
 
@@ -762,13 +796,13 @@ class AuditEvent(NoheadModel):
     organization_id: str
     project: AuditEventProject | None
     """The project the event belongs to, or null for organization-level events."""
-    action: str
+    type: str
     """`<resource>.<verb>`, e.g. `record.published`, `field.updated`, `api_key.created`,
-    `member.role_changed`.
+    `member.role_changed`: a webhook event's type too, for the events webhooks get.
     """
     resource: AuditEventResource
     actor: Actor
-    via: str | None
+    via: Via | None
     """The client the change came through, when known."""
     metadata: dict[str, Any]
     """Small, action-specific references, e.g. `revision_id` and `collection_id` for record
@@ -851,14 +885,14 @@ class WebhookDeliveryList(NoheadModel):
 
 class WebhookEventPayload(NoheadModel):
     """The JSON body of every webhook request. It is rendered from the event's history each
-    time it is sent or shown, so redacted values are redacted in it too.
+    time it is sent or shown, so redacted values are redacted in it too. `data` depends on
+    the `type`.
     """
 
     id: str
     """The event's ID, also sent as `webhook-id`; dedupe by it."""
     object: str
-    type: str
-    """One of the event types (`WebhookEventType`), or `webhook.test`."""
+    type: WebhookEventType | str
     created_at: Timestamp
     project_id: str
     actor: Actor | None = None
@@ -867,15 +901,98 @@ class WebhookEventPayload(NoheadModel):
     """The client the change came through (null when not known). Always sent. An integration
     that writes back can skip changes made with its own API key (`actor`).
     """
-    data: dict[str, Any]
-    """`record.*`: `record` (as the change's revision left it, or as it is now for events
-    without a revision such as `record.scheduled`; null once it is purged), `revision` and
-    `revision_id`; a merged draft's `record.updated` adds its `draft_id`. `draft.*`: `draft`
-    (as it is now; null once merged or discarded, and while its record is deleted),
-    `draft_id` and `record_id`. `asset.*`: `asset` (as it is now). `collection.*` and
-    `field.*`: `collection` and `schema_change`, except `field.alias_removed`: `field`.
-    `webhook.test`: `webhook`.
+    data: (
+        RecordEventData
+        | DraftEventData
+        | AssetEventData
+        | SchemaEventData
+        | FieldAliasEventData
+        | WebhookTestEventData
+    )
+
+
+class RecordEventData(NoheadModel):
+    """`record.*`: the record as the change's revision left it, or as it is now for events
+    without a revision (`record.scheduled`, `record.unscheduled`, `record.schedule_failed`,
+    `record.redacted`).
     """
+
+    record: Record | None
+    """Null once the record is purged."""
+    revision: int | None
+    revision_id: str | None
+    """Null for events without a revision."""
+    draft_id: str | None = None
+    """On the `record.updated` of a merged draft, the draft it merged."""
+
+
+class DraftEventData(NoheadModel):
+    """`draft.*`: the draft as it is now."""
+
+    draft: Draft | None
+    """Null once merged or discarded, and while its record is deleted."""
+    draft_id: str
+    """The draft's ID, also once it is gone."""
+    record_id: str
+
+
+class AssetEventDataAsset(NoheadModel):
+    """Only its ID once it is purged."""
+
+    id: str
+    object: str
+
+
+class AssetEventData(NoheadModel):
+    """`asset.*`: the asset as it is now."""
+
+    asset: Asset | AssetEventDataAsset
+
+
+class SchemaEventDataCollection(NoheadModel):
+    """Only `id` and `object` are known once the schema change is gone (the collection was
+    purged).
+    """
+
+    id: str
+    object: str
+    slug: str | None
+    name: str | None
+    schema_version: int | None
+    deleted_at: NullableTimestamp
+
+
+class SchemaEventDataSchemaChange(NoheadModel):
+    id: str
+    operation: str
+    from_version: int
+    to_version: int
+
+
+class SchemaEventData(NoheadModel):
+    """`collection.*` and `field.*` (but `field.alias_removed`): the collection as the change
+    left it, and the change.
+    """
+
+    collection: SchemaEventDataCollection
+    """Only `id` and `object` are known once the schema change is gone (the collection was
+    purged).
+    """
+    field_id: str | None = None
+    """`field.*`: the field that changed."""
+    schema_change: SchemaEventDataSchemaChange | None
+
+
+class FieldAliasEventData(NoheadModel):
+    """`field.alias_removed`: the field."""
+
+    field: Field | None
+
+
+class WebhookTestEventData(NoheadModel):
+    """`webhook.test`: the webhook it was sent to."""
+
+    webhook: Webhook | None
 
 
 class AssetProperties(NoheadModel):
@@ -923,16 +1040,16 @@ class ImageUrl(NoheadModel):
 class AssetUsageUses(NoheadModel):
     record: Record
     fields: list[str]
-    """API keys of the record's fields that use the asset."""
+    """API keys of the record's fields that use the asset, in its content or its draft."""
 
 
 class AssetUsage(NoheadModel):
     object: str
     asset_id: str
     records: int
-    """Undeleted records that use the asset."""
+    """Undeleted records that use the asset, in their content or their draft."""
     published: int
-    """Of those, the published ones (what sites show)."""
+    """Of those, the published ones whose content uses it (what sites show)."""
     uses: list[AssetUsageUses]
     """The most recently updated records that use the asset."""
 
@@ -1007,6 +1124,7 @@ NullableTimestamp: TypeAlias = datetime | None
 RecordFilterValue: TypeAlias = str | RecordFilterValueObject
 FieldType: TypeAlias = str
 SchemaChange: TypeAlias = SchemaChangeProperties
+RecordRevisionOperation: TypeAlias = str
 Via: TypeAlias = str
 RecordData: TypeAlias = dict[str, Any]
 RecordRevision: TypeAlias = RecordRevisionProperties

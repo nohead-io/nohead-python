@@ -9,7 +9,7 @@
       "email": "hello@nohead.io",
       "url": "https://nohead.io"
     },
-    "description": "The Nohead API manages projects, collections (your data models), their\nfields, and records (your content), with full version history.\n\n## Authentication\n\nSend `Authorization: Bearer <token>`. Servers, CI and agents use a\nproject API key (`sk_live_...`, created in the web app under API keys)\nwith scopes such as `records:read` or `schema:write`. Organization,\nproject, member and API key management need a person signed in to the\nweb app and are not available to API keys.\n\n## Resources and IDs\n\nEvery object has an opaque, prefixed `id` (`col_`, `fld_`, `rec_`, ...)\nand an `object` type. Record values live under `data`, keyed by each\nfield's `api_key`. Timestamps are ISO 8601 in UTC. Deletes are soft and\ncan be undone.\n\n## Lists\n\nLists return `{ \"data\": [...], \"meta\": { \"next_cursor\", \"has_more\" } }`.\nPass `limit` (1-100) and `cursor` to page, and `sort` (prefix `-` for\ndescending). Records also take `filter[<api_key>]=value`,\n`filter[published_at][exists]=true` and `expand=<relation, asset or\nrich text fields>`.\n\n## Errors\n\nErrors share one envelope: `{ \"error\": { \"type\", \"message\",\n\"request_id\", \"details\" } }`. `details` lists field-level problems as\n`{ \"field\", \"code\", \"message\" }`. Include the `request_id` when asking\nfor support.\n\n## Safe retries and concurrent edits\n\nSend `Idempotency-Key` on any `POST`, `PATCH` or `DELETE` to make retrying\nit safe: the first result is stored for 24 hours and returned again for\nthe same request. Record responses carry the record's revision as an\n`ETag`; send it back as `If-Match` to update only if nobody changed the\nrecord in the meantime (`412` otherwise).\n\n## History\n\nEvery change to a record is a revision, attributed to the person or API\nkey that made it: record revisions can be listed, diffed and reverted,\nand collections keep a schema history. Send `Nohead-Change-Note` to\nrecord why a change was made. Changes that rewrite existing values\n(such as a field's type) are explicit, previewable field migrations.\n\nHow long revisions are kept depends on the organization's plan. Older\nones are removed, but every record keeps its first revision and its\nlast 10; `history_pruned_through` says how far history was removed.\n",
+    "description": "The Nohead API manages projects, collections (your data models), their\nfields, and records (your content), with full version history.\n\n## Authentication\n\nSend `Authorization: Bearer <token>`. Servers, CI and agents use a\nproject API key (`sk_live_...`, created in the web app under API keys)\nwith scopes such as `records:read` or `schema:write`. Organization,\nproject, member and API key management need a person signed in to the\nweb app and are not available to API keys.\n\n## Resources and IDs\n\nEvery object has an `object` type, and every resource with an identity of\nits own an opaque, prefixed `id` (`col_`, `fld_`, `rec_`, ...). Record values live under `data`, keyed by each\nfield's `api_key`. Timestamps are ISO 8601 in UTC. Deleting a record,\ncollection, field, asset or webhook is soft: it can be restored until its\n`purge_after`.\n\n## Lists\n\nLists return `{ \"data\": [...], \"meta\": { \"next_cursor\", \"has_more\" } }`.\nPass `limit` (1-100) and `cursor` to page, and `sort` (prefix `-` for\ndescending). Records also take `filter[<api_key>]=value`,\n`filter[published_at][exists]=true` and `expand=<relation, asset or\nrich text fields>`.\n\n## Errors\n\nErrors share one envelope: `{ \"error\": { \"type\", \"message\",\n\"request_id\", \"details\" } }`. `details` lists field-level problems as\n`{ \"field\", \"code\", \"message\" }`. Include the `request_id` when asking\nfor support.\n\n## Safe retries and concurrent edits\n\nSend `Idempotency-Key` on any `POST`, `PUT`, `PATCH` or `DELETE` to make retrying\nit safe: the first result is stored for 24 hours and returned again for\nthe same request. Record responses carry the record's revision as an\n`ETag`; send it back as `If-Match` to update only if nobody changed the\nrecord in the meantime (`412` otherwise).\n\n## History\n\nEvery change to a record is a revision, attributed to the person or API\nkey that made it: record revisions can be listed, diffed and reverted,\nand collections keep a schema history. Send `Nohead-Change-Note` to\nrecord why a change was made. Changes that rewrite existing values\n(such as a field's type) are explicit, previewable field migrations.\n\nHow long revisions are kept depends on the organization's plan. Older\nones are removed, but every record keeps its first revision and its\nlast 10; `history_pruned_through` says how far history was removed.\n",
     "license": {
       "name": "Proprietary",
       "identifier": "LicenseRef-Proprietary"
@@ -28,9 +28,6 @@
   "security": [
     {
       "apiKey": []
-    },
-    {
-      "session": []
     }
   ],
   "tags": [
@@ -276,7 +273,7 @@
       "patch": {
         "operationId": "records_update",
         "summary": "Update a record",
-        "description": "Partial update. Keys present in `data` replace their values; `null`\nclears one. `409` with detail code `deleted` while the record is\nsoft-deleted: restore it first.\n",
+        "description": "Partial update. Keys present in `data` replace their values; `null`\nclears one. `409` with detail code `deleted` while the record is\nsoft-deleted: restore it first. With a pending draft the update still\napplies, and merging the draft later replaces the fields the draft\nchanges.\n",
         "tags": [
           "records"
         ],
@@ -337,7 +334,7 @@
       "delete": {
         "operationId": "records_delete",
         "summary": "Delete a record",
-        "description": "Soft-deletes the record: values and history are kept, and it can be\nrestored until `purge_after`. Its schedule is cancelled. Deleting a\ndeleted record changes nothing.\n",
+        "description": "Soft-deletes the record: values and history are kept, and it can be\nrestored until `purge_after`. Its schedule is cleared with it: the\ndelete is the change, so there is no `record.unscheduled` event, and\nrestoring the record doesn't bring the schedule back. Its draft's\nmerge waits for a restore. Deleting a deleted record changes nothing.\n",
         "tags": [
           "records"
         ],
@@ -439,7 +436,7 @@
       "post": {
         "operationId": "records_bulk",
         "summary": "Change many records",
-        "description": "Publishes, unpublishes, deletes, restores or updates\n(`update` with `data`, applied to each) up to 100 records. Each record\nis changed as if by its own request: one revision per effective\nchange, with its own audit event, webhook and search update. Records\nthat fail (not found, invalid, over a plan limit, a live record with\na pending draft for `publish`) are reported without stopping the\nothers. Publishing needs `records:publish`; the rest `records:write`.\n",
+        "description": "Publishes, unpublishes, deletes, restores or updates\n(`update` with `data`, applied to each) up to 100 records. Each record\nis changed as if by its own request: one revision per effective\nchange, with its own audit event, webhook and search update. Records\nthat fail (not found, invalid, over a plan limit, a live record with\na pending draft for `publish`) are reported without stopping the\nothers. Publishing needs `records:publish` (an API key's `records:write`); the rest `records:write`.\n",
         "tags": [
           "records"
         ],
@@ -601,7 +598,7 @@
       "post": {
         "operationId": "records_publish",
         "summary": "Publish a record",
-        "description": "Makes the record's current content live (`records:publish`), as a\n`publish` revision. Publishing a published record changes nothing,\nbut a live record with a pending draft is `409` with detail code\n`draft_pending` and its `draft_id`: publishing never merges a draft\n(`POST /v1/drafts/{id}/merge` does). An unpublished record goes live\nwith its current content and keeps its draft.\n",
+        "description": "Makes the record's current content live (`records:publish`; an API key's `records:write`), as a\n`publish` revision. Publishing a published record changes nothing,\nbut a live record with a pending draft is `409` with detail code\n`draft_pending` and its `draft_id`: publishing never merges a draft\n(`POST /v1/drafts/{id}/merge` does). An unpublished record goes live\nwith its current content and keeps its draft.\n",
         "tags": [
           "publishing"
         ],
@@ -649,7 +646,7 @@
       "delete": {
         "operationId": "records_unpublish",
         "summary": "Unpublish a record",
-        "description": "Takes the record offline (`records:publish`), as an `unpublish`\nrevision; its content is kept. Unpublishing an unpublished record\nchanges nothing.\n",
+        "description": "Takes the record offline (`records:publish`; an API key's `records:write`), as an `unpublish`\nrevision; its content is kept. Unpublishing an unpublished record\nchanges nothing.\n",
         "tags": [
           "publishing"
         ],
@@ -732,7 +729,7 @@
       "put": {
         "operationId": "records_schedule",
         "summary": "Schedule publishing or unpublishing",
-        "description": "Publishes (`publish_at`) or unpublishes (`unpublish_at`) the record at\na future time (`records:publish`). The change is made within a minute of\nthe time, like a manual publish from the scheduler: it has its own\nrevision (`via: scheduler`), webhooks and audit event. `publish_at`\nneeds an unpublished record; `unpublish_at` needs a published record or a\n`publish_at` before it. Setting or cancelling a schedule is audited but\nmakes no revision. `409` with detail code `deleted` while the record is\nsoft-deleted.\n",
+        "description": "Publishes (`publish_at`) or unpublishes (`unpublish_at`) the record at\na future time (`records:publish`; an API key's `records:write`). The change is made within a minute of\nthe time, like a manual publish from the scheduler: it has its own\nrevision (`via: scheduler`), webhooks and audit event. `publish_at`\nneeds an unpublished record; `unpublish_at` needs a published record or a\n`publish_at` before it. Setting or cancelling a schedule is audited but\nmakes no revision. `409` with detail code `deleted` while the record is\nsoft-deleted.\n\nReplaces the whole schedule: a time left out, or null, is none, so\nboth left out cancel it as `DELETE` does. Setting the schedule the\nrecord already has changes nothing and records no event. Publishing\nthe record by hand clears `publish_at`, and unpublishing it clears\n`unpublish_at`.\n\nA scheduled change that can't be made when it is due (the record is\nlive with a pending draft, say) is dropped: its time is cleared, the\nschedule's `last_error` says why, and `record.schedule_failed` is\nrecorded. One due while a field migration runs on the collection is\nmade once the migration finishes.\n",
         "tags": [
           "publishing"
         ],
@@ -784,6 +781,7 @@
       "delete": {
         "operationId": "records_unschedule",
         "summary": "Cancel a record's schedule",
+        "description": "Clears `publish_at`, `unpublish_at` and `last_error`. Cancelling when\nthere is nothing to clear changes nothing and records no event.\n",
         "tags": [
           "publishing"
         ],
@@ -1128,13 +1126,6 @@
         }
       }
     },
-    "/v1/records/{record_id}/redact": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/RecordId"
-        }
-      ]
-    },
     "/v1/records/{record_id}/drafts": {
       "parameters": [
         {
@@ -1180,7 +1171,7 @@
       "post": {
         "operationId": "drafts_create",
         "summary": "Start a draft",
-        "description": "Starts the record's draft (`records:write`): changes to its content\nthat wait until they are merged, now or at a set time, while the\nrecord keeps its current values. `data` takes values as a record\nupdate does, validated on what the record would read after the\nmerge. With `from_revision`, the draft starts from that revision's\nvalues (mapped onto the current schema, as a revert is), to bring an\nearlier version back for review. Works on any record, live or not.\n\nOne draft per record: a second is `409` with detail code\n`draft_exists` and its `draft_id`, so change that one instead. `409`\nwith detail code `deleted` while the record is soft-deleted.\n",
+        "description": "Starts the record's draft (`records:write`): changes to its content\nthat wait until they are merged, now or at a set time, while the\nrecord keeps its current values. `data` takes values as a record\nupdate does, validated on what the record would read after the\nmerge. With `from_revision`, the draft starts from that revision's\nvalues (mapped onto the current schema, as a revert is), to bring an\nearlier version back for review (`400` unless it is a revision\nnumber, `404` if the record has no such revision). Works on any\nrecord, live or not.\n\nOne draft per record: a second is `409` with detail code\n`draft_exists` and its `draft_id`, so change that one instead. `409`\nwith detail code `deleted` while the record is soft-deleted.\n",
         "tags": [
           "drafts"
         ],
@@ -1469,7 +1460,7 @@
       "post": {
         "operationId": "drafts_merge",
         "summary": "Merge a draft",
-        "description": "Applies the draft to its record now (`records:write`), as one `merge`\nrevision that names the draft and its authors, then removes the\ndraft; returns the record. Content only: the record stays live or\nunpublished as it was, and `published_at` keeps its date. Fields the\nrecord changed since the draft started (`base_revision`) keep their\nvalues, unless the draft changes them too. The result is validated\nas a record update is, and unique values are checked again (`422`).\nWebhooks get `record.updated` with the `draft_id`.\n",
+        "description": "Applies the draft to its record now (`records:write`), as one `merge`\nrevision that names the draft and its authors, then removes the\ndraft; returns the record. Content only: the record stays live or\nunpublished as it was, and `published_at` keeps its date. Fields the\nrecord changed since the draft started (`base_revision`) keep their\nvalues, unless the draft changes them too. The result is validated\nas a record update is, and unique values are checked again (`422`).\n`If-Match` is the draft's revision; the response's `ETag` is the\nrecord's. Webhooks get `record.updated` with the `draft_id`.\n",
         "tags": [
           "drafts"
         ],
@@ -1527,7 +1518,7 @@
       "put": {
         "operationId": "drafts_schedule",
         "summary": "Schedule a draft's merge",
-        "description": "Merges the draft at `merge_at`, a future time (`records:write`),\nwithin a minute of it, from the scheduler (`via: scheduler`). The\nmerge uses the draft as it is then. One that can't be made leaves the\ndraft as it is, with `schedule.last_error` (and `draft.schedule_failed`).\nReturns the draft. A merge due while the record is deleted waits;\nonce its time has passed, restoring the record drops it, with\n`last_error`.\n",
+        "description": "Merges the draft at `merge_at`, a future time (`records:write`),\nwithin a minute of it, from the scheduler (`via: scheduler`). The\nmerge uses the draft as it is then. One that can't be made leaves the\ndraft as it is, with `schedule.last_error` (and `draft.schedule_failed`),\nas does one due while the collection is deleted; one due while a field\nmigration runs on the collection is made once the migration finishes.\nReturns the draft. A merge due while the record is deleted waits;\nonce its time has passed, restoring the record drops it, with\n`last_error`. Setting the time the draft already has changes nothing\nand records no event.\n",
         "tags": [
           "drafts"
         ],
@@ -1579,7 +1570,7 @@
       "delete": {
         "operationId": "drafts_unschedule",
         "summary": "Cancel a draft's merge",
-        "description": "Clears `merge_at` and `last_error`; returns the draft.",
+        "description": "Clears `merge_at` and `last_error`; returns the draft. Cancelling when\nthere is nothing to clear changes nothing and records no event.\n",
         "tags": [
           "drafts"
         ],
@@ -1896,6 +1887,7 @@
       "post": {
         "operationId": "collections_restore",
         "summary": "Restore a deleted collection",
+        "description": "Brings back a deleted collection, its fields and records as they were.\nPast its `purge_after` it is being purged: `409` with detail code\n`purging`.\n",
         "tags": [
           "collections"
         ],
@@ -2221,6 +2213,41 @@
           "$ref": "#/components/parameters/FieldId"
         }
       ],
+      "get": {
+        "operationId": "fields_get",
+        "summary": "Get a field",
+        "description": "A field of a collection, deleted ones included (with `deleted_at` and\n`purge_after`). Published-only keys can't read deleted fields (`403`).\n",
+        "tags": [
+          "fields"
+        ],
+        "responses": {
+          "200": {
+            "description": "The field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Field"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
       "patch": {
         "operationId": "fields_update",
         "summary": "Update a field",
@@ -2744,13 +2771,16 @@
       "post": {
         "operationId": "migrations_cancel",
         "summary": "Cancel a field migration",
-        "description": "A pending migration is cancelled at once. A running one stops at its\nnext batch and is rolled back entirely (`cancel_requested_at` is set\nuntil then). Finished migrations cannot be cancelled (`409`).\n",
+        "description": "A pending migration is cancelled at once. A running one stops at its\nnext batch and is rolled back entirely (`cancel_requested_at` is set\nuntil then). Finished migrations cannot be cancelled (`409` with\ndetail code `finished`).\n",
         "tags": [
           "migrations"
         ],
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
           }
         ],
         "responses": {
@@ -2850,9 +2880,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "requestBody": {
@@ -2917,7 +2944,7 @@
       "post": {
         "operationId": "assets_complete",
         "summary": "Complete an upload",
-        "description": "Step 2 of uploading a file: verifies the uploaded file (it exists, with the\ndeclared size and content type), reads image dimensions and marks the asset\n`ready`. Only ready assets can be used in records. Safe to retry: a ready\nasset is returned unchanged. `422 upload_missing` means the file has not\nbeen uploaded yet; `422 upload_mismatch` means it differed from what was\ndeclared, and the asset is marked `failed`. `409` if the file was uploaded\nagain while it was being checked: complete it again.\n",
+        "description": "Step 2 of uploading a file: verifies the uploaded file (it exists, with the\ndeclared size and content type), reads image dimensions and marks the asset\n`ready`. Only ready assets can be used in records. Safe to retry: a ready\nasset is returned unchanged. `422 upload_missing` means the file has not\nbeen uploaded yet; `422 upload_mismatch` means it differed from what was\ndeclared, and the asset is marked `failed` (completing it again is\n`409 upload_failed`: start a new upload). `409 upload_changed` if the\nfile was uploaded again while it was being checked: complete it again.\nWebhooks get `asset.created` now, when the asset is ready.\n",
         "tags": [
           "assets"
         ],
@@ -2927,9 +2954,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "responses": {
@@ -3021,9 +3045,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "responses": {
@@ -3067,7 +3088,7 @@
       "get": {
         "operationId": "assets_image_url",
         "summary": "Get an image URL",
-        "description": "A signed URL for a transformed rendition of a ready image asset\n(JPEG, PNG, GIF, WebP or AVIF). The same asset and options always give\nthe same URL, so it can be cached and embedded; it does not expire.\nOnly these options can be requested, so nobody can generate other\ntransformations. Without options it serves the original size. A width\nor height on its own rounds up to the next of 16, 32, 48, 64, 96, 128,\n160, 192, 256, 320, 384, 480, 512, 640, 768, 800, 960, 1024, 1200, 1280,\n1536, 1600, 1920, 2048, 2560, 3072, 3840 and 4096; with both, the larger\ndoes and the other keeps its ratio to it, rounded up to a multiple of\n1/32. Quality rounds up to a multiple of 10. The response says what\nwas signed. `409` for an upload not yet completed, and with detail\ncode `deleted` for a deleted asset.\n",
+        "description": "A signed URL for a transformed rendition of a ready image asset\n(JPEG, PNG, GIF, WebP or AVIF). The same asset and options always give\nthe same URL, so it can be cached and embedded; it does not expire.\nOnly these options can be requested, so nobody can generate other\ntransformations. Without options it serves the original size. A width\nor height on its own rounds up to the next of 16, 32, 48, 64, 96, 128,\n160, 192, 256, 320, 384, 480, 512, 640, 768, 800, 960, 1024, 1200, 1280,\n1536, 1600, 1920, 2048, 2560, 3072, 3840 and 4096; with both, the larger\ndoes and the other keeps its ratio to it, rounded up to a multiple of\n1/32. Quality rounds up to a multiple of 10. The response says what\nwas signed. `409` with detail code `upload_incomplete` for an upload\nnot yet completed, and `deleted` for a deleted asset.\n",
         "tags": [
           "assets"
         ],
@@ -3176,7 +3197,7 @@
       "get": {
         "operationId": "assets_download_url",
         "summary": "Get a download URL",
-        "description": "A short-lived URL (2 minutes) that downloads the original file under its\nfilename: ask for it when the download starts, not ahead of time. A\ndownload that has started finishes however long it takes. `409` for an\nupload not yet completed, and with detail code `deleted` for a deleted\nasset.\n",
+        "description": "A short-lived URL (2 minutes) that downloads the original file under its\nfilename: ask for it when the download starts, not ahead of time. A\ndownload that has started finishes however long it takes. `409` with\ndetail code `upload_incomplete` for an upload not yet completed, and\n`deleted` for a deleted asset.\n",
         "tags": [
           "assets"
         ],
@@ -3221,7 +3242,7 @@
       "get": {
         "operationId": "assets_usage",
         "summary": "See where an asset is used",
-        "description": "The undeleted records that use the asset, through an asset field or\nas an image in a rich text field: how many, how many of them are\npublished, and the 10 most recently updated with the fields they use\nit in. Record history does not count. Needs `records:read` too, as\nit shows records; published-only API keys get `403`.\n",
+        "description": "The undeleted records that use the asset, through an asset field or\nas an image in a rich text field, in their content or in their\npending draft (whose merge needs the asset): how many, how many of\nthem are published with it in their content, and the 10 most\nrecently updated with the fields they use it in. Record history does\nnot count. Needs `records:read` too, as it shows records;\npublished-only API keys get `403`.\n",
         "tags": [
           "assets"
         ],
@@ -3272,9 +3293,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "responses": {
@@ -3318,7 +3336,7 @@
       "post": {
         "operationId": "assets_purge",
         "summary": "Permanently delete a deleted asset",
-        "description": "Removes a deleted asset's original from storage now, instead of 30\ndays after the delete, and frees its storage. It cannot be restored.\nRecords that reference it keep the ID, which no longer resolves. Its\nimage URLs stop working within a minute or so (the CDN's copies are\ncleared), though browsers keep copies they already cached. An asset\nthat is not deleted is a `409`: delete it first.\n",
+        "description": "Removes a deleted asset's original from storage now, instead of 30\ndays after the delete, and frees its storage. It cannot be restored.\nRecords that reference it keep the ID, which no longer resolves. Its\nimage URLs stop working within a minute or so (the CDN's copies are\ncleared), though browsers keep copies they already cached. An asset\nthat is not deleted is `409 not_deleted`: delete it first.\n",
         "tags": [
           "assets"
         ],
@@ -3328,9 +3346,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "responses": {
@@ -3374,7 +3389,7 @@
       "get": {
         "operationId": "collections_search",
         "summary": "Search records",
-        "description": "Full-text search in a collection, ranked by relevance (or `sort`).\nWith an API key, the collection must be `search_enabled` and the words\nmatch its `searchable` fields only; members in the web app search any\ncollection, on all its text fields. Filters work as in the records list,\non `published_at` (`exists` only) and on fields marked `filterable`\n(not on `deleted` or the other timestamps); `sort` on `created_at`, `updated_at`, `published_at` and\nfields marked `sortable` (`-` for descending).\nResults are the current records; changes appear within seconds. At\nmost the first 1,000 hits can be paged through. `expand` embeds related\nrecords and assets as in the records list. `409` when search is not\nenabled for API keys, while a new collection's index is first built,\nand when filtering or sorting on a field newly made `filterable` or\n`sortable` until the rebuild that adds it has run (detail code\n`rebuilding`; the index status is `stale` meanwhile).\n",
+        "description": "Full-text search in a collection, ranked by relevance (or `sort`).\nWith an API key, the collection must be `search_enabled` and the words\nmatch its `searchable` fields only; members in the web app search any\ncollection, on all its text fields. Filters work as in the records list,\non `published_at` (`exists` only) and on fields marked `filterable`\n(not on `deleted` or the other timestamps); `sort` on `created_at`, `updated_at`, `published_at` and\nfields marked `sortable` (`-` for descending).\nResults are the current records; changes appear within seconds. At\nmost the first 1,000 hits can be paged through. `expand` embeds related\nrecords and assets as in the records list. `409` with a detail code:\n`search_disabled` when search is not enabled (API keys),\n`index_building` while a new collection's index is first built, and\n`rebuilding` when filtering or sorting on a field newly made\n`filterable` or `sortable` until the rebuild that adds it has run (the\nindex status is `stale` meanwhile).\n",
         "tags": [
           "search"
         ],
@@ -3626,9 +3641,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "responses": {
@@ -3728,9 +3740,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "requestBody": {
@@ -3835,9 +3844,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "requestBody": {
@@ -3897,9 +3903,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "responses": {
@@ -3943,7 +3946,7 @@
       "post": {
         "operationId": "webhooks_test",
         "summary": "Send a test event",
-        "description": "Sends a `webhook.test` event to this webhook only. `409` if it is\ndisabled.\n",
+        "description": "Sends a `webhook.test` event to this webhook only. `409` with detail\ncode `disabled` if it is disabled.\n",
         "tags": [
           "webhooks"
         ],
@@ -3953,9 +3956,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "responses": {
@@ -4052,9 +4052,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "responses": {
@@ -4108,9 +4105,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "responses": {
@@ -4154,7 +4148,7 @@
       "post": {
         "operationId": "webhooks_restore",
         "summary": "Restore a webhook",
-        "description": "Brings a deleted webhook back, with its settings and secrets, until\n`purge_after`. Deliveries that came due while it was deleted failed;\nattempt them again with `POST /v1/webhook-deliveries/{delivery_id}/attempts`.\nRestoring counts against the plan's webhook limit (`402`).\n",
+        "description": "Brings a deleted webhook back, with its settings and secrets, until\n`purge_after`. Deliveries that came due while it was deleted failed;\nattempt them again with `POST /v1/webhook-deliveries/{delivery_id}/retry`.\nRestoring counts against the plan's webhook limit (`402`).\n",
         "tags": [
           "webhooks"
         ],
@@ -4164,9 +4158,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "responses": {
@@ -4316,7 +4307,7 @@
         }
       }
     },
-    "/v1/webhook-deliveries/{delivery_id}/attempts": {
+    "/v1/webhook-deliveries/{delivery_id}/retry": {
       "parameters": [
         {
           "$ref": "#/components/parameters/DeliveryId"
@@ -4335,9 +4326,6 @@
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
           }
         ],
         "responses": {
@@ -4372,13 +4360,6 @@
         }
       }
     },
-    "/v1/organizations/{organization_id}/audit-events": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ]
-    },
     "/v1/projects/{project_id}/audit-events": {
       "parameters": [
         {
@@ -4386,7 +4367,7 @@
         }
       ],
       "get": {
-        "operationId": "audit_events_list_for_project",
+        "operationId": "audit_events_list",
         "summary": "List a project's audit events",
         "description": "The project's audit events, newest first. API keys need the `audit:read`\nscope and see their own project only.\n",
         "tags": [
@@ -4503,7 +4484,7 @@
       "get": {
         "operationId": "feature_flags_list",
         "summary": "Get evaluated feature flags",
-        "description": "Feature flags evaluated for the caller. Without credentials,\nonly public flags are returned, evaluated without actors (for the\nmarketing website). With a session or API key, client flags are\nincluded, evaluated for the user and the given organization/project\n(API keys: their own project). Server flags are never returned.\n",
+        "description": "Feature flags evaluated for the caller. Without credentials,\nonly public flags are returned, evaluated without actors (for the\nmarketing website). With credentials, client flags are included,\nevaluated for the caller: an API key's project, or for the web app the\nuser and the given organization or project. Server flags are never\nreturned.\n",
         "tags": [
           "system"
         ],
@@ -4511,27 +4492,6 @@
           {},
           {
             "apiKey": []
-          },
-          {
-            "session": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "organization_id",
-            "in": "query",
-            "description": "Organization context (sessions only).",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "project_id",
-            "in": "query",
-            "description": "Project context; implies its organization.",
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "responses": {
@@ -4567,130 +4527,6 @@
           }
         }
       }
-    },
-    "/v1/projects/{project_id}/api-keys": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/ProjectId"
-        }
-      ]
-    },
-    "/v1/api-keys/{api_key_id}": {
-      "parameters": [
-        {
-          "name": "api_key_id",
-          "in": "path",
-          "required": true,
-          "schema": {
-            "type": "string"
-          }
-        }
-      ]
-    },
-    "/v1/projects/{project_id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/ProjectId"
-        }
-      ]
-    },
-    "/v1/projects/{project_id}/restore": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/ProjectId"
-        }
-      ]
-    },
-    "/v1/organizations/{organization_id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ]
-    },
-    "/v1/organizations/{organization_id}/restore": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ]
-    },
-    "/v1/organizations/{organization_id}/usage": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ]
-    },
-    "/v1/organizations/{organization_id}/members": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ]
-    },
-    "/v1/members/{membership_id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/MembershipId"
-        }
-      ]
-    },
-    "/v1/organizations/{organization_id}/invitations": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ]
-    },
-    "/v1/invitations/{invitation_id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/InvitationId"
-        }
-      ]
-    },
-    "/v1/organizations/{organization_id}/access-review": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ]
-    },
-    "/v1/me/invitations/{invitation_id}/accept": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/InvitationId"
-        }
-      ]
-    },
-    "/v1/me/invitations/{invitation_id}": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/InvitationId"
-        }
-      ]
-    },
-    "/v1/organizations/{organization_id}/billing": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ]
-    },
-    "/v1/organizations/{organization_id}/billing/checkout-sessions": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ]
-    },
-    "/v1/organizations/{organization_id}/billing/portal-sessions": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/OrganizationId"
-        }
-      ]
     }
   },
   "webhooks": {
@@ -4741,9 +4577,6 @@
         "responses": {
           "200": {
             "description": "Received (any 2xx)."
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
           }
         }
       }
@@ -4755,42 +4588,9 @@
         "type": "http",
         "scheme": "bearer",
         "description": "Project-scoped API key, e.g. `sk_live_k7fz0a9c3m2q_<secret>`. Used by\nservers, CI, the CLI and coding agents.\n"
-      },
-      "session": {
-        "type": "apiKey",
-        "in": "cookie",
-        "name": "__Host-nohead_session",
-        "description": "A person signed in to the web app: the httpOnly cookie its sign-in\nsets, accepted only on requests from the web app's origin (named\n`nohead_session` over plain http, in local development). Servers,\nCI, the CLI and agents use an API key.\n"
       }
     },
     "parameters": {
-      "OrganizationId": {
-        "name": "organization_id",
-        "in": "path",
-        "required": true,
-        "schema": {
-          "type": "string"
-        },
-        "example": "org_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
-      },
-      "MembershipId": {
-        "name": "membership_id",
-        "in": "path",
-        "required": true,
-        "schema": {
-          "type": "string"
-        },
-        "example": "mem_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
-      },
-      "InvitationId": {
-        "name": "invitation_id",
-        "in": "path",
-        "required": true,
-        "schema": {
-          "type": "string"
-        },
-        "example": "inv_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
-      },
       "ProjectId": {
         "name": "project_id",
         "in": "path",
@@ -4945,16 +4745,12 @@
         "in": "query",
         "style": "deepObject",
         "explode": true,
-        "description": "`action` matches exactly, or by prefix with a trailing `.*`\n(`filter[action]=record.*`). `since` is inclusive and `until` exclusive.\n",
+        "description": "`type` matches exactly, or by prefix with a trailing `.*`\n(`filter[type]=record.*`). `resource_type` takes one type, or several\nwith `[in]` (`filter[resource_type][in]=collection,field`). Unknown\nfilters are `400`.\n",
         "schema": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "project_id": {
-              "type": "string",
-              "description": "Organization list only."
-            },
-            "action": {
+            "type": {
               "type": "string",
               "examples": [
                 "field.updated",
@@ -4962,9 +4758,26 @@
               ]
             },
             "resource_type": {
-              "type": "string",
-              "examples": [
-                "record"
+              "oneOf": [
+                {
+                  "type": "string",
+                  "examples": [
+                    "record"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "in"
+                  ],
+                  "properties": {
+                    "in": {
+                      "type": "string",
+                      "description": "Comma-separated types."
+                    }
+                  }
+                }
               ]
             },
             "resource_id": {
@@ -4982,13 +4795,8 @@
               "type": "string",
               "description": "A user (`usr_...`) or API key (`key_...`)."
             },
-            "since": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "until": {
-              "type": "string",
-              "format": "date-time"
+            "created_at": {
+              "$ref": "#/components/schemas/TimeFilter"
             }
           }
         }
@@ -4998,36 +4806,20 @@
         "in": "query",
         "style": "deepObject",
         "explode": true,
-        "description": "`since` is inclusive and `until` exclusive.",
+        "description": "Unknown filters are `400`.",
         "schema": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "operation": {
-              "type": "string",
-              "enum": [
-                "create",
-                "update",
-                "publish",
-                "unpublish",
-                "delete",
-                "restore",
-                "revert",
-                "migrate",
-                "import"
-              ]
+              "$ref": "#/components/schemas/RecordRevisionOperation"
             },
             "actor_id": {
               "type": "string",
               "description": "A user (`usr_...`) or API key (`key_...`)."
             },
-            "since": {
-              "type": "string",
-              "format": "date-time"
-            },
-            "until": {
-              "type": "string",
-              "format": "date-time"
+            "created_at": {
+              "$ref": "#/components/schemas/TimeFilter"
             }
           }
         }
@@ -5140,7 +4932,7 @@
       "ChangeNote": {
         "name": "Nohead-Change-Note",
         "in": "header",
-        "description": "Optional reason for the change, shown in history (at most 500\ncharacters once decoded). Percent-encoded UTF-8, as\n`encodeURIComponent` encodes it, so any language fits in a header:\n`Rettet%20stavefejl%20p%C3%A5%20forsiden`. Plain ASCII may be sent\nas is. Other bytes are `400`.\n",
+        "description": "Optional reason for the change, kept with the record revision, schema\nchange or field migration it makes (at most 500 characters once\ndecoded). Percent-encoded UTF-8, as\n`encodeURIComponent` encodes it, so any language fits in a header:\n`Rettet%20stavefejl%20p%C3%A5%20forsiden`. Plain ASCII may be sent\nas is. Other bytes are `400`.\n",
         "schema": {
           "type": "string"
         }
@@ -5444,7 +5236,8 @@
             "type": "string"
           },
           "api_key": {
-            "type": "string"
+            "type": "string",
+            "description": "The field's key in records' `data`, filters and sorts. Reserved for records' own attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`, `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`, `revision` and `schema_version`."
           },
           "type": {
             "$ref": "#/components/schemas/FieldType"
@@ -5469,7 +5262,8 @@
             "type": "string"
           },
           "api_key": {
-            "type": "string"
+            "type": "string",
+            "description": "The field's key in records' `data`, filters and sorts. Reserved for records' own attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`, `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`, `revision` and `schema_version`."
           },
           "type": {
             "$ref": "#/components/schemas/FieldType"
@@ -5810,7 +5604,6 @@
           "via",
           "note",
           "request_id",
-          "status",
           "created_at"
         ],
         "properties": {
@@ -5867,17 +5660,6 @@
             "type": [
               "string",
               "null"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "pending",
-              "validating",
-              "migrating",
-              "reindexing",
-              "complete",
-              "failed"
             ]
           },
           "created_at": {
@@ -6313,7 +6095,7 @@
           "unpublish_at",
           "last_error"
         ],
-        "description": "When the record publishes or unpublishes on its own (within a minute of\nthe time), set with `PUT /v1/records/{record_id}/schedule`. A time is\ncleared once it has run. `last_error` explains the last scheduled change\nthat could not be made, until a new schedule is set.\n",
+        "description": "When the record publishes or unpublishes on its own (within a minute of\nthe time), set with `PUT /v1/records/{record_id}/schedule`. A time is\ncleared once it has run, or once the record is published or\nunpublished by hand or deleted. `last_error` explains the last\nscheduled change that could not be made, until a new schedule is set\nor a scheduled change is made.\n",
         "properties": {
           "object": {
             "const": "schedule"
@@ -6338,7 +6120,7 @@
       "RecordScheduleUpdate": {
         "type": "object",
         "additionalProperties": false,
-        "description": "A time in the future, or null for none. Omitted keys keep their value.",
+        "description": "The whole schedule. A time in the future, or null for none; a time left out is none too.",
         "properties": {
           "publish_at": {
             "$ref": "#/components/schemas/NullableTimestamp"
@@ -6371,7 +6153,7 @@
           },
           "revision": {
             "type": "integer",
-            "description": "The revision that is live."
+            "description": "The revision that is live, the record's current one (a live record's edits are live; a draft keeps changes back)."
           },
           "published_by": {
             "description": "Who published it last; null when that revision is no longer kept.",
@@ -6394,8 +6176,7 @@
           "action",
           "at",
           "record_id",
-          "draft_id",
-          "last_error"
+          "draft_id"
         ],
         "properties": {
           "object": {
@@ -6422,13 +6203,6 @@
               "null"
             ],
             "description": "The draft that merges, for `merge`."
-          },
-          "last_error": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Why the last scheduled change could not be made, as in the record's (or the draft's) schedule."
           }
         }
       },
@@ -6451,9 +6225,47 @@
           }
         }
       },
+      "RecordRevisionOperation": {
+        "type": "string",
+        "description": "What made the revision; `merge` is a draft's changes.",
+        "enum": [
+          "create",
+          "update",
+          "publish",
+          "unpublish",
+          "delete",
+          "restore",
+          "revert",
+          "migrate",
+          "merge"
+        ]
+      },
+      "TimeFilter": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "A time range, as record lists filter times (`filter[created_at][gte]=2026-10-01T00:00:00Z`).",
+        "properties": {
+          "gte": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "gt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lte": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "Via": {
         "type": "string",
-        "description": "The client a change came through; `scheduler` for scheduled changes.",
+        "description": "The client a change came through; `scheduler` for scheduled changes. `import` and `migration` are not sent yet.",
         "enum": [
           "ui",
           "api",
@@ -6896,19 +6708,7 @@
             "type": "integer"
           },
           "operation": {
-            "type": "string",
-            "enum": [
-              "create",
-              "update",
-              "publish",
-              "unpublish",
-              "delete",
-              "restore",
-              "revert",
-              "migrate",
-              "import",
-              "merge"
-            ]
+            "$ref": "#/components/schemas/RecordRevisionOperation"
           },
           "actor": {
             "$ref": "#/components/schemas/Actor"
@@ -7294,7 +7094,6 @@
         "description": "An event webhooks can subscribe to: the same names as the activity\nlog's actions. A subscription can also be every type of a resource\n(`record.*`, `draft.*`, `collection.*`, `field.*`, `asset.*`) or `*` for all.\n",
         "enum": [
           "record.created",
-          "record.imported",
           "record.updated",
           "record.published",
           "record.unpublished",
@@ -7396,7 +7195,7 @@
             "type": "array",
             "description": "The subscribed event types and wildcards (`record.*`, or `*` for all).",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/WebhookSubscription"
             }
           },
           "enabled": {
@@ -7661,7 +7460,7 @@
           "object",
           "organization_id",
           "project",
-          "action",
+          "type",
           "resource",
           "actor",
           "via",
@@ -7677,7 +7476,7 @@
             ]
           },
           "object": {
-            "const": "audit_event"
+            "const": "event"
           },
           "organization_id": {
             "type": "string"
@@ -7706,9 +7505,9 @@
               }
             ]
           },
-          "action": {
+          "type": {
             "type": "string",
-            "description": "`<resource>.<verb>`, e.g. `record.published`, `field.updated`,\n`api_key.created`, `member.role_changed`.\n",
+            "description": "`<resource>.<verb>`, e.g. `record.published`, `field.updated`,\n`api_key.created`, `member.role_changed`: a webhook event's type\ntoo, for the events webhooks get.\n",
             "examples": [
               "record.published"
             ]
@@ -7723,6 +7522,7 @@
             "properties": {
               "type": {
                 "type": "string",
+                "description": "What the event is about, such as `record`, `draft`, `collection`, `field`, `asset` or `webhook`; a field's change names its collection in `metadata.collection_id`.",
                 "examples": [
                   "record"
                 ]
@@ -7743,17 +7543,7 @@
                 "type": "null"
               },
               {
-                "type": "string",
-                "enum": [
-                  "ui",
-                  "api",
-                  "cli",
-                  "sdk",
-                  "import",
-                  "migration",
-                  "system",
-                  "scheduler"
-                ]
+                "$ref": "#/components/schemas/Via"
               }
             ]
           },
@@ -8058,7 +7848,7 @@
           "project_id",
           "data"
         ],
-        "description": "The JSON body of every webhook request. It is rendered from the event's\nhistory each time it is sent or shown, so redacted values are redacted\nin it too.\n",
+        "description": "The JSON body of every webhook request. It is rendered from the event's\nhistory each time it is sent or shown, so redacted values are redacted\nin it too. `data` depends on the `type`.\n",
         "properties": {
           "id": {
             "type": "string",
@@ -8071,8 +7861,14 @@
             "const": "event"
           },
           "type": {
-            "type": "string",
-            "description": "One of the event types (`WebhookEventType`), or `webhook.test`."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WebhookEventType"
+              },
+              {
+                "const": "webhook.test"
+              }
+            ]
           },
           "created_at": {
             "$ref": "#/components/schemas/Timestamp"
@@ -8089,7 +7885,7 @@
             ]
           },
           "via": {
-            "description": "The client the change came through (null when not known). Always\nsent. An integration that writes back can skip changes made with\nits own API key (`actor`).\n",
+            "description": "The client the change came through (null when not known). Always\nsent. An integration that writes back can skip changes made with its own\nAPI key (`actor`).\n",
             "oneOf": [
               {
                 "type": "null"
@@ -8100,8 +7896,258 @@
             ]
           },
           "data": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordEventData"
+              },
+              {
+                "$ref": "#/components/schemas/DraftEventData"
+              },
+              {
+                "$ref": "#/components/schemas/AssetEventData"
+              },
+              {
+                "$ref": "#/components/schemas/SchemaEventData"
+              },
+              {
+                "$ref": "#/components/schemas/FieldAliasEventData"
+              },
+              {
+                "$ref": "#/components/schemas/WebhookTestEventData"
+              }
+            ]
+          }
+        }
+      },
+      "RecordEventData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "record",
+          "revision",
+          "revision_id"
+        ],
+        "description": "`record.*`: the record as the change's revision left it, or as it is now for events without a revision (`record.scheduled`, `record.unscheduled`, `record.schedule_failed`, `record.redacted`).",
+        "properties": {
+          "record": {
+            "description": "Null once the record is purged.",
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Record"
+              }
+            ]
+          },
+          "revision": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "revision_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Null for events without a revision."
+          },
+          "draft_id": {
+            "type": "string",
+            "description": "On the `record.updated` of a merged draft, the draft it merged."
+          }
+        }
+      },
+      "DraftEventData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "draft",
+          "draft_id",
+          "record_id"
+        ],
+        "description": "`draft.*`: the draft as it is now.",
+        "properties": {
+          "draft": {
+            "description": "Null once merged or discarded, and while its record is deleted.",
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Draft"
+              }
+            ]
+          },
+          "draft_id": {
+            "type": "string",
+            "description": "The draft's ID, also once it is gone."
+          },
+          "record_id": {
+            "type": "string"
+          }
+        }
+      },
+      "AssetEventData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "asset"
+        ],
+        "description": "`asset.*`: the asset as it is now.",
+        "properties": {
+          "asset": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Asset"
+              },
+              {
+                "type": "object",
+                "description": "Only its ID once it is purged.",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "object"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "object": {
+                    "const": "asset"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "SchemaEventData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "collection",
+          "schema_change"
+        ],
+        "description": "`collection.*` and `field.*` (but `field.alias_removed`): the collection as the change left it, and the change.",
+        "properties": {
+          "collection": {
             "type": "object",
-            "description": "`record.*`: `record` (as the change's revision left it, or as it is\nnow for events without a revision such as `record.scheduled`; null\nonce it is purged), `revision` and `revision_id`; a merged draft's\n`record.updated` adds its `draft_id`. `draft.*`: `draft` (as it is\nnow; null once merged or discarded, and while its record is\ndeleted), `draft_id` and `record_id`. `asset.*`:\n`asset` (as it is now). `collection.*` and `field.*`: `collection`\nand `schema_change`, except `field.alias_removed`: `field`.\n`webhook.test`: `webhook`.\n"
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "object",
+              "slug",
+              "name",
+              "schema_version",
+              "deleted_at"
+            ],
+            "description": "Only `id` and `object` are known once the schema change is gone (the collection was purged).",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "object": {
+                "const": "collection"
+              },
+              "slug": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "schema_version": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "deleted_at": {
+                "$ref": "#/components/schemas/NullableTimestamp"
+              }
+            }
+          },
+          "field_id": {
+            "type": "string",
+            "description": "`field.*`: the field that changed."
+          },
+          "schema_change": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "operation",
+                  "from_version",
+                  "to_version"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "operation": {
+                    "type": "string"
+                  },
+                  "from_version": {
+                    "type": "integer"
+                  },
+                  "to_version": {
+                    "type": "integer"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "FieldAliasEventData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "field"
+        ],
+        "description": "`field.alias_removed`: the field.",
+        "properties": {
+          "field": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Field"
+              }
+            ]
+          }
+        }
+      },
+      "WebhookTestEventData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "webhook"
+        ],
+        "description": "`webhook.test`: the webhook it was sent to.",
+        "properties": {
+          "webhook": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Webhook"
+              }
+            ]
           }
         }
       },
@@ -8308,12 +8354,12 @@
           "records": {
             "type": "integer",
             "minimum": 0,
-            "description": "Undeleted records that use the asset."
+            "description": "Undeleted records that use the asset, in their content or their draft."
           },
           "published": {
             "type": "integer",
             "minimum": 0,
-            "description": "Of those, the published ones (what sites show)."
+            "description": "Of those, the published ones whose content uses it (what sites show)."
           },
           "uses": {
             "type": "array",
@@ -8333,7 +8379,7 @@
                 "fields": {
                   "type": "array",
                   "minItems": 1,
-                  "description": "API keys of the record's fields that use the asset.",
+                  "description": "API keys of the record's fields that use the asset, in its content or its draft.",
                   "items": {
                     "type": "string"
                   }
@@ -8469,7 +8515,7 @@
       },
       "ApiKeyScope": {
         "type": "string",
-        "description": "What a project API key may do. `webhooks:read` includes delivery payloads and `webhooks:write` can subscribe an endpoint to every event, so both give access to the record, schema and asset data in events, unpublished records included; published-only keys cannot have them.",
+        "description": "What a project API key may do. `records:write` also publishes, unpublishes and schedules records (the `records:publish` permission). `webhooks:read` includes delivery payloads and `webhooks:write` can subscribe an endpoint to every event, so both give access to the record, schema and asset data in events, unpublished records included; published-only keys cannot have them.",
         "enum": [
           "records:read",
           "records:write",

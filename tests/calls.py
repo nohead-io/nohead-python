@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable
+from functools import partial
 from typing import Any
 
 import httpx
@@ -14,21 +15,27 @@ from .conftest import json_response
 from .spec import Route, example, route_of
 
 
-def mock_reply(request: httpx.Request) -> httpx.Response:
+def mock_reply(request: httpx.Request, variant: int = 0) -> httpx.Response:
     """The reply to any of the calls in every_call: the contract's example of the
-    operation's success response (tests/spec.py), with an upload URL on storage."""
+    operation's success response (tests/spec.py), with an upload URL on storage.
+    `variant` picks the variants of the response's unions."""
     if request.url.host == "storage.test":
         return httpx.Response(200)
     route = route_of(request.method, request.url.path)
-    return json_response(route.status, example_reply(route, request))
+    return json_response(route.status, example_reply(route, request, variant))
 
 
-def example_reply(route: Route, request: httpx.Request) -> Any:
+def mock_replies(variant: int) -> Callable[[httpx.Request], httpx.Response]:
+    """mock_reply with other variants of the responses' unions."""
+    return partial(mock_reply, variant=variant)
+
+
+def example_reply(route: Route, request: httpx.Request, variant: int = 0) -> Any:
     """The body of mock_reply for a request of an operation."""
     schema = route.response.schema
-    if request.url.params.get("dry_run") == "true" and "oneOf" in schema:
-        schema = schema["oneOf"][-1]  # the preview (records.revisions.revert)
-    body = copy.deepcopy(example(schema))  # examples are the contract's
+    if "oneOf" in schema:  # a dry run's preview, or the change (records.revisions.revert)
+        schema = schema["oneOf"][-1 if request.url.params.get("dry_run") == "true" else 0]
+    body = copy.deepcopy(example(schema, variant))  # examples are the contract's
     if route.id == "assets_upload":
         body["upload"]["url"] = "https://storage.test/u"
     return body
@@ -67,7 +74,7 @@ def every_call(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.drafts.discard("drf_01J9ZQ3F8X"),
         lambda: nohead.records.count("posts", filter={"published_at": {"exists": False}}),
         lambda: nohead.records.bulk("posts", action="publish", record_ids=["rec_01J9ZQ3F8X"]),
-        lambda: nohead.records.diff("rec_01J9ZQ3F8X", 1, 2),
+        lambda: nohead.records.diff("rec_01J9ZQ3F8X", from_revision=1, to_revision=2),
         lambda: nohead.records.search(
             "posts",
             "hello",
@@ -78,7 +85,9 @@ def every_call(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.records.revisions.list("rec_01J9ZQ3F8X", filter={"operation": "update"}),
         lambda: nohead.records.revisions.get("rec_01J9ZQ3F8X", 1),
         lambda: nohead.records.revisions.revert("rec_01J9ZQ3F8X", 1, dry_run=True),
-        lambda: nohead.search("hello", collections=["posts"], published=True),
+        lambda: nohead.search(
+            "hello", collections=["posts"], filter={"published_at": {"exists": True}}
+        ),
         lambda: nohead.collections.list(deleted=True),
         lambda: nohead.collections.get("posts"),
         lambda: nohead.collections.create(name="Posts", slug="posts"),
@@ -91,12 +100,13 @@ def every_call(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.collections.search_index.get("posts"),
         lambda: nohead.collections.search_index.rebuild("posts"),
         lambda: nohead.fields.list("posts", deleted=True),
+        lambda: nohead.fields.get("fld_01J9ZQ3F8X"),
         lambda: nohead.fields.create("posts", name="Title", api_key="title", type="text"),
         lambda: nohead.fields.update("fld_01J9ZQ3F8X", name="Heading"),
         lambda: nohead.fields.delete("fld_01J9ZQ3F8X"),
         lambda: nohead.fields.restore("fld_01J9ZQ3F8X"),
         lambda: nohead.fields.order("posts"),
-        lambda: nohead.fields.reorder("posts", ["fld_01J9ZQ3F8X"]),
+        lambda: nohead.fields.reorder("posts", field_ids=["fld_01J9ZQ3F8X"]),
         lambda: nohead.fields.remove_alias("fld_01J9ZQ3F8X", "old_title"),
         lambda: nohead.fields.migrate("fld_01J9ZQ3F8X", type="long_text", dry_run=True),
         lambda: nohead.migrations.list("posts"),
@@ -128,7 +138,7 @@ def every_call(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.webhooks.deliveries.list("wh_01J9ZQ3F8X", status="failed"),
         lambda: nohead.webhooks.deliveries.get("whd_01J9ZQ3F8X"),
         lambda: nohead.webhooks.deliveries.retry("whd_01J9ZQ3F8X"),
-        lambda: nohead.audit_events.list(filter={"action": "record.*"}, sort="-id"),
+        lambda: nohead.audit_events.list(filter={"type": "record.*"}, sort="-id"),
         lambda: nohead.feature_flags.list(),
         lambda: nohead.me.get(),
         lambda: nohead.health.check(),

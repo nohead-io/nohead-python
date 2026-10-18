@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Literal
+from collections.abc import Mapping
+from typing import Any, Literal
 
 from ..._pagination import AsyncPaginator
 from ...models import AuditEvent, Principal
 from ...models import FeatureFlags as FeatureFlagValues
 from ...models import Health as HealthStatus
-from ...types import RecordFilter
+from ...types import AuditEventFilter
 from ._resource import AsyncResource
 
 
@@ -16,18 +17,27 @@ class AsyncAuditEvents(AsyncResource):
     def list(
         self,
         *,
-        filter: RecordFilter | None = None,
+        filter: AuditEventFilter | None = None,
         sort: Literal["id", "-id"] | None = None,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> AsyncPaginator[AuditEvent]:
-        """`filter` takes `action` (exact, or a `record.*` prefix), `resource_type`,
-        `resource_id`, `actor_type`, `actor_id`, `since` and `until`."""
+        """`filter` takes `type` (exact, or a `record.*` prefix), `resource_type` (one, or
+        a list of several), `resource_id`, `actor_type`, `actor_id` and a `created_at`
+        range: `filter={"type": "record.*", "created_at": {"gte": since}}`."""
         return self._client.paginate(
-            "audit_events_list_for_project",
+            "audit_events_list",
             item=AuditEvent,
-            query={"filter": filter, "sort": sort, "limit": limit, "cursor": cursor},
+            query={"filter": _audit_filter(filter), "sort": sort, "limit": limit, "cursor": cursor},
         )
+
+
+def _audit_filter(filter: AuditEventFilter | None) -> Mapping[str, Any] | None:
+    """`resource_type` as the API takes several: `{"in": [...]}`."""
+    resource_type = (filter or {}).get("resource_type")
+    if filter is None or resource_type is None or isinstance(resource_type, str):
+        return filter
+    return {**filter, "resource_type": {"in": list(resource_type)}}
 
 
 class AsyncFeatureFlags(AsyncResource):

@@ -100,12 +100,13 @@ def route_of(method: str, path: str) -> Route:
     raise AssertionError(f"No operation for {method} {path}")
 
 
-def example(schema: dict[str, Any]) -> Any:
+def example(schema: dict[str, Any], variant: int = 0) -> Any:
     """A value that matches `schema`: its example, constant, first enum value or default,
-    else one built from its type, with every property (the first non-null type, the
-    first of `oneOf` and `anyOf`)."""
+    else one built from its type, with every property (the first non-null type). Of a
+    `oneOf` or `anyOf`, it is the variant numbered `variant` (counting round), so the
+    examples numbered 0 to VARIANTS - 1 take each union's every variant."""
     if "$ref" in schema:
-        return example(at(schema["$ref"])[1])
+        return example(at(schema["$ref"])[1], variant)
     if "examples" in schema:
         return schema["examples"][0]
     if "const" in schema:
@@ -117,17 +118,18 @@ def example(schema: dict[str, Any]) -> Any:
     if "allOf" in schema:
         merged: dict[str, Any] = {}
         for part in schema["allOf"]:
-            merged |= example(part)
+            merged |= example(part, variant)
         return merged
     if "oneOf" in schema or "anyOf" in schema:
-        return example((schema.get("oneOf") or schema["anyOf"])[0])
+        options = schema.get("oneOf") or schema["anyOf"]
+        return example(options[variant % len(options)], variant)
     types = schema.get("type", [])
     types = types if isinstance(types, list) else [types]
     kind = next((t for t in types if t != "null"), types[0] if types else None)
     if kind == "object":
-        return {name: example(sub) for name, sub in schema.get("properties", {}).items()}
+        return {name: example(sub, variant) for name, sub in schema.get("properties", {}).items()}
     if kind == "array":
-        return [example(schema.get("items", {}))] * max(schema.get("minItems", 1), 1)
+        return [example(schema.get("items", {}), variant)] * max(schema.get("minItems", 1), 1)
     if kind == "string":
         return {"date-time": "2026-10-02T12:00:00Z", "date": "2026-10-02"}.get(
             schema.get("format", ""), "string"
@@ -139,3 +141,17 @@ def example(schema: dict[str, Any]) -> Any:
     if kind == "null":
         return None
     return {}
+
+
+def _widest(value: Any) -> int:
+    """The most variants of any `oneOf` or `anyOf` in the contract."""
+    if isinstance(value, dict):
+        own = max((len(value[key]) for key in ("oneOf", "anyOf") if key in value), default=1)
+        return max([own, *(_widest(inner) for inner in value.values())])
+    if isinstance(value, list):
+        return max((_widest(inner) for inner in value), default=1)
+    return 1
+
+
+VARIANTS = _widest(SPEC)
+"""How many examples of a schema it takes to have every variant of its unions."""

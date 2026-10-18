@@ -87,6 +87,7 @@ post = nohead.records.get(created.id, expand=["author"])
 nohead.records.update(post.id, data={"title": "Hello again"})  # None clears a field
 nohead.records.publish(post.id)
 nohead.records.publication(post.id)  # since when, by whom, which revision
+# The whole schedule: a time left out is cleared
 nohead.records.schedule(post.id, unpublish_at=datetime(2027, 1, 1, tzinfo=UTC))
 nohead.records.delete(post.id)  # soft delete; records.restore() undoes it
 ```
@@ -95,9 +96,9 @@ Methods return models and raise on failure. Field values are in `record.data`, a
 
 **More:**
 
-- `count`, and `bulk` (up to 100 records at once)
-- `diff(record, from_revision, to_revision)`
-- `revisions.list`, `revisions.get` and `revisions.revert` (with `dry_run=True` for a preview)
+- `count`, and `bulk` (up to 100 records at once, each succeeding or failing on its own: its `results` are `RecordBatchResultsSucceeded` or `RecordBatchResultsFailed`, by `status`)
+- `diff(record, from_revision=1, to_revision=2)`
+- `revisions.list` (`filter` by `operation`, `actor_id` or a `created_at` range), `revisions.get` and `revisions.revert` (with `dry_run=True` for a preview)
 
 ## Drafts
 
@@ -201,7 +202,7 @@ Every write gets an `Idempotency-Key` that stays the same across its retries, so
 nohead.records.create("posts", data=data, idempotency_key=f"import-{row.id}")
 ```
 
-Writes also take `change_note`, a reason shown in history.
+Writes that change records or the schema also take `change_note`, a reason shown in history.
 
 ## Concurrency
 
@@ -217,7 +218,7 @@ except PreconditionFailedError as error:
     ...  # changed since (now at error.current_revision): reload, and merge or ask
 ```
 
-`if_match` takes a record or a revision number, on `update`, `delete`, `publish`, `unpublish` and `revisions.revert`.
+`if_match` takes a record or a revision number, on the records' `update`, `delete`, `restore`, `publish`, `unpublish` and `revisions.revert`, and the drafts' `update`, `discard` and `merge` (with the draft's `revision`).
 
 ## Assets
 
@@ -238,9 +239,11 @@ url = nohead.assets.image_url(asset.id, width=1200, format="webp").url
 
 **Errors:** `UploadError` if storage refuses the bytes; `ValidationError` if the file fails the checks.
 
+**Resuming:** with an `idempotency_key`, running the same upload again resumes it: an asset that is already `ready` is returned without sending the bytes again. Once the upload's URL has expired (its `upload.expires_at`), it raises `UploadError`: start over with a new key.
+
 **Uploading from a browser:** create the upload on your server with `create_upload`, `PUT` the file from the browser, then `complete` it.
 
-**Deleting:** `usage` shows which records use an asset. `delete` keeps the file until its `purge_after` (30 days), during which `restore` undoes it; `purge` removes a deleted asset for good, now.
+**Deleting:** `usage` shows which records use an asset. `delete` keeps the file until its `purge_after`, during which `restore` undoes it; `purge` removes a deleted asset for good, now.
 
 ## Search
 
@@ -250,7 +253,11 @@ for hit in nohead.records.search("posts", "content model"):
     ...
 
 # Across the project
-results = nohead.search("content model", collections=["posts", "pages"], published=True)
+results = nohead.search(
+    "content model",
+    collections=["posts", "pages"],
+    filter={"published_at": {"exists": True}},
+)
 results.meta.total_estimate
 ```
 
@@ -287,21 +294,21 @@ if event.type == "record.published" and event.record:
     rebuild(event.record.collection)
 ```
 
-Event types are the activity log's actions (`record.published`, `record.restored`, `field.updated`, `asset.purged`, ...), and a webhook subscribes to types or wildcards (`record.*`, `*`). `unwrap` checks the signature and the timestamp (Standard Webhooks), and raises `WebhookVerificationError` if either is off. After `rotate_secret`, requests carry a signature for the old secret and the new one for 24 hours, so switch the receiver's secret within that day (or end it sooner with `webhooks.secrets.retire`). Pass the raw body: parsing and re-serializing JSON changes the bytes.
+Event types are the activity log's (`record.published`, `record.restored`, `field.updated`, `asset.purged`, ...), and a webhook subscribes to types or wildcards (`record.*`, `*`). `unwrap` checks the signature and the timestamp (Standard Webhooks), and raises `WebhookVerificationError` if either is off. After `rotate_secret`, requests carry a signature for the old secret and the new one for 24 hours, so switch the receiver's secret within that day (or end it sooner with `webhooks.secrets.retire`). Pass the raw body: parsing and re-serializing JSON changes the bytes.
 
-`event.data` is the payload. For convenience, `event.record`, `event.asset`, `event.collection`, `event.schema_change`, `event.field`, `event.draft` and `event.webhook` give its parts, and are None when the event has no such part; `event.actor` and `event.via` say who made the change, through which client.
+`event.data` is the payload. For convenience, `event.record`, `event.asset`, `event.collection`, `event.schema_change`, `event.field`, `event.draft` and `event.webhook` give its parts, and are None when the event has no such part; so do the IDs `event.draft_id` and `event.record_id` (`draft.*`, also once the draft is gone) and `event.field_id` (`field.*`). A purged asset (`asset.purged`) is only its `id` and `object`, an `AssetEventDataAsset`. `event.actor` and `event.via` say who made the change, through which client. Like responses, an event that doesn't match the models is still returned, unvalidated, with a `NoheadWarning`.
 
 It's also available as `nohead.webhooks.unwrap(...)` on a client. Events can arrive more than once, so deduplicate by the `webhook-id` header.
 
 ## Types and models
 
-- **Responses:** Pydantic models, in `nohead.models`. The main ones (`Record`, `Collection`, `Field`, `Asset`, `Webhook`) are also importable from `nohead`.
+- **Responses:** Pydantic models, in `nohead.models`. The main ones (`Record`, `Draft`, `Collection`, `Field`, `Asset`, `Webhook`) are also importable from `nohead`.
 - **They're lenient on purpose, because the API adds fields and values without notice:**
   - Fields the SDK doesn't know yet are kept, in `model_extra`.
   - Enums are plain strings.
   - A response that doesn't match the models at all is still returned, unvalidated, with a `NoheadWarning`, rather than raised.
 - **Timestamps** are `datetime`s.
-- **Request bodies** are typed with the TypedDicts in `nohead.params`, so a type checker catches a misspelled field.
+- **Request bodies** are typed with the TypedDicts in `nohead.params`, and filters with those in `nohead.types`, so a type checker catches a misspelled field.
 
 ## Reference
 
@@ -314,7 +321,7 @@ It's also available as `nohead.webhooks.unwrap(...)` on a client. Events can arr
 | `collections` | `list`, `get`, `create`, `update`, `delete`, `restore`, `schema` |
 | `collections.schema_changes` | `list`, `get` |
 | `collections.search_index` | `get`, `rebuild` |
-| `fields` | `list`, `create`, `update`, `delete`, `restore`, `order`, `reorder`, `remove_alias`, `migrate` |
+| `fields` | `list`, `get`, `create`, `update`, `delete`, `restore`, `order`, `reorder`, `remove_alias`, `migrate` |
 | `migrations` | `list`, `get`, `cancel` |
 | `assets` | `upload`, `create_upload`, `complete`, `list`, `get`, `usage`, `delete`, `restore`, `purge`, `image_url`, `download_url` |
 | `webhooks` | `list`, `get`, `create`, `update`, `delete`, `restore`, `rotate_secret`, `test`, `unwrap` |
@@ -352,7 +359,7 @@ The smoke test (`smoke/smoke.py`) runs the core flow against a real API, with bo
 ```bash
 uv build
 NOHEAD_API_URL=http://localhost:3000 NOHEAD_API_KEY=sk_live_... \
-  uv run --isolated --no-project --with dist/nohead-0.2.0-py3-none-any.whl python smoke/smoke.py
+  uv run --isolated --no-project --with "dist/nohead-$(uv version --short)-py3-none-any.whl" python smoke/smoke.py
 ```
 
 ## Releasing

@@ -3,8 +3,11 @@ methods, every request must match its operation (method, path, declared query pa
 and their values, and the JSON body), and every declared query parameter must be sent by
 some call. A new operation or query parameter in openapi.json fails this test until a
 method takes it (and a call in tests/calls.py or below passes it). Each call gets the
-contract's example of its operation's response, and must return it, parsed without a
-NoheadWarning. Both clients are checked."""
+contract's examples of its operation's response, one for each variant of its unions
+(`oneOf`, `anyOf`), and must return them, parsed without a NoheadWarning. A method
+takes `if_match` and `change_note` exactly when its operation declares `If-Match` and
+`Nohead-Change-Note`, and no request sends a header its operation doesn't declare. Both
+clients are checked."""
 
 from __future__ import annotations
 
@@ -12,7 +15,7 @@ import inspect
 import json
 import re
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from functools import cache
 from typing import Any
 
@@ -26,9 +29,9 @@ from referencing.jsonschema import DRAFT202012
 from nohead import AsyncNohead, AsyncPage, Nohead, Page
 from nohead._generated.operations import OPERATIONS
 
-from .calls import every_call, example_reply, mock_reply
+from .calls import every_call, example_reply, mock_replies
 from .conftest import Recorder, make_async, make_sync
-from .spec import ROUTES, SPEC, Parameter, route_of
+from .spec import ROUTES, SPEC, VARIANTS, Parameter, at, pointer, route_of
 
 CONTRACT = "urn:nohead:openapi.json"
 REGISTRY = Registry().with_resource(
@@ -93,7 +96,12 @@ def every_parameter(nohead: Any) -> list[Callable[[], Any]]:
     """Calls that pass the query parameters the samples in tests/calls.py leave out."""
     return [
         lambda: nohead.records.list("posts", cursor="cur_x"),
-        lambda: nohead.records.revisions.list("rec_01J9ZQ3F8X", limit=5, cursor="cur_x"),
+        lambda: nohead.records.revisions.list(
+            "rec_01J9ZQ3F8X",
+            filter={"created_at": {"gte": datetime(2026, 10, 1, tzinfo=UTC)}},
+            limit=5,
+            cursor="cur_x",
+        ),
         lambda: nohead.records.search("posts", "hello", limit=5, cursor="cur_x"),
         lambda: nohead.search("hello", limit=5, cursor="cur_x"),
         lambda: nohead.collections.list(limit=5, cursor="cur_x"),
@@ -110,14 +118,45 @@ def every_parameter(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.webhooks.list(limit=5, cursor="cur_x"),
         lambda: nohead.webhooks.deliveries.list("wh_01J9ZQ3F8X", limit=5, cursor="cur_x"),
         lambda: nohead.webhooks.secrets.list("wh_01J9ZQ3F8X", limit=5, cursor="cur_x"),
-        lambda: nohead.audit_events.list(limit=5, cursor="cur_x"),
+        lambda: nohead.audit_events.list(
+            filter={
+                "resource_type": ["collection", "field"],
+                "resource_id": "col_01J9ZQ3F8X",
+                "actor_type": "api_key",
+                "actor_id": "key_01J9ZQ3F8X",
+                "created_at": {"gte": "2026-10-01T00:00:00Z", "lt": "2026-11-01T00:00:00Z"},
+            },
+            limit=5,
+            cursor="cur_x",
+        ),
+        lambda: nohead.audit_events.list(filter={"resource_type": "record"}),
     ]
+
+
+# Headers that some operations declare and others don't.
+OPTIONAL_HEADERS = {"idempotency-key", "if-match", "nohead-change-note"}
+
+
+@cache
+def declared_headers(operation: str) -> frozenset[str]:
+    """The header parameters an operation declares, lowercased."""
+    method, path = OPERATIONS[operation]
+    owners = [pointer("paths", path), pointer("paths", path, method.lower())]
+    found: set[str] = set()
+    for owner in owners:
+        for index in range(len(at(owner)[1].get("parameters", []))):
+            parameter = at(f"{owner}/parameters/{index}")[1]
+            if parameter["in"] == "header":
+                found.add(parameter["name"].lower())
+    return frozenset(found)
 
 
 def check_requests(requests: list[httpx.Request], sent: dict[str, set[str]]) -> None:
     """Checks one call's requests against their operations, noting the parameters sent."""
     for request in requests:
         route = route_of(request.method, request.url.path)
+        extra = (OPTIONAL_HEADERS & set(request.headers)) - declared_headers(route.id)
+        assert not extra, f"{route.id} sends undeclared headers {extra}"
         keys = {key.split("[", 1)[0] for key in request.url.params}
         declared = {p.name for p in route.query}
         assert keys <= declared, f"{route.id} sends undeclared query parameters {keys - declared}"
@@ -136,10 +175,10 @@ def check_requests(requests: list[httpx.Request], sent: dict[str, set[str]]) -> 
         sent.setdefault(route.id, set()).update(keys)
 
 
-def check_result(requests: list[httpx.Request], result: Any) -> None:
+def check_result(requests: list[httpx.Request], result: Any, variant: int) -> None:
     """The method returns the response its last request got."""
     last = requests[-1]
-    reply = example_reply(route_of(last.method, last.url.path), last)
+    reply = example_reply(route_of(last.method, last.url.path), last, variant)
     assert comparable(result) == comparable(reply)
 
 
@@ -159,20 +198,22 @@ def api_requests(recorder: Recorder, start: int) -> list[httpx.Request]:
 
 
 @pytest.mark.filterwarnings("error::nohead.NoheadWarning")
-def test_the_sync_client_covers_the_contract() -> None:
-    nohead, recorder = make_sync([mock_reply])
+@pytest.mark.parametrize("variant", range(VARIANTS))
+def test_the_sync_client_covers_the_contract(variant: int) -> None:
+    nohead, recorder = make_sync([mock_replies(variant)])
     sent: dict[str, set[str]] = {}
     for call in every_call(nohead) + every_parameter(nohead):
         start = len(recorder.calls)
         result = call()
         check_requests(api_requests(recorder, start), sent)
-        check_result(api_requests(recorder, start), result)
+        check_result(api_requests(recorder, start), result, variant)
     check_coverage(sent)
 
 
 @pytest.mark.filterwarnings("error::nohead.NoheadWarning")
-async def test_the_async_client_covers_the_contract() -> None:
-    nohead, recorder = make_async([mock_reply])
+@pytest.mark.parametrize("variant", range(VARIANTS))
+async def test_the_async_client_covers_the_contract(variant: int) -> None:
+    nohead, recorder = make_async([mock_replies(variant)])
     sent: dict[str, set[str]] = {}
     for call in every_call(nohead) + every_parameter(nohead):
         start = len(recorder.calls)
@@ -180,29 +221,60 @@ async def test_the_async_client_covers_the_contract() -> None:
         if inspect.isawaitable(result):
             result = await result
         check_requests(api_requests(recorder, start), sent)
-        check_result(api_requests(recorder, start), result)
+        check_result(api_requests(recorder, start), result, variant)
     check_coverage(sent)
 
 
-def test_every_success_response_has_a_valid_example() -> None:
+@pytest.mark.parametrize("variant", range(VARIANTS))
+def test_every_success_response_has_valid_examples(variant: int) -> None:
     for route in ROUTES:
         request = httpx.Request(route.method, "https://api.test/")
-        assert errors(route.response.schema_at, example_reply(route, request)) == [], route.id
+        reply = example_reply(route, request, variant)
+        assert errors(route.response.schema_at, reply) == [], route.id
+
+
+def operations_of(method: Callable[..., Any]) -> set[str]:
+    """The operations a method calls, by the IDs in its source."""
+    source = inspect.getsource(method)
+    return {op for op in re.findall(r'"(\w+)"', source) if op in OPERATIONS}
+
+
+@pytest.mark.parametrize("client", [Nohead, AsyncNohead])
+def test_methods_take_the_headers_their_operations_declare(client: type[Any]) -> None:
+    checked: set[str] = set()
+    for name, method in public_methods(client(api_key="sk_live_x")).items():
+        operations = operations_of(method)
+        if len(operations) != 1:
+            continue  # a helper, such as assets.upload or webhooks.unwrap
+        (operation,) = operations
+        declared = declared_headers(operation)
+        parameters = inspect.signature(method).parameters
+        assert ("if_match" in parameters) == ("if-match" in declared), f"{name} if_match"
+        assert ("change_note" in parameters) == ("nohead-change-note" in declared), (
+            f"{name} change_note"
+        )
+        assert ("idempotency_key" in parameters) == ("idempotency-key" in declared), (
+            f"{name} idempotency_key"
+        )
+        checked.add(operation)
+    assert sorted(set(OPERATIONS) - checked) == [], "operations no method was checked for"
+
+
+def public_methods(obj: object, prefix: str = "") -> dict[str, Callable[..., Any]]:
+    """The client's methods by name (`records.revisions.revert`), resources' too."""
+    found: dict[str, Callable[..., Any]] = {}
+    for name in dir(obj):
+        if name.startswith("_") or name in {"with_options", "close"}:
+            continue
+        value = getattr(obj, name)
+        if callable(value):
+            found[prefix + name] = value
+        elif hasattr(value, "_client"):
+            found |= public_methods(value, f"{prefix}{name}.")
+    return found
 
 
 def test_both_clients_have_the_same_methods() -> None:
-    def methods(obj: object, prefix: str = "") -> set[str]:
-        found: set[str] = set()
-        for name in dir(obj):
-            if name.startswith("_") or name in {"with_options", "close"}:
-                continue
-            value = getattr(obj, name)
-            if callable(value):
-                found.add(prefix + name)
-            elif hasattr(value, "_client"):
-                found |= methods(value, f"{prefix}{name}.")
-        return found
-
-    sync = methods(Nohead(api_key="sk_live_x"))
-    assert sync == methods(AsyncNohead(api_key="sk_live_x"))
+    sync = set(public_methods(Nohead(api_key="sk_live_x")))
+    assert sync == set(public_methods(AsyncNohead(api_key="sk_live_x")))
     assert "records.revisions.revert" in sync
