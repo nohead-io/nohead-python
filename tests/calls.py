@@ -121,6 +121,9 @@ def every_call(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.assets.complete("ast_01J9ZQ3F8X"),
         lambda: nohead.assets.list(deleted=True),
         lambda: nohead.assets.get("ast_01J9ZQ3F8X"),
+        lambda: nohead.assets.update(
+            "ast_01J9ZQ3F8X", filename="Spring menu.jpg", alt="The spring menu, on a chalkboard"
+        ),
         lambda: nohead.assets.delete("ast_01J9ZQ3F8X"),
         lambda: nohead.assets.restore("ast_01J9ZQ3F8X"),
         lambda: nohead.assets.purge("ast_01J9ZQ3F8X"),

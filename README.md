@@ -243,6 +243,12 @@ url = nohead.assets.image_url(asset.id, width=1200, format="webp").url
 
 **Uploading from a browser:** create the upload on your server with `create_upload`, `PUT` the file from the browser, then `complete` it.
 
+**Renaming and alt text:** `update` changes an asset's `filename` and `alt` text, the default wherever the asset is used (`expand` returns it with the asset). The file itself never changes.
+
+```python
+nohead.assets.update(asset.id, alt="The spring menu, on a chalkboard")
+```
+
 **Deleting:** `usage` shows which records use an asset. `delete` keeps the file until its `purge_after`, during which `restore` undoes it; `purge` removes a deleted asset for good, now.
 
 ## Search
@@ -323,7 +329,7 @@ It's also available as `nohead.webhooks.unwrap(...)` on a client. Events can arr
 | `collections.search_index` | `get`, `rebuild` |
 | `fields` | `list`, `get`, `create`, `update`, `delete`, `restore`, `order`, `reorder`, `remove_alias` |
 | `migrations` | `create`, `list`, `get`, `cancel` |
-| `assets` | `upload`, `create_upload`, `complete`, `list`, `get`, `usage`, `delete`, `restore`, `purge`, `image_url`, `download_url` |
+| `assets` | `upload`, `create_upload`, `complete`, `list`, `get`, `update`, `usage`, `delete`, `restore`, `purge`, `image_url`, `download_url` |
 | `webhooks` | `list`, `get`, `create`, `update`, `delete`, `restore`, `rotate_secret`, `test`, `unwrap` |
 | `webhooks.secrets` | `list`, `retire` |
 | `webhooks.deliveries` | `list`, `get`, `retry` |

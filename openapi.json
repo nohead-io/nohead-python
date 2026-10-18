@@ -2990,6 +2990,65 @@
           }
         }
       },
+      "patch": {
+        "operationId": "assets_update",
+        "summary": "Update an asset",
+        "description": "Rename the asset or set its alt text. The file itself can't change:\nupload a new asset for that. `alt` is the default wherever the asset\nis used; an image in rich text keeps its own `alt` once it has one.\nA change sends `asset.updated` to webhooks; one that changes nothing\nsends nothing. `409` with detail code `deleted` while the asset is\ndeleted.\n",
+        "tags": [
+          "assets"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssetUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The asset.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
       "delete": {
         "operationId": "assets_delete",
         "summary": "Delete an asset",
@@ -8071,6 +8130,7 @@
           "field.migrated",
           "field.alias_removed",
           "asset.created",
+          "asset.updated",
           "asset.deleted",
           "asset.restored",
           "asset.purged"
@@ -9110,6 +9170,26 @@
         ],
         "unevaluatedProperties": false
       },
+      "AssetUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Control characters are removed and path separators become `_`, as on upload."
+          },
+          "alt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000,
+            "description": "Surrounding whitespace is removed; empty or null clears it."
+          }
+        }
+      },
       "AssetProperties": {
         "type": "object",
         "required": [
@@ -9117,6 +9197,7 @@
           "object",
           "project_id",
           "filename",
+          "alt",
           "content_type",
           "byte_size",
           "width",
@@ -9144,7 +9225,15 @@
           },
           "filename": {
             "type": "string",
-            "description": "The original filename, any Unicode."
+            "description": "The filename, any Unicode, as uploaded unless renamed since. Downloads use it."
+          },
+          "alt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000,
+            "description": "Alternative text, saying what an image shows; null until set. The default wherever the asset is used."
           },
           "content_type": {
             "type": "string",

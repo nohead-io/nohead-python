@@ -1262,12 +1262,23 @@ class WebhookTestEventData(NoheadModel):
     webhook: Webhook | None
 
 
+class AssetUpdate(NoheadModel):
+    filename: str | None = None
+    """Control characters are removed and path separators become `_`, as on upload."""
+    alt: str | None = None
+    """Surrounding whitespace is removed; empty or null clears it."""
+
+
 class AssetProperties(NoheadModel):
     id: str
     object: str
     project_id: str
     filename: str
-    """The original filename, any Unicode."""
+    """The filename, any Unicode, as uploaded unless renamed since. Downloads use it."""
+    alt: str | None
+    """Alternative text, saying what an image shows; null until set. The default wherever the
+    asset is used.
+    """
     content_type: str
     byte_size: int
     width: int | None

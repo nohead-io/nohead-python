@@ -5,6 +5,12 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- `assets.update(asset, filename=..., alt=...)` renames an asset and sets
+  its alt text (`PATCH /v1/assets/{asset_id}`). `Asset` has `alt` (a string
+  or `None`), and webhooks can subscribe to `asset.updated`.
+
 ## 0.5.0
 
 - **Breaking:** a field migration is created under its collection:

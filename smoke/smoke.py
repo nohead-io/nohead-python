@@ -117,6 +117,8 @@ def sync_flow() -> str:
         asset = nohead.assets.upload(b"hello", filename="hello.txt")
         LEFT["assets"] = asset.id
         expect(asset.status == "ready" and asset.byte_size == 5, "assets upload to storage")
+        renamed = nohead.assets.update(asset.id, filename="greeting.txt")
+        expect(renamed.filename == "greeting.txt", "assets rename")
         expect(nohead.assets.delete(asset.id).deleted_at, "assets soft-delete")
         nohead.assets.purge(asset.id)
         del LEFT["assets"]
