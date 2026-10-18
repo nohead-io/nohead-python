@@ -95,7 +95,7 @@ class AsyncAssets(AsyncResource):
         cursor: str | None = None,
     ) -> AsyncPaginator[Asset]:
         """`content_type` lists only assets of a type: a MIME type or a `type/*` wildcard
-        (`"image/*"`), or a list of several (up to 50: `["image/*", "application/pdf"]`),
+        (`"image/*"`), or a list of several (`["image/*", "application/pdf"]`),
         for example the ones an asset field accepts (its `accepted_types`)."""
         types: str | dict[str, list[str]] | None = (
             content_type
