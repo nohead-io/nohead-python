@@ -141,7 +141,7 @@ class WebhookEvent(NoheadModel):
         value = self._data().get(key)
         return cast("dict[str, Any]", value) if isinstance(value, dict) else None
 
-    def _part(self, key: str, model: type[M]) -> M | None:
+    def _part(self, key: str, model: type[M] | Any) -> Any:
         value = self._data().get(key)
         return validate(model, value) if isinstance(value, dict) else None
 

@@ -78,7 +78,7 @@ def comparable(value: Any) -> Any:
     if isinstance(value, Page | AsyncPage):
         return {"data": comparable(value.data), "meta": comparable(value.meta)}
     if isinstance(value, BaseModel):
-        return comparable(value.model_dump(mode="json", by_alias=True))
+        return comparable(value.model_dump(mode="json", by_alias=True, exclude_unset=True))
     if isinstance(value, dict):
         return {key: comparable(item) for key, item in value.items()}
     if isinstance(value, list):

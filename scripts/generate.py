@@ -65,8 +65,15 @@ class Generator:
         self.classes: list[list[str]] = []
         self.class_names: list[str] = []
         self.aliases: dict[str, tuple[str, set[str]]] = {}
-        # Union variants' classes: the property and value that tell them apart.
-        self.discriminators: dict[str, tuple[str, str]] = {}
+        # Union variants' classes: the property and value that tell them apart,
+        # from a oneOf's discriminator mapping here, or found by variant_names.
+        self.discriminators: dict[str, tuple[str, str]] = {
+            variant: (schema["discriminator"]["propertyName"], value)
+            for schema in SCHEMAS.values()
+            if "mapping" in schema.get("discriminator", {})
+            for value, ref in schema["discriminator"]["mapping"].items()
+            if (variant := ref.rsplit("/", 1)[1]) in names
+        }
 
     # Types ------------------------------------------------------------------
 
@@ -176,6 +183,10 @@ class Generator:
         if "allOf" in schema:
             props.update(schema.get("properties", {}))
             required.update(schema.get("required", []))
+        # A class is written after the classes it extends.
+        for base in bases:
+            if base not in self.class_names:
+                self.add_schema(base)
         base_class = "NoheadModel" if self.mode == "model" else "TypedDict"
         lines = [f"class {name}({', '.join(bases) or base_class}):"]
         lines += docstring(schema.get("description"), "    ")
@@ -208,8 +219,36 @@ class Generator:
             line = f"    {prop}: {annotation if required else f'NotRequired[{annotation}]'}"
         return [line, *docstring(schema.get("description"), "    ")]
 
+    def merged(self, name: str, schema: Schema) -> None:
+        """A union of classes as one TypedDict, for `**params: Unpack[...]`: each key
+        any variant takes, typed as any of theirs, required where every variant requires
+        it (FieldCreate: `type` is any field type, `configuration` any configuration)."""
+        props: dict[str, list[Schema]] = {}
+        required: list[set[str]] = []
+        for variant in schema["oneOf"]:
+            target = SCHEMAS[ref_name(variant) or ""]
+            parts = [
+                SCHEMAS[base] if (base := ref_name(p)) else p for p in target.get("allOf", [target])
+            ]
+            required.append(set().union(*(p.get("required", []) for p in parts)))
+            for part in parts:
+                for prop, prop_schema in part.get("properties", {}).items():
+                    props.setdefault(prop, []).append(prop_schema)
+        self.class_names.append(name)
+        lines = [f"class {name}(TypedDict):", *docstring(schema.get("description"), "    ")]
+        for prop, schemas in props.items():
+            lines += self.field(name, prop, {"anyOf": schemas}, prop in set.intersection(*required))
+        self.classes.append(lines)
+
     def add_schema(self, name: str) -> None:
         schema = SCHEMAS[name]
+        if (
+            self.mode == "params"
+            and schema.get("oneOf")
+            and all(ref_name(v) for v in schema["oneOf"])
+        ):
+            self.merged(name, schema)
+            return
         if is_class(schema) and not (
             "allOf" in schema and len(schema["allOf"]) == 1 and ref_name(schema["allOf"][0])
         ):

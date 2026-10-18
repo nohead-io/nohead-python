@@ -7,11 +7,74 @@ from datetime import datetime
 from typing import Any, Literal, NotRequired, TypeAlias, TypedDict
 
 
+class AssetFieldConfiguration(TypedDict):
+    description: NotRequired[str]
+    """Help text for editors."""
+    searchable: NotRequired[bool]
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: NotRequired[bool]
+    """API searches can filter on it. Default false."""
+    sortable: NotRequired[bool]
+    """API searches can sort on it (one value only). Default false."""
+    accepted_types: NotRequired[list[str]]
+    """MIME types or `type/*` wildcards newly written values must have (`["image/*",
+    "application/pdf"]`); any file when absent.
+    """
+
+
+class FieldCreateProperties(TypedDict):
+    """What every new field takes; `FieldCreate` adds its `type` and that type's
+    `configuration`.
+    """
+
+    name: str
+    key: str
+    """The field's key in records' `data`, filters and sorts. Reserved for records' own
+    attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`,
+    `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`,
+    `revision` and `schema_version`.
+    """
+    required: NotRequired[bool]
+    """Every record must have a value. Not available for boolean fields (a boolean is true or
+    false; no value reads as false).
+    """
+    multiple: NotRequired[bool]
+    """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
+    string with `blank_value`). Not available for boolean, long_text, rich_text and json
+    fields.
+    """
+
+
+class AssetFieldCreate(FieldCreateProperties):
+    type: Literal["asset"]
+    configuration: NotRequired[AssetFieldConfiguration]
+
+
 class AssetUploadCreate(TypedDict):
     filename: str
     content_type: str
     byte_size: int
     """Exact size of the file in bytes (at most 100 MB by default)."""
+
+
+class BooleanFieldConfiguration(TypedDict):
+    description: NotRequired[str]
+    """Help text for editors."""
+    searchable: NotRequired[bool]
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: NotRequired[bool]
+    """API searches can filter on it. Default false."""
+    sortable: NotRequired[bool]
+    """API searches can sort on it (one value only). Default false."""
+
+
+class BooleanFieldCreate(FieldCreateProperties):
+    type: Literal["boolean"]
+    configuration: NotRequired[BooleanFieldConfiguration]
 
 
 class CollectionCreate(TypedDict):
@@ -29,6 +92,52 @@ class CollectionUpdate(TypedDict):
     description: NotRequired[str | None]
 
 
+class DateFieldConfiguration(TypedDict):
+    description: NotRequired[str]
+    """Help text for editors."""
+    searchable: NotRequired[bool]
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: NotRequired[bool]
+    """API searches can filter on it. Default false."""
+    sortable: NotRequired[bool]
+    """API searches can sort on it (one value only). Default false."""
+    include_time: NotRequired[bool]
+    """Holds a moment (ISO 8601 with an offset) instead of a calendar date; changing it is a
+    field migration.
+    """
+    time_zone: NotRequired[str]
+    """An IANA time zone (`Europe/Copenhagen`) moments are returned in; changing it never
+    rewrites values.
+    """
+
+
+class DateFieldCreate(FieldCreateProperties):
+    type: Literal["date"]
+    configuration: NotRequired[DateFieldConfiguration]
+
+
+class DecimalFieldConfiguration(TypedDict):
+    description: NotRequired[str]
+    """Help text for editors."""
+    searchable: NotRequired[bool]
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: NotRequired[bool]
+    """API searches can filter on it. Default false."""
+    sortable: NotRequired[bool]
+    """API searches can sort on it (one value only). Default false."""
+    min: NotRequired[float]
+    max: NotRequired[float]
+
+
+class DecimalFieldCreate(FieldCreateProperties):
+    type: Literal["decimal"]
+    configuration: NotRequired[DecimalFieldConfiguration]
+
+
 class DraftCreate(TypedDict):
     data: NotRequired[RecordData]
     from_revision: NotRequired[int]
@@ -39,32 +148,65 @@ class DraftScheduleUpdate(TypedDict):
     merge_at: Timestamp
 
 
+class EnumFieldConfiguration(TypedDict):
+    description: NotRequired[str]
+    """Help text for editors."""
+    searchable: NotRequired[bool]
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: NotRequired[bool]
+    """API searches can filter on it. Default false."""
+    sortable: NotRequired[bool]
+    """API searches can sort on it (one value only). Default false."""
+    options: list[str]
+
+
+class EnumFieldCreate(FieldCreateProperties):
+    type: Literal["enum"]
+    configuration: EnumFieldConfiguration
+
+
 class FieldCreate(TypedDict):
+    """A new field. Its `type` decides the options `configuration` takes."""
+
     name: str
-    api_key: str
-    """The field's key in records' `data`, filters and sorts. Reserved for records' own
-    attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`,
-    `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`,
-    `revision` and `schema_version`.
-    """
-    type: FieldType
+    key: str
     required: NotRequired[bool]
-    """Every record must have a value. Not available for boolean fields (a boolean is true or
-    false; no value reads as false).
-    """
     multiple: NotRequired[bool]
-    """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
-    string with `blank_value`). Not available for boolean, long_text, rich_text and json
-    fields.
-    """
-    configuration: NotRequired[dict[str, Any]]
+    type: (
+        Literal["text"]
+        | Literal["long_text"]
+        | Literal["rich_text"]
+        | Literal["integer"]
+        | Literal["decimal"]
+        | Literal["date"]
+        | Literal["boolean"]
+        | Literal["enum"]
+        | Literal["asset"]
+        | Literal["relation"]
+        | Literal["json"]
+    )
+    configuration: NotRequired[
+        TextFieldConfiguration
+        | LongTextFieldConfiguration
+        | RichTextFieldConfiguration
+        | IntegerFieldConfiguration
+        | DecimalFieldConfiguration
+        | DateFieldConfiguration
+        | BooleanFieldConfiguration
+        | EnumFieldConfiguration
+        | AssetFieldConfiguration
+        | RelationFieldConfiguration
+        | JsonFieldConfiguration
+    ]
 
 
 class FieldMigrationRequest(TypedDict):
     """The parts of the definition to change; omitted parts stay as they are."""
 
     type: NotRequired[FieldType]
-    configuration: NotRequired[dict[str, Any]]
+    configuration: NotRequired[FieldConfiguration]
     """The complete new configuration. When the type changes and this is omitted, only
     `description`, `searchable`, `filterable` and `sortable` carry over.
     """
@@ -90,24 +232,85 @@ class FieldMigrationRequest(TypedDict):
 
 
 class FieldUpdate(TypedDict):
+    """Renames, describes or loosens a field. A change to its `type` or `multiple` rewrites
+    record values, so it is a field migration (`POST /v1/fields/{id}/migrations`); either
+    key here is `400` `unknown_parameter`, saying so.
+    """
+
     name: NotRequired[str]
-    api_key: NotRequired[str]
+    key: NotRequired[str]
     """The field's key in records' `data`, filters and sorts. Reserved for records' own
     attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`,
     `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`,
     `revision` and `schema_version`.
     """
-    type: NotRequired[FieldType]
     required: NotRequired[bool]
     """Every record must have a value. Not available for boolean fields (a boolean is true or
     false; no value reads as false).
     """
-    multiple: NotRequired[bool]
-    """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
-    string with `blank_value`). Not available for boolean, long_text, rich_text and json
-    fields.
+    configuration: NotRequired[FieldConfiguration]
+
+
+class IntegerFieldConfiguration(TypedDict):
+    description: NotRequired[str]
+    """Help text for editors."""
+    searchable: NotRequired[bool]
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
     """
-    configuration: NotRequired[dict[str, Any]]
+    filterable: NotRequired[bool]
+    """API searches can filter on it. Default false."""
+    sortable: NotRequired[bool]
+    """API searches can sort on it (one value only). Default false."""
+    min: NotRequired[int]
+    max: NotRequired[int]
+    unique: NotRequired[bool]
+    """No two active records of the collection share a value (one value only)."""
+
+
+class IntegerFieldCreate(FieldCreateProperties):
+    type: Literal["integer"]
+    configuration: NotRequired[IntegerFieldConfiguration]
+
+
+class JsonFieldConfiguration(TypedDict):
+    description: NotRequired[str]
+    """Help text for editors."""
+    searchable: NotRequired[bool]
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: NotRequired[bool]
+    """API searches can filter on it. Default false."""
+    sortable: NotRequired[bool]
+    """API searches can sort on it (one value only). Default false."""
+
+
+class JsonFieldCreate(FieldCreateProperties):
+    type: Literal["json"]
+    configuration: NotRequired[JsonFieldConfiguration]
+
+
+class LongTextFieldConfiguration(TypedDict):
+    """Text up to 100,000 characters."""
+
+    description: NotRequired[str]
+    """Help text for editors."""
+    searchable: NotRequired[bool]
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: NotRequired[bool]
+    """API searches can filter on it. Default false."""
+    sortable: NotRequired[bool]
+    """API searches can sort on it (one value only). Default false."""
+    min_length: NotRequired[int]
+    max_length: NotRequired[int]
+
+
+class LongTextFieldCreate(FieldCreateProperties):
+    type: Literal["long_text"]
+    configuration: NotRequired[LongTextFieldConfiguration]
 
 
 class RecordBatchRequest(TypedDict):
@@ -128,6 +331,74 @@ class RecordWrite(TypedDict):
     data: RecordData
 
 
+class RelationFieldConfiguration(TypedDict):
+    description: NotRequired[str]
+    """Help text for editors."""
+    searchable: NotRequired[bool]
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: NotRequired[bool]
+    """API searches can filter on it. Default false."""
+    sortable: NotRequired[bool]
+    """API searches can sort on it (one value only). Default false."""
+    target_collection_id: str
+    """The collection (same project) whose records it points at."""
+
+
+class RelationFieldCreate(FieldCreateProperties):
+    type: Literal["relation"]
+    configuration: RelationFieldConfiguration
+
+
+class RichTextFieldConfiguration(TypedDict):
+    description: NotRequired[str]
+    """Help text for editors."""
+    searchable: NotRequired[bool]
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: NotRequired[bool]
+    """API searches can filter on it. Default false."""
+    sortable: NotRequired[bool]
+    """API searches can sort on it (one value only). Default false."""
+
+
+class RichTextFieldCreate(FieldCreateProperties):
+    type: Literal["rich_text"]
+    configuration: NotRequired[RichTextFieldConfiguration]
+
+
+class TextFieldConfiguration(TypedDict):
+    """Plain text up to 10,000 characters, or a `format`."""
+
+    description: NotRequired[str]
+    """Help text for editors."""
+    searchable: NotRequired[bool]
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: NotRequired[bool]
+    """API searches can filter on it. Default false."""
+    sortable: NotRequired[bool]
+    """API searches can sort on it (one value only). Default false."""
+    min_length: NotRequired[int]
+    max_length: NotRequired[int]
+    format: NotRequired[Literal["slug", "url", "email"]]
+    """`slug` (always unique, one value), `url` (absolute http or https) or `email`; each sets
+    its own length limits.
+    """
+    unique: NotRequired[bool]
+    """No two active records of the collection share a value (one value only; a slug is always
+    unique).
+    """
+
+
+class TextFieldCreate(FieldCreateProperties):
+    type: Literal["text"]
+    configuration: NotRequired[TextFieldConfiguration]
+
+
 class WebhookCreate(TypedDict):
     url: str
     """An https URL on the public internet."""
@@ -143,6 +414,19 @@ class WebhookUpdate(TypedDict):
     enabled: NotRequired[bool]
 
 
+FieldConfiguration: TypeAlias = (
+    TextFieldConfiguration
+    | LongTextFieldConfiguration
+    | RichTextFieldConfiguration
+    | IntegerFieldConfiguration
+    | DecimalFieldConfiguration
+    | DateFieldConfiguration
+    | BooleanFieldConfiguration
+    | EnumFieldConfiguration
+    | AssetFieldConfiguration
+    | RelationFieldConfiguration
+    | JsonFieldConfiguration
+)
 FieldType: TypeAlias = Literal[
     "text",
     "long_text",

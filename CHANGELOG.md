@@ -5,6 +5,22 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## 0.4.0
+
+- **Breaking:** a field's `api_key` is its `key` (in fields, their aliases,
+  `fields.create(key=...)` and `fields.update(key=...)`), as the editor's
+  "Field key" says. API keys keep their name.
+- **Breaking:** `collections.schema_changes.get(schema_change)` takes the
+  schema change's ID alone (`GET /v1/schema-changes/{id}`).
+- **Breaking:** `fields.update` no longer takes `type` or `multiple`; they
+  rewrite record values, so they are `fields.migrate`. The API refuses a
+  body key an operation doesn't take with `400` (`unknown_parameter`, naming
+  it), so a misspelt keyword no longer passes unnoticed.
+- Fields are typed per field type: a field is a `TextField`, `EnumField`,
+  `RelationField`... (`Field` is their union), with its `configuration` as
+  `TextFieldConfiguration`, `EnumFieldConfiguration`... `fields.create`'s
+  `configuration` takes any of them.
+
 ## 0.3.0
 
 - **Breaking:** 0.1 and 0.2 no longer work with the current API: its paths

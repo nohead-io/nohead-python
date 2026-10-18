@@ -9,7 +9,7 @@
       "email": "hello@nohead.io",
       "url": "https://nohead.io"
     },
-    "description": "The Nohead API manages projects, collections (your data models), their\nfields, and records (your content), with full version history.\n\n## Authentication\n\nSend `Authorization: Bearer <token>`. Servers, CI and agents use a\nproject API key (`sk_live_...`, created in the web app under API keys)\nwith scopes such as `records:read` or `schema:write`. Organization,\nproject, member and API key management need a person signed in to the\nweb app and are not available to API keys.\n\n## Resources and IDs\n\nEvery object has an `object` type, and every resource with an identity of\nits own an opaque, prefixed `id` (`col_`, `fld_`, `rec_`, ...). Record values live under `data`, keyed by each\nfield's `api_key`. Timestamps are ISO 8601 in UTC. Deleting a record,\ncollection, field, asset or webhook is soft: it can be restored until its\n`purge_after`.\n\n## Lists\n\nLists return `{ \"data\": [...], \"meta\": { \"next_cursor\", \"has_more\" } }`.\nPass `limit` (1-100) and `cursor` to page, and `sort` (prefix `-` for\ndescending). Records also take `filter[<api_key>]=value`,\n`filter[published_at][exists]=true` and `expand=<relation, asset or\nrich text fields>`.\n\n## Errors\n\nErrors share one envelope: `{ \"error\": { \"type\", \"message\",\n\"request_id\", \"details\" } }`. `details` lists field-level problems as\n`{ \"field\", \"code\", \"message\" }`. Include the `request_id` when asking\nfor support.\n\n## Safe retries and concurrent edits\n\nSend `Idempotency-Key` on any `POST`, `PUT`, `PATCH` or `DELETE` to make retrying\nit safe: the first result is stored for 24 hours and returned again for\nthe same request. Record responses carry the record's revision as an\n`ETag`; send it back as `If-Match` to update only if nobody changed the\nrecord in the meantime (`412` otherwise).\n\n## History\n\nEvery change to a record is a revision, attributed to the person or API\nkey that made it: record revisions can be listed, diffed and reverted,\nand collections keep a schema history. Send `Nohead-Change-Note` to\nrecord why a change was made. Changes that rewrite existing values\n(such as a field's type) are explicit, previewable field migrations.\n\nHow long revisions are kept depends on the organization's plan. Older\nones are removed, but every record keeps its first revision and its\nlast 10; `history_pruned_through` says how far history was removed.\n",
+    "description": "The Nohead API manages projects, collections (your data models), their\nfields, and records (your content), with full version history.\n\n## Authentication\n\nSend `Authorization: Bearer <token>`. Servers, CI and agents use a\nproject API key (`sk_live_...`, created in the web app under API keys)\nwith scopes such as `records:read` or `schema:write`. Organization,\nproject, member and API key management need a person signed in to the\nweb app and are not available to API keys.\n\n## Resources and IDs\n\nEvery object has an `object` type, and every resource with an identity of\nits own an opaque, prefixed `id` (`col_`, `fld_`, `rec_`, ...). Record values live under `data`, keyed by each\nfield's `key`. Timestamps are ISO 8601 in UTC. Deleting a record,\ncollection, field, asset or webhook is soft: it can be restored until its\n`purge_after`.\n\n## Lists\n\nLists return `{ \"data\": [...], \"meta\": { \"next_cursor\", \"has_more\" } }`.\nPass `limit` (1-100) and `cursor` to page, and `sort` (prefix `-` for\ndescending). Records also take `filter[<key>]=value`,\n`filter[published_at][exists]=true` and `expand=<relation, asset or\nrich text fields>`.\n\n## Errors\n\nErrors share one envelope: `{ \"error\": { \"type\", \"message\",\n\"request_id\", \"details\" } }`. `details` lists field-level problems as\n`{ \"field\", \"code\", \"message\" }`. Include the `request_id` when asking\nfor support.\n\n## Safe retries and concurrent edits\n\nSend `Idempotency-Key` on any `POST`, `PUT`, `PATCH` or `DELETE` to make retrying\nit safe: the first result is stored for 24 hours and returned again for\nthe same request. Record responses carry the record's revision as an\n`ETag`; send it back as `If-Match` to update only if nobody changed the\nrecord in the meantime (`412` otherwise).\n\n## History\n\nEvery change to a record is a revision, attributed to the person or API\nkey that made it: record revisions can be listed, diffed and reverted,\nand collections keep a schema history. Send `Nohead-Change-Note` to\nrecord why a change was made. Changes that rewrite existing values\n(such as a field's type) are explicit, previewable field migrations.\n\nHow long revisions are kept depends on the organization's plan. Older\nones are removed, but every record keeps its first revision and its\nlast 10; `history_pruned_through` says how far history was removed.\n",
     "license": {
       "name": "Proprietary",
       "identifier": "LicenseRef-Proprietary"
@@ -122,7 +122,7 @@
           {
             "name": "sort",
             "in": "query",
-            "description": "`id`, `created_at`, `updated_at`, `published_at` (unpublished\nrecords first), or the API key of a text, number, boolean, date or\nenum field with one value (records without a value last, in both\ndirections; text by code point). `-` for descending.\n",
+            "description": "`id`, `created_at`, `updated_at`, `published_at` (unpublished\nrecords first), or the key of a text, number, boolean, date or\nenum field with one value (records without a value last, in both\ndirections; text by code point). `-` for descending.\n",
             "schema": {
               "type": "string",
               "pattern": "^-?[a-z][a-z0-9_]*$",
@@ -2043,11 +2043,8 @@
         }
       }
     },
-    "/v1/collections/{collection_id}/schema-changes/{schema_change_id}": {
+    "/v1/schema-changes/{schema_change_id}": {
       "parameters": [
-        {
-          "$ref": "#/components/parameters/CollectionRef"
-        },
         {
           "name": "schema_change_id",
           "in": "path",
@@ -2251,7 +2248,7 @@
       "patch": {
         "operationId": "fields_update",
         "summary": "Update a field",
-        "description": "Changes that keep existing record values valid. After an `api_key`\nchange the old key keeps working for 6 months as an alias (see\n`aliases`), so clients have time to move. Changing `type` or `multiple`, or a\n`configuration` that existing active records would violate, is rejected\nwith `requires_migration`: use `POST /v1/fields/{field_id}/migrations`.\n`409` with detail code `deleted` while the field is deleted.\n",
+        "description": "Changes that keep existing record values valid. After a `key`\nchange the old key keeps working for 6 months as an alias (see\n`aliases`), so clients have time to move. Changing `type` or `multiple`, or a\n`configuration` that existing active records would violate, is rejected\nwith `requires_migration`: use `POST /v1/fields/{field_id}/migrations`.\n`409` with detail code `deleted` while the field is deleted.\n",
         "tags": [
           "fields"
         ],
@@ -2471,7 +2468,7 @@
           "name": "alias",
           "in": "path",
           "required": true,
-          "description": "The old API key.",
+          "description": "The old key.",
           "schema": {
             "type": "string"
           }
@@ -4697,7 +4694,7 @@
       "Expand": {
         "name": "expand",
         "in": "query",
-        "description": "Comma-separated relation, asset or rich text field API keys whose records or assets to embed under `expanded` (at most 5); for a rich text field, the assets its images show. Embedding needs permission to read what is embedded: `records:read` for relations, `assets:read` for assets and rich text (`403` otherwise).",
+        "description": "Comma-separated relation, asset or rich text field keys whose records or assets to embed under `expanded` (at most 5); for a rich text field, the assets its images show. Embedding needs permission to read what is embedded: `records:read` for relations, `assets:read` for assets and rich text (`403` otherwise).",
         "schema": {
           "type": "string"
         },
@@ -4708,7 +4705,7 @@
         "in": "query",
         "style": "deepObject",
         "explode": true,
-        "description": "`filter[<key>]=value` (equal), or `filter[<key>][<operator>]=value`;\nfilters combine with AND. Keys are field API keys, `published_at`,\n`deleted` (`true` lists soft-deleted records instead) and, in record\nlists and counts, `created_at` and `updated_at`. In search,\n`published_at` takes only `exists`.\n\n- `eq`, `ne`: equal, not equal. For fields with several values,\n  \"contains\" and \"does not contain\". `ne` matches records with no value.\n- `gt`, `gte`, `lt`, `lte`: integer, decimal and date fields with one\n  value, and the timestamps.\n- `in`: any of up to 100 comma-separated values (`\\,` is a comma\n  inside a value, `\\\\` a backslash); for fields with several values,\n  \"contains any of\".\n- `exists`: `true` for records with a value, `false` for those without\n  (and `published_at`: published or not).\n\nValues are parsed per field type (`\"5\"` is not the integer 5), but\nnot held to the field's limits or format (`price[lt]=10` works when\n`max` is 5; a slug filter that isn't a slug matches nothing). Dates\ntake `today`, and dates with a time `now` too. A day (`YYYY-MM-DD`)\ngiven for a date with a time, or a timestamp, covers that day in the\nfield's `time_zone` (UTC without one): `gte` from its start, `lte` to\nits end, `eq` within it. A date with a time matches the same moment\nwritten with any offset.\n",
+        "description": "`filter[<key>]=value` (equal), or `filter[<key>][<operator>]=value`;\nfilters combine with AND. Keys are field keys, `published_at`,\n`deleted` (`true` lists soft-deleted records instead) and, in record\nlists and counts, `created_at` and `updated_at`. In search,\n`published_at` takes only `exists`.\n\n- `eq`, `ne`: equal, not equal. For fields with several values,\n  \"contains\" and \"does not contain\". `ne` matches records with no value.\n- `gt`, `gte`, `lt`, `lte`: integer, decimal and date fields with one\n  value, and the timestamps.\n- `in`: any of up to 100 comma-separated values (`\\,` is a comma\n  inside a value, `\\\\` a backslash); for fields with several values,\n  \"contains any of\".\n- `exists`: `true` for records with a value, `false` for those without\n  (and `published_at`: published or not).\n\nValues are parsed per field type (`\"5\"` is not the integer 5), but\nnot held to the field's limits or format (`price[lt]=10` works when\n`max` is 5; a slug filter that isn't a slug matches nothing). Dates\ntake `today`, and dates with a time `now` too. A day (`YYYY-MM-DD`)\ngiven for a date with a time, or a timestamp, covers that day in the\nfield's `time_zone` (UTC without one): `gte` from its start, `lte` to\nits end, `eq` within it. A date with a time matches the same moment\nwritten with any offset.\n",
         "schema": {
           "type": "object",
           "additionalProperties": {
@@ -5108,19 +5105,324 @@
         ]
       },
       "Field": {
+        "description": "A field, typed by its `type`, which also decides the options its `configuration` takes.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TextField"
+          },
+          {
+            "$ref": "#/components/schemas/LongTextField"
+          },
+          {
+            "$ref": "#/components/schemas/RichTextField"
+          },
+          {
+            "$ref": "#/components/schemas/IntegerField"
+          },
+          {
+            "$ref": "#/components/schemas/DecimalField"
+          },
+          {
+            "$ref": "#/components/schemas/DateField"
+          },
+          {
+            "$ref": "#/components/schemas/BooleanField"
+          },
+          {
+            "$ref": "#/components/schemas/EnumField"
+          },
+          {
+            "$ref": "#/components/schemas/AssetField"
+          },
+          {
+            "$ref": "#/components/schemas/RelationField"
+          },
+          {
+            "$ref": "#/components/schemas/JsonField"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "text": "#/components/schemas/TextField",
+            "long_text": "#/components/schemas/LongTextField",
+            "rich_text": "#/components/schemas/RichTextField",
+            "integer": "#/components/schemas/IntegerField",
+            "decimal": "#/components/schemas/DecimalField",
+            "date": "#/components/schemas/DateField",
+            "boolean": "#/components/schemas/BooleanField",
+            "enum": "#/components/schemas/EnumField",
+            "asset": "#/components/schemas/AssetField",
+            "relation": "#/components/schemas/RelationField",
+            "json": "#/components/schemas/JsonField"
+          }
+        }
+      },
+      "TextField": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "text"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/TextFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "LongTextField": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "long_text"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/LongTextFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "RichTextField": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "rich_text"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/RichTextFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "IntegerField": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "integer"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/IntegerFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "DecimalField": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "decimal"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/DecimalFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "DateField": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "date"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/DateFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "BooleanField": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "boolean"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/BooleanFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "EnumField": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "enum"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/EnumFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "AssetField": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "asset"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/AssetFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "RelationField": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "relation"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/RelationFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "JsonField": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "json"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/JsonFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "FieldProperties": {
         "type": "object",
-        "additionalProperties": false,
+        "description": "What every field has; `Field` adds its `type` and that type's `configuration`.",
         "required": [
           "id",
           "object",
           "collection_id",
           "name",
-          "api_key",
-          "type",
+          "key",
           "required",
           "multiple",
           "position",
-          "configuration",
           "deleted_at",
           "purge_after",
           "aliases",
@@ -5145,12 +5447,9 @@
             "type": "string",
             "description": "Display name. Safe to change."
           },
-          "api_key": {
+          "key": {
             "type": "string",
             "description": "Key used in record data. Part of the API contract."
-          },
-          "type": {
-            "$ref": "#/components/schemas/FieldType"
           },
           "required": {
             "type": "boolean",
@@ -5164,10 +5463,6 @@
             "type": "integer",
             "description": "Where the field sorts in the collection's order, lowest first. New fields are added last; `PUT /v1/collections/{collection_id}/field-order` changes the order, numbering the fields from 0."
           },
-          "configuration": {
-            "type": "object",
-            "description": "Type-specific options, e.g. `max_length`, `options`, `target_collection_id`,\n`accepted_types` (asset fields: MIME types or `type/*` wildcards that newly\nwritten values must have; any file when absent), `include_time` and\n`time_zone` (date fields, below), `format` (text fields, below),\n`unique` (text and integer fields, below), plus\nthe options for searches with API keys: `searchable` (the search words match the\nfield; default true for text, long_text, rich_text and enum), `filterable` and\n`sortable` (default false).\n\nDate fields hold a calendar date, `YYYY-MM-DD`, with no time and no\ntime zone: returned exactly as written, so it never shows as the day\nbefore or after. With `include_time: true` they hold a moment: ISO\n8601 with an offset, stored in UTC and returned in UTC, or with the\noffset of `time_zone` (an IANA name such as `Europe/Copenhagen`,\ndaylight saving included) when the field has one. Input may use any\noffset. Changing `time_zone` never rewrites values; turning\n`include_time` on or off does, through a field migration.\n\nText fields (not long text) can have a `format`: `slug`\n(lowercase letters, digits and single hyphens, at most 200\ncharacters; one value per record, never a list, and always\nunique: a slug field has `unique: true`), `url` (an absolute\n`http` or `https` address) or `email`. A value that doesn't match is\nrefused with `invalid_format`. A format sets its own length limits\n(254 characters for emails, 2,048 for URLs), so `min_length` and\n`max_length` are for plain text. Text and integer\nfields with one value can be `unique`: no two active records of the\ncollection share a value (emails compare ignoring capitals; records\nwithout a value don't count). A taken value is refused with\n`taken` and the `record_id` that has it. Turning `unique` on is\nrefused with `duplicate_values` while records share a value (and\nso is restoring a deleted unique field, `409`). A field migration\nto a unique field is refused with `duplicate_values` when its\nconverted values or backfill would be shared, and fails if values\nwritten while it waits would be.\n"
-          },
           "deleted_at": {
             "description": "When the field was deleted; null unless it is. Its values stay hidden in records until it is restored or purged.",
             "$ref": "#/components/schemas/NullableTimestamp"
@@ -5178,16 +5473,16 @@
           },
           "aliases": {
             "type": "array",
-            "description": "Old API keys of a renamed field that still work until `expires_at`:\nrecord data also carries the value under them, and writes, filters,\nsorts and `expand` accept them. Responses about the collection then\nhave `Deprecation` and `Sunset` headers.\n",
+            "description": "Old keys of a renamed field that still work until `expires_at`:\nrecord data also carries the value under them, and writes, filters,\nsorts and `expand` accept them. Responses about the collection then\nhave `Deprecation` and `Sunset` headers.\n",
             "items": {
               "type": "object",
               "additionalProperties": false,
               "required": [
-                "api_key",
+                "key",
                 "expires_at"
               ],
               "properties": {
-                "api_key": {
+                "key": {
                   "type": "string"
                 },
                 "expires_at": {
@@ -5203,6 +5498,381 @@
             "$ref": "#/components/schemas/Timestamp"
           }
         }
+      },
+      "TextFieldConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Plain text up to 10,000 characters, or a `format`.",
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Help text for editors."
+          },
+          "searchable": {
+            "type": "boolean",
+            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+          },
+          "filterable": {
+            "type": "boolean",
+            "description": "API searches can filter on it. Default false."
+          },
+          "sortable": {
+            "type": "boolean",
+            "description": "API searches can sort on it (one value only). Default false."
+          },
+          "min_length": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_length": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "slug",
+              "url",
+              "email"
+            ],
+            "description": "`slug` (always unique, one value), `url` (absolute http or https) or `email`; each sets its own length limits."
+          },
+          "unique": {
+            "type": "boolean",
+            "description": "No two active records of the collection share a value (one value only; a slug is always unique)."
+          }
+        }
+      },
+      "LongTextFieldConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Text up to 100,000 characters.",
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Help text for editors."
+          },
+          "searchable": {
+            "type": "boolean",
+            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+          },
+          "filterable": {
+            "type": "boolean",
+            "description": "API searches can filter on it. Default false."
+          },
+          "sortable": {
+            "type": "boolean",
+            "description": "API searches can sort on it (one value only). Default false."
+          },
+          "min_length": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_length": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "RichTextFieldConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Help text for editors."
+          },
+          "searchable": {
+            "type": "boolean",
+            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+          },
+          "filterable": {
+            "type": "boolean",
+            "description": "API searches can filter on it. Default false."
+          },
+          "sortable": {
+            "type": "boolean",
+            "description": "API searches can sort on it (one value only). Default false."
+          }
+        }
+      },
+      "IntegerFieldConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Help text for editors."
+          },
+          "searchable": {
+            "type": "boolean",
+            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+          },
+          "filterable": {
+            "type": "boolean",
+            "description": "API searches can filter on it. Default false."
+          },
+          "sortable": {
+            "type": "boolean",
+            "description": "API searches can sort on it (one value only). Default false."
+          },
+          "min": {
+            "type": "integer"
+          },
+          "max": {
+            "type": "integer"
+          },
+          "unique": {
+            "type": "boolean",
+            "description": "No two active records of the collection share a value (one value only)."
+          }
+        }
+      },
+      "DecimalFieldConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Help text for editors."
+          },
+          "searchable": {
+            "type": "boolean",
+            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+          },
+          "filterable": {
+            "type": "boolean",
+            "description": "API searches can filter on it. Default false."
+          },
+          "sortable": {
+            "type": "boolean",
+            "description": "API searches can sort on it (one value only). Default false."
+          },
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          }
+        }
+      },
+      "DateFieldConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Help text for editors."
+          },
+          "searchable": {
+            "type": "boolean",
+            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+          },
+          "filterable": {
+            "type": "boolean",
+            "description": "API searches can filter on it. Default false."
+          },
+          "sortable": {
+            "type": "boolean",
+            "description": "API searches can sort on it (one value only). Default false."
+          },
+          "include_time": {
+            "type": "boolean",
+            "description": "Holds a moment (ISO 8601 with an offset) instead of a calendar date; changing it is a field migration."
+          },
+          "time_zone": {
+            "type": "string",
+            "description": "An IANA time zone (`Europe/Copenhagen`) moments are returned in; changing it never rewrites values."
+          }
+        }
+      },
+      "BooleanFieldConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Help text for editors."
+          },
+          "searchable": {
+            "type": "boolean",
+            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+          },
+          "filterable": {
+            "type": "boolean",
+            "description": "API searches can filter on it. Default false."
+          },
+          "sortable": {
+            "type": "boolean",
+            "description": "API searches can sort on it (one value only). Default false."
+          }
+        }
+      },
+      "EnumFieldConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "options"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Help text for editors."
+          },
+          "searchable": {
+            "type": "boolean",
+            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+          },
+          "filterable": {
+            "type": "boolean",
+            "description": "API searches can filter on it. Default false."
+          },
+          "sortable": {
+            "type": "boolean",
+            "description": "API searches can sort on it (one value only). Default false."
+          },
+          "options": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        }
+      },
+      "AssetFieldConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Help text for editors."
+          },
+          "searchable": {
+            "type": "boolean",
+            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+          },
+          "filterable": {
+            "type": "boolean",
+            "description": "API searches can filter on it. Default false."
+          },
+          "sortable": {
+            "type": "boolean",
+            "description": "API searches can sort on it (one value only). Default false."
+          },
+          "accepted_types": {
+            "type": "array",
+            "maxItems": 50,
+            "description": "MIME types or `type/*` wildcards newly written values must have (`[\"image/*\", \"application/pdf\"]`); any file when absent.",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RelationFieldConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target_collection_id"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Help text for editors."
+          },
+          "searchable": {
+            "type": "boolean",
+            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+          },
+          "filterable": {
+            "type": "boolean",
+            "description": "API searches can filter on it. Default false."
+          },
+          "sortable": {
+            "type": "boolean",
+            "description": "API searches can sort on it (one value only). Default false."
+          },
+          "target_collection_id": {
+            "type": "string",
+            "description": "The collection (same project) whose records it points at."
+          }
+        }
+      },
+      "JsonFieldConfiguration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Help text for editors."
+          },
+          "searchable": {
+            "type": "boolean",
+            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+          },
+          "filterable": {
+            "type": "boolean",
+            "description": "API searches can filter on it. Default false."
+          },
+          "sortable": {
+            "type": "boolean",
+            "description": "API searches can sort on it (one value only). Default false."
+          }
+        }
+      },
+      "FieldConfiguration": {
+        "description": "Type-specific options, e.g. `max_length`, `options`, `target_collection_id`,\n`accepted_types` (asset fields: MIME types or `type/*` wildcards that newly\nwritten values must have; any file when absent), `include_time` and\n`time_zone` (date fields, below), `format` (text fields, below),\n`unique` (text and integer fields, below), plus\nthe options for searches with API keys: `searchable` (the search words match the\nfield; default true for text, long_text, rich_text and enum), `filterable` and\n`sortable` (default false).\n\nDate fields hold a calendar date, `YYYY-MM-DD`, with no time and no\ntime zone: returned exactly as written, so it never shows as the day\nbefore or after. With `include_time: true` they hold a moment: ISO\n8601 with an offset, stored in UTC and returned in UTC, or with the\noffset of `time_zone` (an IANA name such as `Europe/Copenhagen`,\ndaylight saving included) when the field has one. Input may use any\noffset. Changing `time_zone` never rewrites values; turning\n`include_time` on or off does, through a field migration.\n\nText fields (not long text) can have a `format`: `slug`\n(lowercase letters, digits and single hyphens, at most 200\ncharacters; one value per record, never a list, and always\nunique: a slug field has `unique: true`), `url` (an absolute\n`http` or `https` address) or `email`. A value that doesn't match is\nrefused with `invalid_format`. A format sets its own length limits\n(254 characters for emails, 2,048 for URLs), so `min_length` and\n`max_length` are for plain text. Text and integer\nfields with one value can be `unique`: no two active records of the\ncollection share a value (emails compare ignoring capitals; records\nwithout a value don't count). A taken value is refused with\n`taken` and the `record_id` that has it. Turning `unique` on is\nrefused with `duplicate_values` while records share a value (and\nso is restoring a deleted unique field, `409`). A field migration\nto a unique field is refused with `duplicate_values` when its\nconverted values or backfill would be shared, and fails if values\nwritten while it waits would be.\n",
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/TextFieldConfiguration"
+          },
+          {
+            "$ref": "#/components/schemas/LongTextFieldConfiguration"
+          },
+          {
+            "$ref": "#/components/schemas/RichTextFieldConfiguration"
+          },
+          {
+            "$ref": "#/components/schemas/IntegerFieldConfiguration"
+          },
+          {
+            "$ref": "#/components/schemas/DecimalFieldConfiguration"
+          },
+          {
+            "$ref": "#/components/schemas/DateFieldConfiguration"
+          },
+          {
+            "$ref": "#/components/schemas/BooleanFieldConfiguration"
+          },
+          {
+            "$ref": "#/components/schemas/EnumFieldConfiguration"
+          },
+          {
+            "$ref": "#/components/schemas/AssetFieldConfiguration"
+          },
+          {
+            "$ref": "#/components/schemas/RelationFieldConfiguration"
+          },
+          {
+            "$ref": "#/components/schemas/JsonFieldConfiguration"
+          }
+        ]
       },
       "RecordCount": {
         "type": "object",
@@ -5225,22 +5895,317 @@
         }
       },
       "FieldCreate": {
+        "description": "A new field. Its `type` decides the options `configuration` takes.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/TextFieldCreate"
+          },
+          {
+            "$ref": "#/components/schemas/LongTextFieldCreate"
+          },
+          {
+            "$ref": "#/components/schemas/RichTextFieldCreate"
+          },
+          {
+            "$ref": "#/components/schemas/IntegerFieldCreate"
+          },
+          {
+            "$ref": "#/components/schemas/DecimalFieldCreate"
+          },
+          {
+            "$ref": "#/components/schemas/DateFieldCreate"
+          },
+          {
+            "$ref": "#/components/schemas/BooleanFieldCreate"
+          },
+          {
+            "$ref": "#/components/schemas/EnumFieldCreate"
+          },
+          {
+            "$ref": "#/components/schemas/AssetFieldCreate"
+          },
+          {
+            "$ref": "#/components/schemas/RelationFieldCreate"
+          },
+          {
+            "$ref": "#/components/schemas/JsonFieldCreate"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "type",
+          "mapping": {
+            "text": "#/components/schemas/TextFieldCreate",
+            "long_text": "#/components/schemas/LongTextFieldCreate",
+            "rich_text": "#/components/schemas/RichTextFieldCreate",
+            "integer": "#/components/schemas/IntegerFieldCreate",
+            "decimal": "#/components/schemas/DecimalFieldCreate",
+            "date": "#/components/schemas/DateFieldCreate",
+            "boolean": "#/components/schemas/BooleanFieldCreate",
+            "enum": "#/components/schemas/EnumFieldCreate",
+            "asset": "#/components/schemas/AssetFieldCreate",
+            "relation": "#/components/schemas/RelationFieldCreate",
+            "json": "#/components/schemas/JsonFieldCreate"
+          }
+        }
+      },
+      "TextFieldCreate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldCreateProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "text"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/TextFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "LongTextFieldCreate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldCreateProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "long_text"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/LongTextFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "RichTextFieldCreate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldCreateProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "rich_text"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/RichTextFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "IntegerFieldCreate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldCreateProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "integer"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/IntegerFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "DecimalFieldCreate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldCreateProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "decimal"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/DecimalFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "DateFieldCreate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldCreateProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "date"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/DateFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "BooleanFieldCreate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldCreateProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "boolean"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/BooleanFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "EnumFieldCreate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldCreateProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "enum"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/EnumFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "AssetFieldCreate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldCreateProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "asset"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/AssetFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "RelationFieldCreate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldCreateProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type",
+              "configuration"
+            ],
+            "properties": {
+              "type": {
+                "const": "relation"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/RelationFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "JsonFieldCreate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FieldCreateProperties"
+          },
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "const": "json"
+              },
+              "configuration": {
+                "$ref": "#/components/schemas/JsonFieldConfiguration"
+              }
+            }
+          }
+        ],
+        "unevaluatedProperties": false
+      },
+      "FieldCreateProperties": {
         "type": "object",
+        "description": "What every new field takes; `FieldCreate` adds its `type` and that type's `configuration`.",
         "required": [
           "name",
-          "api_key",
-          "type"
+          "key"
         ],
         "properties": {
           "name": {
             "type": "string"
           },
-          "api_key": {
+          "key": {
             "type": "string",
             "description": "The field's key in records' `data`, filters and sorts. Reserved for records' own attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`, `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`, `revision` and `schema_version`."
-          },
-          "type": {
-            "$ref": "#/components/schemas/FieldType"
           },
           "required": {
             "type": "boolean",
@@ -5249,35 +6214,27 @@
           "multiple": {
             "type": "boolean",
             "description": "A list of distinct values (a repeated value is refused with `duplicate_value`, an empty string with `blank_value`). Not available for boolean, long_text, rich_text and json fields."
-          },
-          "configuration": {
-            "type": "object"
           }
         }
       },
       "FieldUpdate": {
         "type": "object",
+        "description": "Renames, describes or loosens a field. A change to its `type` or `multiple` rewrites record values, so it is a field migration (`POST /v1/fields/{id}/migrations`); either key here is `400` `unknown_parameter`, saying so.",
+        "additionalProperties": false,
         "properties": {
           "name": {
             "type": "string"
           },
-          "api_key": {
+          "key": {
             "type": "string",
             "description": "The field's key in records' `data`, filters and sorts. Reserved for records' own attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`, `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`, `revision` and `schema_version`."
-          },
-          "type": {
-            "$ref": "#/components/schemas/FieldType"
           },
           "required": {
             "type": "boolean",
             "description": "Every record must have a value. Not available for boolean fields (a boolean is true or false; no value reads as false)."
           },
-          "multiple": {
-            "type": "boolean",
-            "description": "A list of distinct values (a repeated value is refused with `duplicate_value`, an empty string with `blank_value`). Not available for boolean, long_text, rich_text and json fields."
-          },
           "configuration": {
-            "type": "object"
+            "$ref": "#/components/schemas/FieldConfiguration"
           }
         }
       },
@@ -5375,6 +6332,7 @@
       },
       "CollectionCreate": {
         "type": "object",
+        "additionalProperties": false,
         "required": [
           "name",
           "slug"
@@ -5405,6 +6363,7 @@
       },
       "CollectionUpdate": {
         "type": "object",
+        "additionalProperties": false,
         "properties": {
           "search_enabled": {
             "type": "boolean"
@@ -5484,7 +6443,7 @@
               "required": [
                 "id",
                 "name",
-                "api_key",
+                "key",
                 "type",
                 "required",
                 "multiple",
@@ -5499,7 +6458,7 @@
                 "name": {
                   "type": "string"
                 },
-                "api_key": {
+                "key": {
                   "type": "string"
                 },
                 "type": {
@@ -5515,7 +6474,7 @@
                   "type": "integer"
                 },
                 "configuration": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/FieldConfiguration"
                 },
                 "deleted_at": {
                   "$ref": "#/components/schemas/NullableTimestamp"
@@ -5730,7 +6689,7 @@
             "$ref": "#/components/schemas/FieldType"
           },
           "configuration": {
-            "type": "object"
+            "$ref": "#/components/schemas/FieldConfiguration"
           },
           "multiple": {
             "type": "boolean",
@@ -5750,8 +6709,8 @@
             "$ref": "#/components/schemas/FieldType"
           },
           "configuration": {
-            "type": "object",
-            "description": "The complete new configuration. When the type changes and this is omitted, only `description`, `searchable`, `filterable` and `sortable` carry over."
+            "description": "The complete new configuration. When the type changes and this is omitted, only `description`, `searchable`, `filterable` and `sortable` carry over.",
+            "$ref": "#/components/schemas/FieldConfiguration"
           },
           "multiple": {
             "type": "boolean",
@@ -6331,7 +7290,7 @@
           },
           "changed_fields": {
             "type": "array",
-            "description": "API keys of the fields the draft changes.",
+            "description": "Keys of the fields the draft changes.",
             "items": {
               "type": "string"
             }
@@ -6482,7 +7441,7 @@
       },
       "RecordData": {
         "type": "object",
-        "description": "Field values keyed by field `api_key`. A rich text value is a\nProseMirror/Tiptap JSON document (`{\"type\": \"doc\", \"content\": [...]}`).\nAn image of an asset in it is `{\"type\": \"image\", \"attrs\": {\"asset_id\":\n\"ast_...\", \"alt\": \"...\"}}`, between the document's blocks (not inside\na list or quote), at most 100 per document (`too_many_images`); a\nnewly shown image must be an uploaded JPEG, PNG, GIF, WebP or AVIF of\nthe project (`invalid_reference`, `type_not_accepted`). `expand` embeds the assets, and published-only\nkeys can read the images of published records.\n",
+        "description": "Field values keyed by field `key`. A rich text value is a\nProseMirror/Tiptap JSON document (`{\"type\": \"doc\", \"content\": [...]}`).\nAn image of an asset in it is `{\"type\": \"image\", \"attrs\": {\"asset_id\":\n\"ast_...\", \"alt\": \"...\"}}`, between the document's blocks (not inside\na list or quote), at most 100 per document (`too_many_images`); a\nnewly shown image must be an uploaded JPEG, PNG, GIF, WebP or AVIF of\nthe project (`invalid_reference`, `type_not_accepted`). `expand` embeds the assets, and published-only\nkeys can read the images of published records.\n",
         "additionalProperties": true,
         "examples": [
           {
@@ -6560,7 +7519,7 @@
           },
           "expanded": {
             "type": "object",
-            "description": "Only with `expand`: what each requested relation, asset or rich\ntext field points at, keyed by field API key: records for\nrelation fields, assets for asset fields. A single value is the object, or null when\nit no longer exists; a multiple value is a list of those that still\nexist. For a rich text field, the list of assets its images show,\nin document order, leaving out those that no longer exist.\nExpanded records are not expanded further.\n",
+            "description": "Only with `expand`: what each requested relation, asset or rich\ntext field points at, keyed by field key: records for\nrelation fields, assets for asset fields. A single value is the object, or null when\nit no longer exists; a multiple value is a list of those that still\nexist. For a rich text field, the list of assets its images show,\nin document order, leaving out those that no longer exist.\nExpanded records are not expanded further.\n",
             "additionalProperties": {
               "anyOf": [
                 {
@@ -6598,6 +7557,7 @@
       },
       "RecordWrite": {
         "type": "object",
+        "additionalProperties": false,
         "required": [
           "data"
         ],
@@ -6733,14 +7693,14 @@
           },
           "changed_fields": {
             "type": "array",
-            "description": "API keys of changed fields, and changed attributes.",
+            "description": "Keys of changed fields, and changed attributes.",
             "items": {
               "type": "string"
             }
           },
           "redacted_fields": {
             "type": "array",
-            "description": "API keys of fields whose values in this revision were redacted (owners\nand admins redact them in the web app); those values read\n`{\"$redacted\": true}`.\n",
+            "description": "Keys of fields whose values in this revision were redacted (owners\nand admins redact them in the web app); those values read\n`{\"$redacted\": true}`.\n",
             "items": {
               "type": "string"
             }
@@ -8379,7 +9339,7 @@
                 "fields": {
                   "type": "array",
                   "minItems": 1,
-                  "description": "API keys of the record's fields that use the asset, in its content or its draft.",
+                  "description": "Keys of the record's fields that use the asset, in its content or its draft.",
                   "items": {
                     "type": "string"
                   }
@@ -8560,7 +9520,7 @@
         "properties": {
           "field": {
             "type": "string",
-            "description": "API key of the offending field or parameter, when applicable."
+            "description": "Key of the offending field or parameter, when applicable."
           },
           "code": {
             "type": "string",
@@ -8719,7 +9679,7 @@
         }
       },
       "BadRequest": {
-        "description": "The request was malformed.",
+        "description": "The request was malformed: unparseable JSON, an invalid query parameter, or a body key the operation doesn't take (detail code `unknown_parameter`, naming the key).",
         "headers": {
           "X-Request-Id": {
             "$ref": "#/components/headers/RequestId"

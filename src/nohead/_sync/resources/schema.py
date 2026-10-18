@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Literal, overload
+from typing import Literal, cast, overload
 
 from typing_extensions import Unpack
 
@@ -133,11 +133,11 @@ class SchemaChanges(Resource):
             query={"limit": limit, "cursor": cursor},
         )
 
-    def get(self, collection: str, schema_change: str) -> SchemaChangeDetail:
+    def get(self, schema_change: str) -> SchemaChangeDetail:
         return self._client.request(
             "schema_changes_get",
             cast=SchemaChangeDetail,
-            path={"collection_id": collection, "schema_change_id": schema_change},
+            path={"schema_change_id": schema_change},
         )
 
 
@@ -170,11 +170,15 @@ class Fields(Resource):
         limit: int | None = None,
         cursor: str | None = None,
     ) -> Page[Field]:
-        return self._client.paginate(
-            "fields_list",
-            item=Field,
-            path={"collection_id": collection},
-            query={"filter": {"deleted": deleted}, "limit": limit, "cursor": cursor},
+        # Field is a union of one model per field type, so it can't type `item`.
+        return cast(
+            "Page[Field]",
+            self._client.paginate(
+                "fields_list",
+                item=Field,
+                path={"collection_id": collection},
+                query={"filter": {"deleted": deleted}, "limit": limit, "cursor": cursor},
+            ),
         )
 
     def get(self, field: str) -> Field:
