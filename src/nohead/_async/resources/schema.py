@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Literal, overload
+from typing import Literal, cast, overload
 
 from typing_extensions import Unpack
 
@@ -132,11 +132,11 @@ class AsyncSchemaChanges(AsyncResource):
             query={"limit": limit, "cursor": cursor},
         )
 
-    async def get(self, collection: str, schema_change: str) -> SchemaChangeDetail:
+    async def get(self, schema_change: str) -> SchemaChangeDetail:
         return await self._client.request(
             "schema_changes_get",
             cast=SchemaChangeDetail,
-            path={"collection_id": collection, "schema_change_id": schema_change},
+            path={"schema_change_id": schema_change},
         )
 
 
@@ -169,11 +169,15 @@ class AsyncFields(AsyncResource):
         limit: int | None = None,
         cursor: str | None = None,
     ) -> AsyncPaginator[Field]:
-        return self._client.paginate(
-            "fields_list",
-            item=Field,
-            path={"collection_id": collection},
-            query={"filter": {"deleted": deleted}, "limit": limit, "cursor": cursor},
+        # Field is a union of one model per field type, so it can't type `item`.
+        return cast(
+            "AsyncPaginator[Field]",
+            self._client.paginate(
+                "fields_list",
+                item=Field,
+                path={"collection_id": collection},
+                query={"filter": {"deleted": deleted}, "limit": limit, "cursor": cursor},
+            ),
         )
 
     async def get(self, field: str) -> Field:

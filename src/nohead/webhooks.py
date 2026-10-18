@@ -121,7 +121,9 @@ class WebhookEvent(NoheadModel):
     @property
     def field(self) -> Field | None:
         """`field.alias_removed` events."""
-        return self._part("field", Field)
+        # Field is a union of one model per field type: validate picks the variant.
+        value = self._data().get("field")
+        return validate(Field, value) if isinstance(value, dict) else None
 
     @property
     def webhook(self) -> Webhook | None:

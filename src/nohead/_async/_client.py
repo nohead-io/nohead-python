@@ -79,7 +79,7 @@ class AsyncAPIClient:
         self,
         operation: str,
         *,
-        item: type[T],
+        item: type[T] | Any,
         meta: type[M] = ListMeta,
         path: Mapping[str, str | int] | None = None,
         query: Mapping[str, Any] | None = None,

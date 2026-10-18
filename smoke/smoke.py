@@ -42,7 +42,7 @@ def sync_flow() -> str:
         collection = nohead.collections.create(
             name="Python smoke",
             slug=f"sdk-python-{uuid.uuid4().hex[:8]}",
-            fields=[{"name": "Title", "api_key": "title", "type": "text", "required": True}],
+            fields=[{"name": "Title", "key": "title", "type": "text", "required": True}],
         )
         LEFT["collections"] = collection.id
 

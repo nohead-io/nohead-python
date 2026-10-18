@@ -1,6 +1,6 @@
 [project]
 name = "nohead"
-version = "0.3.0"
+version = "0.4.0"
 description = "Official Python SDK for the Nohead API"
 readme = "README.md"
 license = "MIT"

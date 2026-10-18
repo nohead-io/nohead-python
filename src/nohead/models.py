@@ -44,21 +44,22 @@ class RecordFilterValueObject(NoheadModel):
     exists: str | None = None
 
 
-class FieldAliases(NoheadModel):
-    api_key: str
+class FieldPropertiesAliases(NoheadModel):
+    key: str
     expires_at: Timestamp
 
 
-class Field(NoheadModel):
+class FieldProperties(NoheadModel):
+    """What every field has; `Field` adds its `type` and that type's `configuration`."""
+
     id: str
     """Stable field ID. Never changes, even when the field is renamed."""
     object: str
     collection_id: str
     name: str
     """Display name. Safe to change."""
-    api_key: str
+    key: str
     """Key used in record data. Part of the API contract."""
-    type: FieldType
     required: bool
     """Every record must have a value. Not available for boolean fields (a boolean is true or
     false; no value reads as false).
@@ -73,46 +74,254 @@ class Field(NoheadModel):
     last; `PUT /v1/collections/{collection_id}/field-order` changes the order, numbering the
     fields from 0.
     """
-    configuration: dict[str, Any]
-    """Type-specific options, e.g. `max_length`, `options`, `target_collection_id`,
-    `accepted_types` (asset fields: MIME types or `type/*` wildcards that newly written
-    values must have; any file when absent), `include_time` and `time_zone` (date fields,
-    below), `format` (text fields, below), `unique` (text and integer fields, below), plus
-    the options for searches with API keys: `searchable` (the search words match the field;
-    default true for text, long_text, rich_text and enum), `filterable` and `sortable`
-    (default false). Date fields hold a calendar date, `YYYY-MM-DD`, with no time and no
-    time zone: returned exactly as written, so it never shows as the day before or after.
-    With `include_time: true` they hold a moment: ISO 8601 with an offset, stored in UTC and
-    returned in UTC, or with the offset of `time_zone` (an IANA name such as
-    `Europe/Copenhagen`, daylight saving included) when the field has one. Input may use any
-    offset. Changing `time_zone` never rewrites values; turning `include_time` on or off
-    does, through a field migration. Text fields (not long text) can have a `format`: `slug`
-    (lowercase letters, digits and single hyphens, at most 200 characters; one value per
-    record, never a list, and always unique: a slug field has `unique: true`), `url` (an
-    absolute `http` or `https` address) or `email`. A value that doesn't match is refused
-    with `invalid_format`. A format sets its own length limits (254 characters for emails,
-    2,048 for URLs), so `min_length` and `max_length` are for plain text. Text and integer
-    fields with one value can be `unique`: no two active records of the collection share a
-    value (emails compare ignoring capitals; records without a value don't count). A taken
-    value is refused with `taken` and the `record_id` that has it. Turning `unique` on is
-    refused with `duplicate_values` while records share a value (and so is restoring a
-    deleted unique field, `409`). A field migration to a unique field is refused with
-    `duplicate_values` when its converted values or backfill would be shared, and fails if
-    values written while it waits would be.
-    """
     deleted_at: NullableTimestamp
     """When the field was deleted; null unless it is. Its values stay hidden in records until
     it is restored or purged.
     """
     purge_after: NullableTimestamp
     """When a deleted field and its values are removed for good, unless restored first."""
-    aliases: list[FieldAliases]
-    """Old API keys of a renamed field that still work until `expires_at`: record data also
-    carries the value under them, and writes, filters, sorts and `expand` accept them.
-    Responses about the collection then have `Deprecation` and `Sunset` headers.
+    aliases: list[FieldPropertiesAliases]
+    """Old keys of a renamed field that still work until `expires_at`: record data also carries
+    the value under them, and writes, filters, sorts and `expand` accept them. Responses
+    about the collection then have `Deprecation` and `Sunset` headers.
     """
     created_at: Timestamp
     updated_at: Timestamp
+
+
+class TextField(FieldProperties):
+    type: Literal["text"]
+    configuration: TextFieldConfiguration
+
+
+class LongTextField(FieldProperties):
+    type: Literal["long_text"]
+    configuration: LongTextFieldConfiguration
+
+
+class RichTextField(FieldProperties):
+    type: Literal["rich_text"]
+    configuration: RichTextFieldConfiguration
+
+
+class IntegerField(FieldProperties):
+    type: Literal["integer"]
+    configuration: IntegerFieldConfiguration
+
+
+class DecimalField(FieldProperties):
+    type: Literal["decimal"]
+    configuration: DecimalFieldConfiguration
+
+
+class DateField(FieldProperties):
+    type: Literal["date"]
+    configuration: DateFieldConfiguration
+
+
+class BooleanField(FieldProperties):
+    type: Literal["boolean"]
+    configuration: BooleanFieldConfiguration
+
+
+class EnumField(FieldProperties):
+    type: Literal["enum"]
+    configuration: EnumFieldConfiguration
+
+
+class AssetField(FieldProperties):
+    type: Literal["asset"]
+    configuration: AssetFieldConfiguration
+
+
+class RelationField(FieldProperties):
+    type: Literal["relation"]
+    configuration: RelationFieldConfiguration
+
+
+class JsonField(FieldProperties):
+    type: Literal["json"]
+    configuration: JsonFieldConfiguration
+
+
+class TextFieldConfiguration(NoheadModel):
+    """Plain text up to 10,000 characters, or a `format`."""
+
+    description: str | None = None
+    """Help text for editors."""
+    searchable: bool | None = None
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: bool | None = None
+    """API searches can filter on it. Default false."""
+    sortable: bool | None = None
+    """API searches can sort on it (one value only). Default false."""
+    min_length: int | None = None
+    max_length: int | None = None
+    format: str | None = None
+    """`slug` (always unique, one value), `url` (absolute http or https) or `email`; each sets
+    its own length limits.
+    """
+    unique: bool | None = None
+    """No two active records of the collection share a value (one value only; a slug is always
+    unique).
+    """
+
+
+class LongTextFieldConfiguration(NoheadModel):
+    """Text up to 100,000 characters."""
+
+    description: str | None = None
+    """Help text for editors."""
+    searchable: bool | None = None
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: bool | None = None
+    """API searches can filter on it. Default false."""
+    sortable: bool | None = None
+    """API searches can sort on it (one value only). Default false."""
+    min_length: int | None = None
+    max_length: int | None = None
+
+
+class RichTextFieldConfiguration(NoheadModel):
+    description: str | None = None
+    """Help text for editors."""
+    searchable: bool | None = None
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: bool | None = None
+    """API searches can filter on it. Default false."""
+    sortable: bool | None = None
+    """API searches can sort on it (one value only). Default false."""
+
+
+class IntegerFieldConfiguration(NoheadModel):
+    description: str | None = None
+    """Help text for editors."""
+    searchable: bool | None = None
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: bool | None = None
+    """API searches can filter on it. Default false."""
+    sortable: bool | None = None
+    """API searches can sort on it (one value only). Default false."""
+    min: int | None = None
+    max: int | None = None
+    unique: bool | None = None
+    """No two active records of the collection share a value (one value only)."""
+
+
+class DecimalFieldConfiguration(NoheadModel):
+    description: str | None = None
+    """Help text for editors."""
+    searchable: bool | None = None
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: bool | None = None
+    """API searches can filter on it. Default false."""
+    sortable: bool | None = None
+    """API searches can sort on it (one value only). Default false."""
+    min: float | None = None
+    max: float | None = None
+
+
+class DateFieldConfiguration(NoheadModel):
+    description: str | None = None
+    """Help text for editors."""
+    searchable: bool | None = None
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: bool | None = None
+    """API searches can filter on it. Default false."""
+    sortable: bool | None = None
+    """API searches can sort on it (one value only). Default false."""
+    include_time: bool | None = None
+    """Holds a moment (ISO 8601 with an offset) instead of a calendar date; changing it is a
+    field migration.
+    """
+    time_zone: str | None = None
+    """An IANA time zone (`Europe/Copenhagen`) moments are returned in; changing it never
+    rewrites values.
+    """
+
+
+class BooleanFieldConfiguration(NoheadModel):
+    description: str | None = None
+    """Help text for editors."""
+    searchable: bool | None = None
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: bool | None = None
+    """API searches can filter on it. Default false."""
+    sortable: bool | None = None
+    """API searches can sort on it (one value only). Default false."""
+
+
+class EnumFieldConfiguration(NoheadModel):
+    description: str | None = None
+    """Help text for editors."""
+    searchable: bool | None = None
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: bool | None = None
+    """API searches can filter on it. Default false."""
+    sortable: bool | None = None
+    """API searches can sort on it (one value only). Default false."""
+    options: list[str]
+
+
+class AssetFieldConfiguration(NoheadModel):
+    description: str | None = None
+    """Help text for editors."""
+    searchable: bool | None = None
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: bool | None = None
+    """API searches can filter on it. Default false."""
+    sortable: bool | None = None
+    """API searches can sort on it (one value only). Default false."""
+    accepted_types: list[str] | None = None
+    """MIME types or `type/*` wildcards newly written values must have (`["image/*",
+    "application/pdf"]`); any file when absent.
+    """
+
+
+class RelationFieldConfiguration(NoheadModel):
+    description: str | None = None
+    """Help text for editors."""
+    searchable: bool | None = None
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: bool | None = None
+    """API searches can filter on it. Default false."""
+    sortable: bool | None = None
+    """API searches can sort on it (one value only). Default false."""
+    target_collection_id: str
+    """The collection (same project) whose records it points at."""
+
+
+class JsonFieldConfiguration(NoheadModel):
+    description: str | None = None
+    """Help text for editors."""
+    searchable: bool | None = None
+    """Search words match the field (API searches). Default true for text, long_text, rich_text
+    and enum.
+    """
+    filterable: bool | None = None
+    """API searches can filter on it. Default false."""
+    sortable: bool | None = None
+    """API searches can sort on it (one value only). Default false."""
 
 
 class RecordCount(NoheadModel):
@@ -121,15 +330,18 @@ class RecordCount(NoheadModel):
     count: int
 
 
-class FieldCreate(NoheadModel):
+class FieldCreateProperties(NoheadModel):
+    """What every new field takes; `FieldCreate` adds its `type` and that type's
+    `configuration`.
+    """
+
     name: str
-    api_key: str
+    key: str
     """The field's key in records' `data`, filters and sorts. Reserved for records' own
     attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`,
     `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`,
     `revision` and `schema_version`.
     """
-    type: FieldType
     required: bool | None = None
     """Every record must have a value. Not available for boolean fields (a boolean is true or
     false; no value reads as false).
@@ -139,28 +351,81 @@ class FieldCreate(NoheadModel):
     string with `blank_value`). Not available for boolean, long_text, rich_text and json
     fields.
     """
-    configuration: dict[str, Any] | None = None
+
+
+class TextFieldCreate(FieldCreateProperties):
+    type: Literal["text"]
+    configuration: TextFieldConfiguration | None = None
+
+
+class LongTextFieldCreate(FieldCreateProperties):
+    type: Literal["long_text"]
+    configuration: LongTextFieldConfiguration | None = None
+
+
+class RichTextFieldCreate(FieldCreateProperties):
+    type: Literal["rich_text"]
+    configuration: RichTextFieldConfiguration | None = None
+
+
+class IntegerFieldCreate(FieldCreateProperties):
+    type: Literal["integer"]
+    configuration: IntegerFieldConfiguration | None = None
+
+
+class DecimalFieldCreate(FieldCreateProperties):
+    type: Literal["decimal"]
+    configuration: DecimalFieldConfiguration | None = None
+
+
+class DateFieldCreate(FieldCreateProperties):
+    type: Literal["date"]
+    configuration: DateFieldConfiguration | None = None
+
+
+class BooleanFieldCreate(FieldCreateProperties):
+    type: Literal["boolean"]
+    configuration: BooleanFieldConfiguration | None = None
+
+
+class EnumFieldCreate(FieldCreateProperties):
+    type: Literal["enum"]
+    configuration: EnumFieldConfiguration
+
+
+class AssetFieldCreate(FieldCreateProperties):
+    type: Literal["asset"]
+    configuration: AssetFieldConfiguration | None = None
+
+
+class RelationFieldCreate(FieldCreateProperties):
+    type: Literal["relation"]
+    configuration: RelationFieldConfiguration
+
+
+class JsonFieldCreate(FieldCreateProperties):
+    type: Literal["json"]
+    configuration: JsonFieldConfiguration | None = None
 
 
 class FieldUpdate(NoheadModel):
+    """Renames, describes or loosens a field. A change to its `type` or `multiple` rewrites
+    record values, so it is a field migration (`POST /v1/fields/{id}/migrations`); either
+    key here is `400` `unknown_parameter`, saying so.
+    """
+
     name: str | None = None
-    api_key: str | None = None
+    key: str | None = None
     """The field's key in records' `data`, filters and sorts. Reserved for records' own
     attributes, and a few kept for later: `id`, `object`, `collection`, `data`, `status`,
     `published_at`, `created_at`, `updated_at`, `deleted`, `deleted_at`, `purge_after`,
     `revision` and `schema_version`.
     """
-    type: FieldType | None = None
     required: bool | None = None
     """Every record must have a value. Not available for boolean fields (a boolean is true or
     false; no value reads as false).
     """
-    multiple: bool | None = None
-    """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
-    string with `blank_value`). Not available for boolean, long_text, rich_text and json
-    fields.
-    """
-    configuration: dict[str, Any] | None = None
+    configuration: FieldConfiguration | None = None
 
 
 class FieldList(NoheadModel):
@@ -216,12 +481,12 @@ class CollectionList(NoheadModel):
 class SchemaDefinitionFields(NoheadModel):
     id: str
     name: str
-    api_key: str
+    key: str
     type: FieldType
     required: bool
     multiple: bool
     position: int
-    configuration: dict[str, Any]
+    configuration: FieldConfiguration
     deleted_at: NullableTimestamp
 
 
@@ -282,7 +547,7 @@ class SchemaChangeList(NoheadModel):
 
 class FieldDefinition(NoheadModel):
     type: FieldType
-    configuration: dict[str, Any]
+    configuration: FieldConfiguration
     multiple: bool
     """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
     string with `blank_value`). Not available for boolean, long_text, rich_text and json
@@ -295,7 +560,7 @@ class FieldMigrationRequest(NoheadModel):
     """The parts of the definition to change; omitted parts stay as they are."""
 
     type: FieldType | None = None
-    configuration: dict[str, Any] | None = None
+    configuration: FieldConfiguration | None = None
     """The complete new configuration. When the type changes and this is omitted, only
     `description`, `searchable`, `filterable` and `sortable` carry over.
     """
@@ -491,7 +756,7 @@ class Draft(NoheadModel):
     data: RecordData
     """The record's values as they read after the merge."""
     changed_fields: list[str]
-    """API keys of the fields the draft changes."""
+    """Keys of the fields the draft changes."""
     schedule: DraftSchedule
     created_by: Actor
     edited_by: list[Actor]
@@ -558,11 +823,11 @@ class Record(NoheadModel):
     data: RecordData
     expanded: dict[str, Record | Asset | list[Record | Asset] | None] | None = None
     """Only with `expand`: what each requested relation, asset or rich text field points at,
-    keyed by field API key: records for relation fields, assets for asset fields. A single
-    value is the object, or null when it no longer exists; a multiple value is a list of
-    those that still exist. For a rich text field, the list of assets its images show, in
-    document order, leaving out those that no longer exist. Expanded records are not
-    expanded further.
+    keyed by field key: records for relation fields, assets for asset fields. A single value
+    is the object, or null when it no longer exists; a multiple value is a list of those
+    that still exist. For a rich text field, the list of assets its images show, in document
+    order, leaving out those that no longer exist. Expanded records are not expanded
+    further.
     """
     created_at: Timestamp
     updated_at: Timestamp
@@ -603,9 +868,9 @@ class RecordRevisionProperties(NoheadModel):
     schema_version: int
     reverted_to_revision: int | None
     changed_fields: list[str]
-    """API keys of changed fields, and changed attributes."""
+    """Keys of changed fields, and changed attributes."""
     redacted_fields: list[str]
-    """API keys of fields whose values in this revision were redacted (owners and admins redact
+    """Keys of fields whose values in this revision were redacted (owners and admins redact
     them in the web app); those values read `{"$redacted": true}`.
     """
     draft: MergedDraft | None
@@ -1040,7 +1305,7 @@ class ImageUrl(NoheadModel):
 class AssetUsageUses(NoheadModel):
     record: Record
     fields: list[str]
-    """API keys of the record's fields that use the asset, in its content or its draft."""
+    """Keys of the record's fields that use the asset, in its content or its draft."""
 
 
 class AssetUsage(NoheadModel):
@@ -1091,7 +1356,7 @@ class AssetUploadTarget(NoheadModel):
 
 class ErrorDetail(NoheadModel):
     field: str | None = None
-    """API key of the offending field or parameter, when applicable."""
+    """Key of the offending field or parameter, when applicable."""
     code: str
     """Machine-readable error code, e.g. `required`."""
     message: str
@@ -1123,6 +1388,45 @@ Timestamp: TypeAlias = datetime
 NullableTimestamp: TypeAlias = datetime | None
 RecordFilterValue: TypeAlias = str | RecordFilterValueObject
 FieldType: TypeAlias = str
+Field: TypeAlias = (
+    TextField
+    | LongTextField
+    | RichTextField
+    | IntegerField
+    | DecimalField
+    | DateField
+    | BooleanField
+    | EnumField
+    | AssetField
+    | RelationField
+    | JsonField
+)
+FieldConfiguration: TypeAlias = (
+    TextFieldConfiguration
+    | LongTextFieldConfiguration
+    | RichTextFieldConfiguration
+    | IntegerFieldConfiguration
+    | DecimalFieldConfiguration
+    | DateFieldConfiguration
+    | BooleanFieldConfiguration
+    | EnumFieldConfiguration
+    | AssetFieldConfiguration
+    | RelationFieldConfiguration
+    | JsonFieldConfiguration
+)
+FieldCreate: TypeAlias = (
+    TextFieldCreate
+    | LongTextFieldCreate
+    | RichTextFieldCreate
+    | IntegerFieldCreate
+    | DecimalFieldCreate
+    | DateFieldCreate
+    | BooleanFieldCreate
+    | EnumFieldCreate
+    | AssetFieldCreate
+    | RelationFieldCreate
+    | JsonFieldCreate
+)
 SchemaChange: TypeAlias = SchemaChangeProperties
 RecordRevisionOperation: TypeAlias = str
 Via: TypeAlias = str
