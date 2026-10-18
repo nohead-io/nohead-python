@@ -65,7 +65,7 @@ def every_call(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.records.scheduled_changes("posts", sort="-at"),
         lambda: nohead.records.drafts("rec_01J9ZQ3F8X"),
         lambda: nohead.drafts.create("rec_01J9ZQ3F8X", data={"title": "Hey"}),
-        lambda: nohead.drafts.list("posts", record_id=["rec_01J9ZQ3F8X"]),
+        lambda: nohead.drafts.list("posts"),
         lambda: nohead.drafts.get("drf_01J9ZQ3F8X", expand=["author"]),
         lambda: nohead.drafts.update("drf_01J9ZQ3F8X", data={"title": "Hey there"}, if_match=1),
         lambda: nohead.drafts.merge("drf_01J9ZQ3F8X"),
@@ -108,7 +108,9 @@ def every_call(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.fields.order("posts"),
         lambda: nohead.fields.reorder("posts", field_ids=["fld_01J9ZQ3F8X"]),
         lambda: nohead.fields.remove_alias("fld_01J9ZQ3F8X", "old_title"),
-        lambda: nohead.fields.migrate("fld_01J9ZQ3F8X", type="long_text", dry_run=True),
+        lambda: nohead.migrations.create(
+            "posts", field_id="fld_01J9ZQ3F8X", type="long_text", dry_run=True
+        ),
         lambda: nohead.migrations.list("posts"),
         lambda: nohead.migrations.get("mig_01J9ZQ3F8X"),
         lambda: nohead.migrations.cancel("mig_01J9ZQ3F8X"),
@@ -138,7 +140,7 @@ def every_call(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.webhooks.deliveries.list("wh_01J9ZQ3F8X", status="failed"),
         lambda: nohead.webhooks.deliveries.get("whd_01J9ZQ3F8X"),
         lambda: nohead.webhooks.deliveries.retry("whd_01J9ZQ3F8X"),
-        lambda: nohead.audit_events.list(filter={"type": "record.*"}, sort="-id"),
+        lambda: nohead.audit_events.list(filter={"type": "record.*"}, sort="-created_at"),
         lambda: nohead.feature_flags.list(),
         lambda: nohead.me.get(),
         lambda: nohead.health.check(),

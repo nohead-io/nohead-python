@@ -107,13 +107,12 @@ def every_parameter(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.collections.list(limit=5, cursor="cur_x"),
         lambda: nohead.records.scheduled_changes("posts", limit=5, cursor="cur_x"),
         lambda: nohead.records.drafts("rec_01J9ZQ3F8X", limit=5, cursor="cur_x"),
-        lambda: nohead.drafts.list(
-            "posts", record_id="rec_01J9ZQ3F8X", sort="updated_at", limit=5, cursor="cur_x"
-        ),
+        lambda: nohead.drafts.list("posts", sort="updated_at", limit=5, cursor="cur_x"),
         lambda: nohead.collections.schema_changes.list("posts", limit=5, cursor="cur_x"),
         lambda: nohead.fields.list("posts", limit=5, cursor="cur_x"),
         lambda: nohead.migrations.list("posts", limit=5, cursor="cur_x"),
-        lambda: nohead.assets.list(content_type=["image/*"], limit=5, cursor="cur_x"),
+        lambda: nohead.assets.list(content_type="image/*", limit=5, cursor="cur_x"),
+        lambda: nohead.assets.list(content_type=["image/*", "application/pdf"]),
         lambda: nohead.assets.image_url("ast_01J9ZQ3F8X", height=100, fit="cover", quality=80),
         lambda: nohead.webhooks.list(limit=5, cursor="cur_x"),
         lambda: nohead.webhooks.deliveries.list("wh_01J9ZQ3F8X", limit=5, cursor="cur_x"),

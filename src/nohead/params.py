@@ -203,8 +203,10 @@ class FieldCreate(TypedDict):
 
 
 class FieldMigrationRequest(TypedDict):
-    """The parts of the definition to change; omitted parts stay as they are."""
+    """The field, and the parts of its definition to change; omitted parts stay as they are."""
 
+    field_id: str
+    """One of the collection's fields (`422` otherwise)."""
     type: NotRequired[FieldType]
     configuration: NotRequired[FieldConfiguration]
     """The complete new configuration. When the type changes and this is omitted, only

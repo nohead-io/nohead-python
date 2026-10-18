@@ -5,6 +5,27 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- **Breaking:** a field migration is created under its collection:
+  `migrations.create(collection, field_id=..., ..., dry_run=...)`
+  (`POST /v1/collections/{collection_id}/migrations`) replaces
+  `fields.migrate(field, ...)`, which is gone. It returns the same: a
+  `FieldMigrationPreview` for a dry run, a `FieldMigration` otherwise.
+- **Breaking:** `drafts.list` no longer takes `record_id`; a record's draft
+  is `records.drafts(record)`.
+- **Breaking:** `assets.list(content_type=...)` takes one MIME type or
+  `type/*` wildcard as a string (`"image/*"`), or several as a list
+  (`["image/*", "application/pdf"]`, up to 50). A comma-separated string is
+  no longer split into several.
+- **Breaking:** `audit_events.list` sorts by `created_at` or `-created_at`
+  (was `id` or `-id`), and `records.list` no longer sorts by `id`.
+- **Breaking:** a webhook event's `actor` and `via` are always there:
+  `event.actor` is an `Actor`, no longer None, and `event.via` is None only
+  when the client is not known. An event without them is returned
+  unvalidated, with a `NoheadWarning`. `via` is no longer `import` or
+  `migration`.
+
 ## 0.4.0
 
 - **Breaking:** a field's `api_key` is its `key` (in fields, their aliases,

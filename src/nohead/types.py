@@ -93,8 +93,8 @@ class SearchFilter(TypedDict, total=False):
 
 
 RecordSort: TypeAlias = str
-"""`id`, `created_at`, `updated_at`, `published_at` or a field's API key (records
-without a value last); `-` for descending, e.g. `"-published_at"`."""
+"""`created_at`, `updated_at`, `published_at` or a field's key (records without a value
+last); `-` for descending, e.g. `"-published_at"`."""
 
 
 class HasRevision(Protocol):

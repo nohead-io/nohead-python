@@ -43,26 +43,17 @@ class AsyncDrafts(AsyncResource):
         self,
         collection: str,
         *,
-        record_id: str | Sequence[str] | None = None,
         sort: Literal["updated_at", "-updated_at"] | None = None,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> AsyncPaginator[Draft]:
-        """A collection's drafts, most recently changed first. `record_id` narrows
-        them to one record, or to several (1 to 100; an empty list is a ValueError,
-        since it would match no record)."""
-        filter: dict[str, Any] | None = None
-        if isinstance(record_id, str):
-            filter = {"record_id": record_id}
-        elif record_id is not None:
-            if not record_id:
-                raise ValueError("record_id needs at least one record ID")
-            filter = {"record_id": {"in": list(record_id)}}
+        """A collection's drafts, most recently changed first. One record's draft is
+        `records.drafts(record)`."""
         return self._client.paginate(
             "drafts_list",
             item=Draft,
             path={"collection_id": collection},
-            query={"filter": filter, "sort": sort, "limit": limit, "cursor": cursor},
+            query={"sort": sort, "limit": limit, "cursor": cursor},
         )
 
     async def get(self, draft: str, *, expand: Sequence[str] | None = None) -> Draft:
