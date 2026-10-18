@@ -113,7 +113,7 @@ nohead.drafts.merge(draft.id)  # or drafts.schedule(draft.id, merge_at=...)
 
 - A record has at most one draft; starting a second is a `ConflictError` (detail code `draft_exists`, with its `draft_id`).
 - A merge changes content only: a live record stays live, an unpublished one unpublished. Publishing a live record with a pending draft is a `ConflictError` (`draft_pending`).
-- `records.drafts(id)` lists a record's draft, and `drafts.list(collection, record_id=...)` a collection's (`record_id` takes up to 100 IDs).
+- `records.drafts(id)` lists a record's draft, and `drafts.list(collection)` a collection's.
 - `drafts.discard` deletes one for good.
 
 ## Pagination
@@ -274,8 +274,8 @@ nohead.collections.create(
 nohead.fields.create("posts", name="Summary", key="summary", type="long_text")
 
 # Changes that rewrite records go through a migration; preview first
-preview = nohead.fields.migrate("fld_...", type="long_text", dry_run=True)
-migration = nohead.fields.migrate("fld_...", type="long_text")
+preview = nohead.migrations.create("posts", field_id="fld_...", type="long_text", dry_run=True)
+migration = nohead.migrations.create("posts", field_id="fld_...", type="long_text")
 nohead.migrations.get(migration.id)
 ```
 
@@ -296,7 +296,7 @@ if event.type == "record.published" and event.record:
 
 Event types are the activity log's (`record.published`, `record.restored`, `field.updated`, `asset.purged`, ...), and a webhook subscribes to types or wildcards (`record.*`, `*`). `unwrap` checks the signature and the timestamp (Standard Webhooks), and raises `WebhookVerificationError` if either is off. After `rotate_secret`, requests carry a signature for the old secret and the new one for 24 hours, so switch the receiver's secret within that day (or end it sooner with `webhooks.secrets.retire`). Pass the raw body: parsing and re-serializing JSON changes the bytes.
 
-`event.data` is the payload. For convenience, `event.record`, `event.asset`, `event.collection`, `event.schema_change`, `event.field`, `event.draft` and `event.webhook` give its parts, and are None when the event has no such part; so do the IDs `event.draft_id` and `event.record_id` (`draft.*`, also once the draft is gone) and `event.field_id` (`field.*`). A purged asset (`asset.purged`) is only its `id` and `object`, an `AssetEventDataAsset`. `event.actor` and `event.via` say who made the change, through which client. Like responses, an event that doesn't match the models is still returned, unvalidated, with a `NoheadWarning`.
+`event.data` is the payload. For convenience, `event.record`, `event.asset`, `event.collection`, `event.schema_change`, `event.field`, `event.draft` and `event.webhook` give its parts, and are None when the event has no such part; so do the IDs `event.draft_id` and `event.record_id` (`draft.*`, also once the draft is gone) and `event.field_id` (`field.*`). A purged asset (`asset.purged`) is only its `id` and `object`, an `AssetEventDataAsset`. `event.actor` and `event.via` say who made the change, through which client (`via` is None when not known). Like responses, an event that doesn't match the models is still returned, unvalidated, with a `NoheadWarning`.
 
 It's also available as `nohead.webhooks.unwrap(...)` on a client. Events can arrive more than once, so deduplicate by the `webhook-id` header.
 
@@ -321,8 +321,8 @@ It's also available as `nohead.webhooks.unwrap(...)` on a client. Events can arr
 | `collections` | `list`, `get`, `create`, `update`, `delete`, `restore`, `schema` |
 | `collections.schema_changes` | `list`, `get` |
 | `collections.search_index` | `get`, `rebuild` |
-| `fields` | `list`, `get`, `create`, `update`, `delete`, `restore`, `order`, `reorder`, `remove_alias`, `migrate` |
-| `migrations` | `list`, `get`, `cancel` |
+| `fields` | `list`, `get`, `create`, `update`, `delete`, `restore`, `order`, `reorder`, `remove_alias` |
+| `migrations` | `create`, `list`, `get`, `cancel` |
 | `assets` | `upload`, `create_upload`, `complete`, `list`, `get`, `usage`, `delete`, `restore`, `purge`, `image_url`, `download_url` |
 | `webhooks` | `list`, `get`, `create`, `update`, `delete`, `restore`, `rotate_secret`, `test`, `unwrap` |
 | `webhooks.secrets` | `list`, `retire` |

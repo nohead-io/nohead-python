@@ -51,10 +51,11 @@ class WebhookEvent(NoheadModel):
     `collection.*`, `field.*`, `asset.*`, or `webhook.test`."""
     created_at: datetime
     project_id: str
-    actor: Actor | None = None
+    actor: Actor
     """Who made the change. An integration that writes back can skip its own."""
-    via: str | None = None
-    """The client the change came through, when known."""
+    via: str | None
+    """The client the change came through (`ui`, `api`, `cli`, `sdk`, `system` or
+    `scheduler`), or None when not known."""
     data: dict[str, Any]
 
     @property

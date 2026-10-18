@@ -150,6 +150,16 @@ def test_audit_events_filter_several_resource_types_and_a_time_range() -> None:
     assert dict(calls.calls[1].url.params) == {"filter[resource_type]": "record"}
 
 
+def test_lists_assets_of_one_type_or_several() -> None:
+    nohead, calls = make_sync([page([], None), page([], None)])
+    nohead.assets.list(content_type="image/*").data  # noqa: B018 (fetches it)
+    nohead.assets.list(content_type=["image/*", "application/pdf"]).data  # noqa: B018
+    assert dict(calls.calls[0].url.params) == {"filter[content_type]": "image/*"}
+    assert dict(calls.calls[1].url.params) == {
+        "filter[content_type][in]": "image/*,application/pdf"
+    }
+
+
 def test_record_batch_results_that_failed() -> None:
     batch = {
         "object": "record_batch",
@@ -207,9 +217,10 @@ def test_change_note_in_any_language_percent_encoded() -> None:
 def test_dry_runs_are_query_parameters() -> None:
     preview = {"object": "field_migration_preview", "field_id": "fld_1"}
     nohead, calls = make_sync([json_response(200, preview)])
-    nohead.fields.migrate("fld_1", type="integer", dry_run=True)
+    nohead.migrations.create("posts", field_id="fld_1", type="integer", dry_run=True)
+    assert calls.calls[0].url.path == "/v1/collections/posts/migrations"
     assert calls.calls[0].url.params["dry_run"] == "true"
-    assert calls.body(0) == {"type": "integer"}
+    assert calls.body(0) == {"field_id": "fld_1", "type": "integer"}
 
 
 def test_diff_names_its_revisions() -> None:

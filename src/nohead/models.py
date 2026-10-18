@@ -557,8 +557,10 @@ class FieldDefinition(NoheadModel):
 
 
 class FieldMigrationRequest(NoheadModel):
-    """The parts of the definition to change; omitted parts stay as they are."""
+    """The field, and the parts of its definition to change; omitted parts stay as they are."""
 
+    field_id: str
+    """One of the collection's fields (`422` otherwise)."""
     type: FieldType | None = None
     configuration: FieldConfiguration | None = None
     """The complete new configuration. When the type changes and this is omitted, only
@@ -1160,11 +1162,11 @@ class WebhookEventPayload(NoheadModel):
     type: WebhookEventType | str
     created_at: Timestamp
     project_id: str
-    actor: Actor | None = None
-    """Who made the change. Always sent."""
-    via: Via | None = None
-    """The client the change came through (null when not known). Always sent. An integration
-    that writes back can skip changes made with its own API key (`actor`).
+    actor: Actor
+    """Who made the change."""
+    via: Via | None
+    """The client the change came through (null when not known). An integration that writes
+    back can skip changes made with its own API key (`actor`).
     """
     data: (
         RecordEventData

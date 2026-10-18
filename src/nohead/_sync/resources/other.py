@@ -19,7 +19,7 @@ class AuditEvents(Resource):
         self,
         *,
         filter: AuditEventFilter | None = None,
-        sort: Literal["id", "-id"] | None = None,
+        sort: Literal["created_at", "-created_at"] | None = None,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> Page[AuditEvent]:

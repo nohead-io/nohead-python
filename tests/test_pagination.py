@@ -59,16 +59,6 @@ def test_search_totals() -> None:
     assert calls.calls[0].url.params["filter[collection][in]"] == "posts,pages"
 
 
-def test_lists_drafts_by_record() -> None:
-    nohead, calls = make_sync([page([], None), page([], None)])
-    nohead.drafts.list("posts", record_id="rec_1").data  # noqa: B018 (fetches it)
-    nohead.drafts.list("posts", record_id=["rec_1", "rec_2"]).data  # noqa: B018
-    assert calls.calls[0].url.params["filter[record_id]"] == "rec_1"
-    assert calls.calls[1].url.params["filter[record_id][in]"] == "rec_1,rec_2"
-    with pytest.raises(ValueError, match="at least one"):
-        nohead.drafts.list("posts", record_id=[])
-
-
 async def test_async_iterates_across_pages() -> None:
     nohead, calls = make_async([page([record("rec_1")], "c2"), page([record("rec_2")], None)])
     ids = [r.id async for r in nohead.records.list("posts")]

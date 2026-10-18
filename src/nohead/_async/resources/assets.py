@@ -94,14 +94,19 @@ class AsyncAssets(AsyncResource):
         limit: int | None = None,
         cursor: str | None = None,
     ) -> AsyncPaginator[Asset]:
-        """`content_type` lists only assets of those MIME types or `type/*` wildcards
-        (`["image/*", "application/pdf"]`), for example the ones an asset field accepts
-        (its `accepted_types`)."""
+        """`content_type` lists only assets of a type: a MIME type or a `type/*` wildcard
+        (`"image/*"`), or a list of several (up to 50: `["image/*", "application/pdf"]`),
+        for example the ones an asset field accepts (its `accepted_types`)."""
+        types: str | dict[str, list[str]] | None = (
+            content_type
+            if content_type is None or isinstance(content_type, str)
+            else {"in": list(content_type)}
+        )
         return self._client.paginate(
             "assets_list",
             item=Asset,
             query={
-                "filter": {"content_type": content_type, "deleted": deleted},
+                "filter": {"content_type": types, "deleted": deleted},
                 "limit": limit,
                 "cursor": cursor,
             },

@@ -210,7 +210,7 @@ class AsyncFields(AsyncResource):
         **params: Unpack[FieldUpdate],
     ) -> Field:
         """Renames, describes or loosens a field. Changes that rewrite record values
-        (type, `multiple`, tighter rules) are `migrate`."""
+        (type, `multiple`, tighter rules) are `migrations.create`."""
         return await self._client.request(
             "fields_update",
             cast=Field,
@@ -279,47 +279,6 @@ class AsyncFields(AsyncResource):
             idempotency_key=idempotency_key,
         )
 
-    @overload
-    async def migrate(
-        self,
-        field: str,
-        *,
-        dry_run: Literal[True],
-        idempotency_key: str | None = None,
-        change_note: str | None = None,
-        **params: Unpack[FieldMigrationRequest],
-    ) -> FieldMigrationPreview: ...
-    @overload
-    async def migrate(
-        self,
-        field: str,
-        *,
-        dry_run: Literal[False] = False,
-        idempotency_key: str | None = None,
-        change_note: str | None = None,
-        **params: Unpack[FieldMigrationRequest],
-    ) -> FieldMigration: ...
-    async def migrate(
-        self,
-        field: str,
-        *,
-        dry_run: bool = False,
-        idempotency_key: str | None = None,
-        change_note: str | None = None,
-        **params: Unpack[FieldMigrationRequest],
-    ) -> FieldMigration | FieldMigrationPreview:
-        """Starts a field migration (type, `multiple`, tighter configuration or a
-        backfill) that rewrites every record. With `dry_run=True`, previews it."""
-        return await self._client.request(
-            "fields_migrate",
-            cast=FieldMigrationPreview if dry_run else FieldMigration,
-            path={"field_id": field},
-            query={"dry_run": dry_run or None},
-            body=params,
-            idempotency_key=idempotency_key,
-            change_note=change_note,
-        )
-
 
 class AsyncMigrations(AsyncResource):
     """Field migrations. While one runs, its collection is read-only."""
@@ -332,6 +291,48 @@ class AsyncMigrations(AsyncResource):
             item=FieldMigration,
             path={"collection_id": collection},
             query={"limit": limit, "cursor": cursor},
+        )
+
+    @overload
+    async def create(
+        self,
+        collection: str,
+        *,
+        dry_run: Literal[True],
+        idempotency_key: str | None = None,
+        change_note: str | None = None,
+        **params: Unpack[FieldMigrationRequest],
+    ) -> FieldMigrationPreview: ...
+    @overload
+    async def create(
+        self,
+        collection: str,
+        *,
+        dry_run: Literal[False] = False,
+        idempotency_key: str | None = None,
+        change_note: str | None = None,
+        **params: Unpack[FieldMigrationRequest],
+    ) -> FieldMigration: ...
+    async def create(
+        self,
+        collection: str,
+        *,
+        dry_run: bool = False,
+        idempotency_key: str | None = None,
+        change_note: str | None = None,
+        **params: Unpack[FieldMigrationRequest],
+    ) -> FieldMigration | FieldMigrationPreview:
+        """Starts a migration of one of the collection's fields (`field_id`): a new type,
+        `multiple`, a tighter configuration or a backfill, rewriting every record. With
+        `dry_run=True`, previews it."""
+        return await self._client.request(
+            "migrations_create",
+            cast=FieldMigrationPreview if dry_run else FieldMigration,
+            path={"collection_id": collection},
+            query={"dry_run": dry_run or None},
+            body=params,
+            idempotency_key=idempotency_key,
+            change_note=change_note,
         )
 
     async def get(self, migration: str) -> FieldMigration:

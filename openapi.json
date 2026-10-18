@@ -122,7 +122,7 @@
           {
             "name": "sort",
             "in": "query",
-            "description": "`id`, `created_at`, `updated_at`, `published_at` (unpublished\nrecords first), or the key of a text, number, boolean, date or\nenum field with one value (records without a value last, in both\ndirections; text by code point). `-` for descending.\n",
+            "description": "`created_at`, `updated_at`, `published_at` (unpublished records\nfirst), or the key of a text, number, boolean, date or\nenum field with one value (records without a value last, in both\ndirections; text by code point). `-` for descending.\n",
             "schema": {
               "type": "string",
               "pattern": "^-?[a-z][a-z0-9_]*$",
@@ -1230,43 +1230,11 @@
       "get": {
         "operationId": "drafts_list",
         "summary": "List drafts",
-        "description": "The drafts of the collection's records, most recently changed first,\nfor \"changes pending\" badges: a record's representation is only its\ncontent. `filter[record_id]` takes a record ID, or up to 100 with\n`filter[record_id][in]=rec_1,rec_2`. Deleted records' drafts are left\nout. Published-only API keys get `403`.\n",
+        "description": "The drafts of the collection's records, most recently changed first,\nfor \"changes pending\" badges: a record's representation is only its\ncontent. One record's draft is `GET /v1/records/{record_id}/drafts`.\nDeleted records' drafts are left out. Published-only API keys get\n`403`.\n",
         "tags": [
           "drafts"
         ],
         "parameters": [
-          {
-            "name": "filter",
-            "in": "query",
-            "style": "deepObject",
-            "explode": true,
-            "schema": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "record_id": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "required": [
-                        "in"
-                      ],
-                      "properties": {
-                        "in": {
-                          "type": "string",
-                          "description": "Up to 100 comma-separated record IDs."
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
           {
             "name": "sort",
             "in": "query",
@@ -2248,7 +2216,7 @@
       "patch": {
         "operationId": "fields_update",
         "summary": "Update a field",
-        "description": "Changes that keep existing record values valid. After a `key`\nchange the old key keeps working for 6 months as an alias (see\n`aliases`), so clients have time to move. Changing `type` or `multiple`, or a\n`configuration` that existing active records would violate, is rejected\nwith `requires_migration`: use `POST /v1/fields/{field_id}/migrations`.\n`409` with detail code `deleted` while the field is deleted.\n",
+        "description": "Changes that keep existing record values valid. After a `key`\nchange the old key keeps working for 6 months as an alias (see\n`aliases`), so clients have time to move. Changing `type` or `multiple`, or a\n`configuration` that existing active records would violate, is rejected\nwith `requires_migration`: use `POST /v1/collections/{collection_id}/migrations`.\n`409` with detail code `deleted` while the field is deleted.\n",
         "tags": [
           "fields"
         ],
@@ -2628,18 +2596,11 @@
             "$ref": "#/components/responses/RateLimited"
           }
         }
-      }
-    },
-    "/v1/fields/{field_id}/migrations": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/FieldId"
-        }
-      ],
+      },
       "post": {
-        "operationId": "fields_migrate",
+        "operationId": "migrations_create",
         "summary": "Migrate a field",
-        "description": "Changes a field in a way that rewrites existing record values: its\n`type`, `multiple`, a stricter `configuration`, a date's\n`include_time`, or making it `required` with a `backfill` for records\nthat have no value.\n\nEvery record is checked first. With `dry_run=true` the result is a\npreview: counts per outcome and sample records, nothing written. Without\nit, a migration whose values do not all convert is refused (`422`)\nunless `on_invalid` is `clear`; otherwise it is accepted (`202`) and\napplied in the background. Poll `GET /v1/migrations/{migration_id}`.\n\nWhile a migration is pending or running, schema writes to the collection\nreturn `409`, and record writes do once it is running (a pending one may\nwait for others to finish). A value written while it waits that does\nnot convert fails the migration, or is cleared with `on_invalid: clear`. Each record whose data changes gets a\n`migrate` revision, so cleared or converted values stay recoverable.\nA dry run's preview shows sample record values, so it also needs\n`records:read`.\n",
+        "description": "Changes one of the collection's fields (`field_id`) in a way that\nrewrites existing record values: its `type`, `multiple`, a stricter\n`configuration`, a date's `include_time`, or making it `required`\nwith a `backfill` for records that have no value.\n\nEvery record is checked first. With `dry_run=true` the result is a\npreview: counts per outcome and sample records, nothing written. Without\nit, a migration whose values do not all convert is refused (`422`)\nunless `on_invalid` is `clear`; otherwise it is accepted (`202`) and\napplied in the background. Poll `GET /v1/migrations/{migration_id}`.\n\nWhile a migration is pending or running, schema writes to the collection\nreturn `409`, and record writes do once it is running (a pending one may\nwait for others to finish). A value written while it waits that does\nnot convert fails the migration, or is cleared with `on_invalid: clear`. Each record whose data changes gets a\n`migrate` revision, so cleared or converted values stay recoverable.\nA dry run's preview shows sample record values, so it also needs\n`records:read`.\n",
         "tags": [
           "migrations"
         ],
@@ -4827,10 +4788,10 @@
         "schema": {
           "type": "string",
           "enum": [
-            "id",
-            "-id"
+            "created_at",
+            "-created_at"
           ],
-          "default": "-id"
+          "default": "-created_at"
         }
       },
       "Limit": {
@@ -4877,7 +4838,7 @@
         "in": "query",
         "style": "deepObject",
         "explode": true,
-        "description": "`filter[deleted]=true` lists deleted assets instead.\n`filter[content_type]` lists only assets of those types: comma-separated\nMIME types or `type/*` wildcards, for example the ones an asset field\naccepts (its `accepted_types`).\n",
+        "description": "`filter[deleted]=true` lists deleted assets instead.\n`filter[content_type]` lists only assets of a type: a MIME type or a\n`type/*` wildcard, or several with\n`filter[content_type][in]=image/*,application/pdf`, for example the\nones an asset field accepts (its `accepted_types`).\n",
         "schema": {
           "type": "object",
           "additionalProperties": false,
@@ -4890,9 +4851,29 @@
               ]
             },
             "content_type": {
-              "type": "string",
-              "examples": [
-                "image/*,application/pdf"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "examples": [
+                    "image/*"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "in"
+                  ],
+                  "properties": {
+                    "in": {
+                      "type": "string",
+                      "description": "Up to 50 comma-separated MIME types or `type/*` wildcards.",
+                      "examples": [
+                        "image/*,application/pdf"
+                      ]
+                    }
+                  }
+                }
               ]
             }
           }
@@ -6703,8 +6684,18 @@
       "FieldMigrationRequest": {
         "type": "object",
         "additionalProperties": false,
-        "description": "The parts of the definition to change; omitted parts stay as they are.",
+        "required": [
+          "field_id"
+        ],
+        "description": "The field, and the parts of its definition to change; omitted parts stay as they are.",
         "properties": {
+          "field_id": {
+            "type": "string",
+            "description": "One of the collection's fields (`422` otherwise).",
+            "examples": [
+              "fld_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
+            ]
+          },
           "type": {
             "$ref": "#/components/schemas/FieldType"
           },
@@ -7224,14 +7215,12 @@
       },
       "Via": {
         "type": "string",
-        "description": "The client a change came through; `scheduler` for scheduled changes. `import` and `migration` are not sent yet.",
+        "description": "The client a change came through; `scheduler` for scheduled changes.",
         "enum": [
           "ui",
           "api",
           "cli",
           "sdk",
-          "import",
-          "migration",
           "system",
           "scheduler"
         ]
@@ -8806,6 +8795,8 @@
           "type",
           "created_at",
           "project_id",
+          "actor",
+          "via",
           "data"
         ],
         "description": "The JSON body of every webhook request. It is rendered from the event's\nhistory each time it is sent or shown, so redacted values are redacted\nin it too. `data` depends on the `type`.\n",
@@ -8837,7 +8828,7 @@
             "type": "string"
           },
           "actor": {
-            "description": "Who made the change. Always sent.",
+            "description": "Who made the change.",
             "allOf": [
               {
                 "$ref": "#/components/schemas/Actor"
@@ -8845,7 +8836,7 @@
             ]
           },
           "via": {
-            "description": "The client the change came through (null when not known). Always\nsent. An integration that writes back can skip changes made with its own\nAPI key (`actor`).\n",
+            "description": "The client the change came through (null when not known). An\nintegration that writes back can skip changes made with its own API\nkey (`actor`).\n",
             "oneOf": [
               {
                 "type": "null"

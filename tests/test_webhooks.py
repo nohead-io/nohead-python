@@ -26,6 +26,8 @@ BODY = json.dumps(
         "type": "record.published",
         "created_at": "2026-10-02T12:00:00.000Z",
         "project_id": "prj_1",
+        "actor": {"type": "api_key", "id": "key_1", "name": "Importer"},
+        "via": "sdk",
         "data": {"record": record("rec_1", title="Hi"), "revision": 2, "revision_id": "rev_1"},
     }
 )
@@ -66,8 +68,11 @@ def test_the_standard_webhooks_spec_example(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_returns_the_event() -> None:
-    event = unwrap(BODY, sign(BODY), secret=SECRET)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        event = unwrap(BODY, sign(BODY), secret=SECRET)
     assert event.type == "record.published"
+    assert (event.actor.id, event.via) == ("key_1", "sdk")
     assert event.revision == 2
     assert event.record is not None and event.record.data["title"] == "Hi"
     assert event.asset is None
@@ -77,6 +82,7 @@ def test_draft_events_name_the_draft_once_it_is_gone() -> None:
     body = (
         '{"id":"wev_2","object":"event","type":"draft.discarded",'
         '"created_at":"2026-10-18T12:00:00.000Z","project_id":"prj_1",'
+        '"actor":{"type":"user","id":"usr_1","name":"Ada"},"via":"ui",'
         '"data":{"draft":null,"draft_id":"drf_1","record_id":"rec_1"}}'
     )
     event = unwrap(body, sign(body), secret=SECRET)
@@ -92,8 +98,8 @@ def event(type: str, data: dict[str, object], **envelope: object) -> str:
         "type": type,
         "created_at": "2026-10-18T12:00:00.000Z",
         "project_id": "prj_1",
-        "actor": None,
-        "via": "api",
+        "actor": {"type": "system", "id": None, "name": "System"},
+        "via": None,
         "data": data,
     }
     return json.dumps(body | envelope)
