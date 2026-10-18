@@ -383,64 +383,6 @@
         }
       }
     },
-    "/v1/records/{record_id}/restore": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/RecordId"
-        }
-      ],
-      "post": {
-        "operationId": "records_restore",
-        "summary": "Restore a record",
-        "description": "Brings a soft-deleted record back; restoring one that isn't deleted\nchanges nothing. `409` when another record took one of its `unique`\nvalues meanwhile (detail code `taken`, with that record's `record_id`).\n",
-        "tags": [
-          "records"
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "$ref": "#/components/parameters/IfMatch"
-          },
-          {
-            "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Record"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "402": {
-            "$ref": "#/components/responses/PlanLimitExceeded"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "412": {
-            "$ref": "#/components/responses/PreconditionFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
     "/v1/collections/{collection_id}/records/count": {
       "parameters": [
         {
@@ -550,6 +492,64 @@
           },
           "422": {
             "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/records/{record_id}/restore": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/RecordId"
+        }
+      ],
+      "post": {
+        "operationId": "records_restore",
+        "summary": "Restore a record",
+        "description": "Brings a soft-deleted record back; restoring one that isn't deleted\nchanges nothing. `409` when another record took one of its `unique`\nvalues meanwhile (detail code `taken`, with that record's `record_id`).\n",
+        "tags": [
+          "records"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          },
+          {
+            "$ref": "#/components/parameters/ChangeNote"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Record"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PlanLimitExceeded"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
@@ -2333,16 +2333,44 @@
         }
       }
     },
-    "/v1/fields/{field_id}/restore": {
+    "/v1/collections/{collection_id}/field-order": {
       "parameters": [
         {
-          "$ref": "#/components/parameters/FieldId"
+          "$ref": "#/components/parameters/CollectionRef"
         }
       ],
-      "post": {
-        "operationId": "fields_restore",
-        "summary": "Restore a deleted field",
-        "description": "Brings a deleted field back with its values. `409` (detail code\n`duplicate_values`) for a unique field whose values records share\nnow.\n",
+      "get": {
+        "operationId": "fields_get_order",
+        "summary": "Get the field order",
+        "description": "The collection's active fields in order, the order of the record editor and of schema listings.",
+        "tags": [
+          "fields"
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FieldOrder"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      },
+      "put": {
+        "operationId": "fields_reorder",
+        "summary": "Reorder fields",
+        "description": "Puts the collection's active fields in the given order as one schema\nchange. `field_ids` must list every active field exactly once.\n",
         "tags": [
           "fields"
         ],
@@ -2357,16 +2385,31 @@
             "$ref": "#/components/parameters/ChangeNote"
           }
         ],
-        "responses": {
-          "200": {
-            "description": "The restored field.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Field"
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "field_ids"
+                ],
+                "properties": {
+                  "field_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
                 }
               }
             }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FieldOrder"
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -2454,44 +2497,16 @@
         }
       }
     },
-    "/v1/collections/{collection_id}/field-order": {
+    "/v1/fields/{field_id}/restore": {
       "parameters": [
         {
-          "$ref": "#/components/parameters/CollectionRef"
+          "$ref": "#/components/parameters/FieldId"
         }
       ],
-      "get": {
-        "operationId": "fields_get_order",
-        "summary": "Get the field order",
-        "description": "The collection's active fields in order, the order of the record editor and of schema listings.",
-        "tags": [
-          "fields"
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/FieldOrder"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      },
-      "put": {
-        "operationId": "fields_reorder",
-        "summary": "Reorder fields",
-        "description": "Puts the collection's active fields in the given order as one schema\nchange. `field_ids` must list every active field exactly once.\n",
+      "post": {
+        "operationId": "fields_restore",
+        "summary": "Restore a deleted field",
+        "description": "Brings a deleted field back with its values. `409` (detail code\n`duplicate_values`) for a unique field whose values records share\nnow.\n",
         "tags": [
           "fields"
         ],
@@ -2506,31 +2521,16 @@
             "$ref": "#/components/parameters/ChangeNote"
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "field_ids"
-                ],
-                "properties": {
-                  "field_ids": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
+        "responses": {
+          "200": {
+            "description": "The restored field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Field"
                 }
               }
             }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/FieldOrder"
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
@@ -2908,6 +2908,65 @@
         }
       }
     },
+    "/v1/assets/{asset_id}/complete": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/AssetId"
+        }
+      ],
+      "post": {
+        "operationId": "assets_complete",
+        "summary": "Complete an upload",
+        "description": "Step 2 of uploading a file: verifies the uploaded file (it exists, with the\ndeclared size and content type), reads image dimensions and marks the asset\n`ready`. Only ready assets can be used in records. Safe to retry: a ready\nasset is returned unchanged. `422 upload_missing` means the file has not\nbeen uploaded yet; `422 upload_mismatch` means it differed from what was\ndeclared, and the asset is marked `failed`. `409` if the file was uploaded\nagain while it was being checked: complete it again.\n",
+        "tags": [
+          "assets"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          },
+          {
+            "$ref": "#/components/parameters/ChangeNote"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ready asset.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Asset"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/ValidationFailed"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
     "/v1/assets/{asset_id}": {
       "parameters": [
         {
@@ -2992,65 +3051,6 @@
           },
           "409": {
             "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/assets/{asset_id}/complete": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/AssetId"
-        }
-      ],
-      "post": {
-        "operationId": "assets_complete",
-        "summary": "Complete an upload",
-        "description": "Step 2 of uploading a file: verifies the uploaded file (it exists, with the\ndeclared size and content type), reads image dimensions and marks the asset\n`ready`. Only ready assets can be used in records. Safe to retry: a ready\nasset is returned unchanged. `422 upload_missing` means the file has not\nbeen uploaded yet; `422 upload_mismatch` means it differed from what was\ndeclared, and the asset is marked `failed`. `409` if the file was uploaded\nagain while it was being checked: complete it again.\n",
-        "tags": [
-          "assets"
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The ready asset.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Asset"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
           },
           "429": {
             "$ref": "#/components/responses/RateLimited"
@@ -3443,104 +3443,6 @@
         }
       }
     },
-    "/v1/collections/{collection_id}/search-index": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/CollectionRef"
-        }
-      ],
-      "get": {
-        "operationId": "search_index_get",
-        "summary": "Get search index status",
-        "description": "Whether the collection's search index is built and up to date.",
-        "tags": [
-          "search"
-        ],
-        "responses": {
-          "200": {
-            "description": "The index status.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SearchIndex"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
-    "/v1/collections/{collection_id}/search-index/rebuild": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/CollectionRef"
-        }
-      ],
-      "post": {
-        "operationId": "search_index_rebuild",
-        "summary": "Rebuild the search index",
-        "description": "Rebuilds the collection's index from its records in the background.\nSearch keeps working with the current index until the new one is ready.\nRarely needed: indexes follow record and schema changes automatically.\nLimited to a few an hour per collection and per organization (`429`).\n",
-        "tags": [
-          "search"
-        ],
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/IdempotencyKey"
-          },
-          {
-            "$ref": "#/components/parameters/NoheadClient"
-          },
-          {
-            "$ref": "#/components/parameters/ChangeNote"
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "The rebuild was queued.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SearchIndex"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          }
-        }
-      }
-    },
     "/v1/projects/{project_id}/search": {
       "parameters": [
         {
@@ -3659,6 +3561,104 @@
           },
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    },
+    "/v1/collections/{collection_id}/search-index": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CollectionRef"
+        }
+      ],
+      "get": {
+        "operationId": "search_index_get",
+        "summary": "Get search index status",
+        "description": "Whether the collection's search index is built and up to date.",
+        "tags": [
+          "search"
+        ],
+        "responses": {
+          "200": {
+            "description": "The index status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchIndex"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/collections/{collection_id}/search-index/rebuild": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CollectionRef"
+        }
+      ],
+      "post": {
+        "operationId": "search_index_rebuild",
+        "summary": "Rebuild the search index",
+        "description": "Rebuilds the collection's index from its records in the background.\nSearch keeps working with the current index until the new one is ready.\nRarely needed: indexes follow record and schema changes automatically.\nLimited to a few an hour per collection and per organization (`429`).\n",
+        "tags": [
+          "search"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/NoheadClient"
+          },
+          {
+            "$ref": "#/components/parameters/ChangeNote"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The rebuild was queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchIndex"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
           }
         }
       }
@@ -3934,16 +3934,16 @@
         }
       }
     },
-    "/v1/webhooks/{webhook_id}/restore": {
+    "/v1/webhooks/{webhook_id}/test": {
       "parameters": [
         {
           "$ref": "#/components/parameters/WebhookId"
         }
       ],
       "post": {
-        "operationId": "webhooks_restore",
-        "summary": "Restore a webhook",
-        "description": "Brings a deleted webhook back, with its settings and secrets, until\n`purge_after`. Deliveries that came due while it was deleted failed;\nattempt them again with `POST /v1/webhook-deliveries/{delivery_id}/attempts`.\nRestoring counts against the plan's webhook limit (`402`).\n",
+        "operationId": "webhooks_test",
+        "summary": "Send a test event",
+        "description": "Sends a `webhook.test` event to this webhook only. `409` if it is\ndisabled.\n",
         "tags": [
           "webhooks"
         ],
@@ -3959,12 +3959,12 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "The restored webhook.",
+          "202": {
+            "description": "The queued delivery.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Webhook"
+                  "$ref": "#/components/schemas/WebhookDelivery"
                 }
               }
             }
@@ -3974,9 +3974,6 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
-          },
-          "402": {
-            "$ref": "#/components/responses/PlanLimitExceeded"
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
@@ -4148,16 +4145,16 @@
         }
       }
     },
-    "/v1/webhooks/{webhook_id}/test": {
+    "/v1/webhooks/{webhook_id}/restore": {
       "parameters": [
         {
           "$ref": "#/components/parameters/WebhookId"
         }
       ],
       "post": {
-        "operationId": "webhooks_test",
-        "summary": "Send a test event",
-        "description": "Sends a `webhook.test` event to this webhook only. `409` if it is\ndisabled.\n",
+        "operationId": "webhooks_restore",
+        "summary": "Restore a webhook",
+        "description": "Brings a deleted webhook back, with its settings and secrets, until\n`purge_after`. Deliveries that came due while it was deleted failed;\nattempt them again with `POST /v1/webhook-deliveries/{delivery_id}/attempts`.\nRestoring counts against the plan's webhook limit (`402`).\n",
         "tags": [
           "webhooks"
         ],
@@ -4173,12 +4170,12 @@
           }
         ],
         "responses": {
-          "202": {
-            "description": "The queued delivery.",
+          "200": {
+            "description": "The restored webhook.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WebhookDelivery"
+                  "$ref": "#/components/schemas/Webhook"
                 }
               }
             }
@@ -4188,6 +4185,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "402": {
+            "$ref": "#/components/responses/PlanLimitExceeded"
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
