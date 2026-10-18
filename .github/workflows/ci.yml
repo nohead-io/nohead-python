@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    # The API repository pushes contract/update. Its pull request is opened by
-    # github-actions (contract-pr.yml), which starts no pull_request run.
+    # The API repository pushes contract/update, and this push run is its
+    # check. Its pull request is opened by github-actions (contract-pr.yml),
+    # so GitHub holds that pull request's run for approval: a duplicate.
     branches: [main, contract/update]
   pull_request:
 
