@@ -5,10 +5,12 @@ import hashlib
 import hmac
 import json
 import time
+import warnings
 
 import pytest
 
-from nohead import WebhookVerificationError
+from nohead import Asset, NoheadWarning, WebhookVerificationError
+from nohead.models import AssetEventDataAsset
 from nohead.webhooks import unwrap
 
 from .conftest import Make, record
@@ -54,9 +56,11 @@ def test_the_standard_webhooks_spec_example(monkeypatch: pytest.MonkeyPatch) -> 
         "webhook-signature": "v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=",
     }
     secret = "whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
-    # The signature matches; its body just isn't a Nohead event.
-    with pytest.raises(WebhookVerificationError, match="not a JSON event"):
-        unwrap('{"test": 2432232314}', headers, secret=secret)
+    # The signature matches; its body just isn't a Nohead event, so it comes unvalidated.
+    with pytest.warns(NoheadWarning):
+        event = unwrap('{"test": 2432232314}', headers, secret=secret)
+    assert event.model_extra == {"test": 2432232314}
+    assert (event.record, event.revision, event.draft_id) == (None, None, None)
     with pytest.raises(WebhookVerificationError, match="No webhook signature matches"):
         unwrap('{"test": 2432232315}', headers, secret=secret)
 
@@ -78,6 +82,62 @@ def test_draft_events_name_the_draft_once_it_is_gone() -> None:
     event = unwrap(body, sign(body), secret=SECRET)
     assert event.draft is None
     assert event.draft_id == "drf_1"
+    assert event.record_id == "rec_1"
+
+
+def event(type: str, data: dict[str, object], **envelope: object) -> str:
+    body = {
+        "id": "wev_3",
+        "object": "event",
+        "type": type,
+        "created_at": "2026-10-18T12:00:00.000Z",
+        "project_id": "prj_1",
+        "actor": None,
+        "via": "api",
+        "data": data,
+    }
+    return json.dumps(body | envelope)
+
+
+def test_a_purged_asset_is_only_its_id() -> None:
+    body = event("asset.purged", {"asset": {"id": "ast_1", "object": "asset"}})
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        asset = unwrap(body, sign(body), secret=SECRET).asset
+    assert isinstance(asset, AssetEventDataAsset)
+    assert asset.id == "ast_1"
+
+
+def test_parts_that_do_not_match_come_unvalidated() -> None:
+    body = event("asset.created", {"asset": {"id": "ast_1", "object": "asset", "status": 7}})
+    received = unwrap(body, sign(body), secret=SECRET)
+    with pytest.warns(NoheadWarning):
+        asset = received.asset
+    assert isinstance(asset, Asset)
+    assert (asset.id, asset.status) == ("ast_1", 7)
+
+
+def test_an_envelope_that_does_not_match_comes_unvalidated() -> None:
+    body = event("record.published", {"record": None}, created_at="yesterday", via=["api"])
+    with pytest.warns(NoheadWarning):
+        received = unwrap(body, sign(body), secret=SECRET)
+    assert (received.id, received.created_at) == ("wev_3", "yesterday")
+    assert received.record is None
+
+
+def test_field_events_name_the_field() -> None:
+    collection = {"id": "col_1", "object": "collection", "slug": "posts", "name": "Posts"}
+    body = event(
+        "field.updated",
+        {
+            "collection": collection | {"schema_version": 3, "deleted_at": None},
+            "field_id": "fld_1",
+            "schema_change": None,
+        },
+    )
+    received = unwrap(body, sign(body), secret=SECRET)
+    assert received.field_id == "fld_1"
+    assert received.collection is not None and received.collection["object"] == "collection"
 
 
 def test_any_header_case_bytes_and_several_signatures() -> None:

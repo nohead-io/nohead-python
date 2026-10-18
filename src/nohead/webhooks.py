@@ -3,7 +3,7 @@
 from nohead.webhooks import unwrap
 
 event = unwrap(request.body, request.headers, secret=os.environ["NOHEAD_WEBHOOK_SECRET"])
-if event.type == "record.published":
+if event.type == "record.published" and event.record:
     print(event.record.id)
 """
 
@@ -19,8 +19,18 @@ from collections.abc import Mapping
 from datetime import datetime
 from typing import Any, TypeVar, cast
 
+from ._base import validate
 from ._errors import WebhookVerificationError
-from .models import Actor, Asset, Draft, Field, NoheadModel, Record, Webhook
+from .models import (
+    Actor,
+    Asset,
+    AssetEventDataAsset,
+    Draft,
+    Field,
+    NoheadModel,
+    Record,
+    Webhook,
+)
 
 __all__ = ["WebhookEvent", "unwrap"]
 
@@ -29,14 +39,16 @@ M = TypeVar("M", bound=NoheadModel)
 
 class WebhookEvent(NoheadModel):
     """A webhook request's body. `data` depends on `type`; the properties below parse
-    the parts each type carries (None when this event has no such part)."""
+    the parts each type carries (None when this event has no such part). Like responses,
+    an event or part that does not match the SDK's models is still returned, unvalidated,
+    with a NoheadWarning."""
 
     id: str
     object: str
     type: str
-    """The activity log's action: `record.*` (`record.created`, `record.published`,
-    `record.restored`, `record.scheduled`, ...), `draft.*`, `collection.*`,
-    `field.*`, `asset.*`, or `webhook.test`."""
+    """The event's type, as in the activity log: `record.*` (`record.created`,
+    `record.published`, `record.restored`, `record.scheduled`, ...), `draft.*`,
+    `collection.*`, `field.*`, `asset.*`, or `webhook.test`."""
     created_at: datetime
     project_id: str
     actor: Actor | None = None
@@ -55,13 +67,12 @@ class WebhookEvent(NoheadModel):
     @property
     def revision(self) -> int | None:
         """`record.*` events: the record's revision number."""
-        value = self.data.get("revision")
+        value = self._data().get("revision")
         return value if isinstance(value, int) else None
 
     @property
     def revision_id(self) -> str | None:
-        value = self.data.get("revision_id")
-        return value if isinstance(value, str) else None
+        return self._str("revision_id")
 
     @property
     def draft(self) -> Draft | None:
@@ -73,19 +84,33 @@ class WebhookEvent(NoheadModel):
     def draft_id(self) -> str | None:
         """`draft.*` events: the draft's ID (also once it is gone); a merged draft's
         `record.updated`: the draft it merged."""
-        value = self.data.get("draft_id")
-        return value if isinstance(value, str) else None
+        return self._str("draft_id")
 
     @property
-    def asset(self) -> Asset | None:
-        """`asset.*` events."""
+    def record_id(self) -> str | None:
+        """`draft.*` events: the draft's record (also once the draft is gone)."""
+        return self._str("record_id")
+
+    @property
+    def asset(self) -> Asset | AssetEventDataAsset | None:
+        """`asset.*` events: the asset as it is now; once it is purged (`asset.purged`),
+        only its `id` and `object`, as an AssetEventDataAsset."""
+        value = self._data().get("asset")
+        if isinstance(value, dict) and set(cast("dict[str, Any]", value)) <= {"id", "object"}:
+            return self._part("asset", AssetEventDataAsset)
         return self._part("asset", Asset)
 
     @property
     def collection(self) -> dict[str, Any] | None:
         """`collection.*` and `field.*` events: the collection as the change left it
-        (`id`, `slug`, `name`, `schema_version`, `deleted_at`)."""
+        (`id`, `object`, `slug`, `name`, `schema_version`, `deleted_at`; only `id` and
+        `object` once the collection is purged)."""
         return self._dict("collection")
+
+    @property
+    def field_id(self) -> str | None:
+        """`field.*` events (but `field.alias_removed`): the field that changed."""
+        return self._str("field_id")
 
     @property
     def schema_change(self) -> dict[str, Any] | None:
@@ -103,13 +128,22 @@ class WebhookEvent(NoheadModel):
         """`webhook.test` events."""
         return self._part("webhook", Webhook)
 
+    def _data(self) -> dict[str, Any]:
+        # An event that did not validate may have no `data`, or another kind.
+        data: object = getattr(self, "data", None)
+        return cast("dict[str, Any]", data) if isinstance(data, dict) else {}
+
+    def _str(self, key: str) -> str | None:
+        value = self._data().get(key)
+        return value if isinstance(value, str) else None
+
     def _dict(self, key: str) -> dict[str, Any] | None:
-        value: object = self.data.get(key)
+        value = self._data().get(key)
         return cast("dict[str, Any]", value) if isinstance(value, dict) else None
 
     def _part(self, key: str, model: type[M]) -> M | None:
-        value = self.data.get(key)
-        return model.model_validate(value) if isinstance(value, dict) else None
+        value = self._data().get(key)
+        return validate(model, value) if isinstance(value, dict) else None
 
 
 def unwrap(
@@ -147,7 +181,11 @@ def unwrap(
         version, _, signature = entry.partition(",")
         if version == "v1" and hmac.compare_digest(signature, expected):
             try:
-                return WebhookEvent.model_validate(json.loads(raw))
+                event: object = json.loads(raw)
             except ValueError:
-                raise WebhookVerificationError("The webhook body is not a JSON event") from None
+                raise WebhookVerificationError("The webhook body is not JSON") from None
+            if not isinstance(event, dict):
+                raise WebhookVerificationError("The webhook body is not a JSON event")
+            # Lenient, as responses are: a newer API's event still arrives, with a warning.
+            return validate(WebhookEvent, event)
     raise WebhookVerificationError("No webhook signature matches")
