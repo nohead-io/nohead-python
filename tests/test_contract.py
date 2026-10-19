@@ -241,7 +241,7 @@ def operations_of(method: Callable[..., Any]) -> set[str]:
 @pytest.mark.parametrize("client", [Nohead, AsyncNohead])
 def test_methods_take_the_headers_their_operations_declare(client: type[Any]) -> None:
     checked: set[str] = set()
-    for name, method in public_methods(client(api_key="sk_live_x")).items():
+    for name, method in public_methods(client(api_key="nohead_sk_x")).items():
         operations = operations_of(method)
         if len(operations) != 1:
             continue  # a helper, such as assets.upload or webhooks.unwrap
@@ -274,6 +274,6 @@ def public_methods(obj: object, prefix: str = "") -> dict[str, Callable[..., Any
 
 
 def test_both_clients_have_the_same_methods() -> None:
-    sync = set(public_methods(Nohead(api_key="sk_live_x")))
-    assert sync == set(public_methods(AsyncNohead(api_key="sk_live_x")))
+    sync = set(public_methods(Nohead(api_key="nohead_sk_x")))
+    assert sync == set(public_methods(AsyncNohead(api_key="nohead_sk_x")))
     assert "records.revisions.revert" in sync

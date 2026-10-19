@@ -19,7 +19,7 @@ def test_needs_an_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_reads_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("NOHEAD_API_KEY", "sk_live_env")
+    monkeypatch.setenv("NOHEAD_API_KEY", "nohead_sk_env")
     monkeypatch.setenv("NOHEAD_API_URL", "https://env.test/")
     seen: list[httpx.Request] = []
 
@@ -30,12 +30,12 @@ def test_reads_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     client = Nohead(http_client=httpx.Client(transport=httpx.MockTransport(handler)))
     client.records.get("rec_1")
     assert str(seen[0].url) == "https://env.test/v1/records/rec_1"
-    assert seen[0].headers["authorization"] == "Bearer sk_live_env"
+    assert seen[0].headers["authorization"] == "Bearer nohead_sk_env"
 
 
 def test_defaults_to_production(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("NOHEAD_API_URL", "")
-    assert Nohead(api_key="sk_live_x")._client.settings.base_url == "https://api.nohead.io"
+    assert Nohead(api_key="nohead_sk_x")._client.settings.base_url == "https://api.nohead.io"
 
 
 def test_identifies_itself() -> None:
@@ -112,12 +112,12 @@ def test_with_options_shares_the_connection() -> None:
 
 
 def test_context_managers() -> None:
-    with Nohead(api_key="sk_live_x") as nohead:
+    with Nohead(api_key="nohead_sk_x") as nohead:
         assert not nohead._client.http.is_closed
     assert nohead._client.http.is_closed
 
 
 async def test_async_context_manager() -> None:
-    async with AsyncNohead(api_key="sk_live_x") as nohead:
+    async with AsyncNohead(api_key="nohead_sk_x") as nohead:
         assert not nohead._client.http.is_closed
     assert nohead._client.http.is_closed

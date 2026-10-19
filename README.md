@@ -51,7 +51,7 @@ nohead = Nohead(
 
 | Option | Default | |
 |---|---|---|
-| `api_key` | `NOHEAD_API_KEY` | A project API key (`sk_live_...`). Required. |
+| `api_key` | `NOHEAD_API_KEY` | A project API key (`nohead_sk_...`, or `nohead_pk_...` when published-only). Required. |
 | `base_url` | `NOHEAD_API_URL`, else `https://api.nohead.io` | |
 | `project_id` | the key's project | Looked up once with `GET /v1/me` when omitted. |
 | `max_retries` | `2` | See [retries](#retries-and-idempotency). |
@@ -364,7 +364,7 @@ The smoke test (`smoke/smoke.py`) runs the core flow against a real API, with bo
 
 ```bash
 uv build
-NOHEAD_API_URL=http://localhost:3000 NOHEAD_API_KEY=sk_live_... \
+NOHEAD_API_URL=http://localhost:3000 NOHEAD_API_KEY=nohead_sk_... \
   uv run --isolated --no-project --with "dist/nohead-$(uv version --short)-py3-none-any.whl" python smoke/smoke.py
 ```
 
