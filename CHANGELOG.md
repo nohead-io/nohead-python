@@ -7,6 +7,10 @@ section is its GitHub release's notes.
 
 ## Unreleased
 
+- API keys now start `nohead_sk_`, or `nohead_pk_` for published-only keys;
+  keys in the old `sk_live_` format no longer work. The SDK sends whatever key
+  it's given, so only the docs and examples change.
+
 - `assets.update(asset, filename=..., alt=...)` renames an asset and sets
   its alt text (`PATCH /v1/assets/{asset_id}`). `Asset` has `alt` (a string
   or `None`), and webhooks can subscribe to `asset.updated`.

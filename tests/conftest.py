@@ -43,7 +43,7 @@ def make_sync(replies: list[Reply], **options: Any) -> tuple[Nohead, Recorder]:
     recorder = Recorder(replies)
     client = httpx.Client(transport=httpx.MockTransport(recorder))
     defaults: dict[str, Any] = {
-        "api_key": "sk_live_test",
+        "api_key": "nohead_sk_test",
         "base_url": "https://api.test",
         "project_id": "prj_1",
     }
@@ -54,7 +54,7 @@ def make_async(replies: list[Reply], **options: Any) -> tuple[AsyncNohead, Recor
     recorder = Recorder(replies)
     client = httpx.AsyncClient(transport=httpx.MockTransport(recorder))
     defaults: dict[str, Any] = {
-        "api_key": "sk_live_test",
+        "api_key": "nohead_sk_test",
         "base_url": "https://api.test",
         "project_id": "prj_1",
     }

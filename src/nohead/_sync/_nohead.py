@@ -55,7 +55,8 @@ class Nohead:
     ) -> None:
         """
         Args:
-            api_key: A project API key (`sk_live_...`). Defaults to NOHEAD_API_KEY.
+            api_key: A project API key (`nohead_sk_...`, or `nohead_pk_...` when
+                published-only). Defaults to NOHEAD_API_KEY.
             base_url: Defaults to NOHEAD_API_URL, else https://api.nohead.io.
             project_id: The key's project. Looked up once with GET /v1/me when omitted.
             max_retries: Retries of failed requests (see the README, "Retries").

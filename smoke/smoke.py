@@ -4,7 +4,7 @@ and webhooks read/write scopes). Exits non-zero on failure, after deleting what 
 created. Run it against the built package:
 
     uv build
-    NOHEAD_API_URL=http://localhost:3000 NOHEAD_API_KEY=sk_live_... \\
+    NOHEAD_API_URL=http://localhost:3000 NOHEAD_API_KEY=nohead_sk_... \\
       uv run --isolated --no-project --with dist/nohead-*.whl python smoke/smoke.py
 """
 
