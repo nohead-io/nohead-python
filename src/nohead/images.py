@@ -43,6 +43,10 @@ def image_url(
     if at < 0:
         raise ValueError(f"Not a Nohead image URL: {base}")
 
+    for option in [gravity, *options]:
+        if option and re.search(r"[/@?#]", option):
+            raise ValueError(f"Not an imgproxy option: {option}")
+
     segments: list[str] = []
     if width or height:
         segments.append(f"rs:{_FITS[fit]}:{width or 0}:{height or 0}")

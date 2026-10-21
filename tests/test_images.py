@@ -35,6 +35,13 @@ def test_writes_the_options_before_the_source_and_the_format_after_it() -> None:
     assert image_url(BASE + "@png", format="avif") == BASE + "@avif"
 
 
+def test_refuses_options_that_would_break_the_path() -> None:
+    with pytest.raises(ValueError, match="Not an imgproxy option"):
+        image_url(BASE, gravity="fp:0.5/0.3")
+    with pytest.raises(ValueError, match="Not an imgproxy option"):
+        image_url(BASE, options=["bl:2@x"])
+
+
 def test_refuses_what_is_not_a_ready_images_url() -> None:
     with pytest.raises(ValueError, match="no image_url"):
         image_url(Asset(None))
