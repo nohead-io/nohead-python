@@ -63,6 +63,7 @@
   "records_unpublish": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.records.unpublish(\"rec_01J9ZQ3F8X\")\n",
   "records_unschedule": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.records.unschedule(\"rec_01J9ZQ3F8X\")\n",
   "records_update": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.records.update(\"rec_01J9ZQ3F8X\", data={\"title\": \"Hey\"}, if_match=1)\n",
+  "revisions_get": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.revisions.get(\"rev_01J9ZQ3F8X\")\n",
   "scheduled_changes_list": "from nohead import Nohead\n\nnohead = Nohead()\n\nfor change in nohead.records.scheduled_changes(\"posts\", sort=\"-at\"):\n    print(change)\n",
   "schema_changes_get": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.collections.schema_changes.get(\"sch_01J9ZQ3F8X\")\n",
   "schema_changes_list": "from nohead import Nohead\n\nnohead = Nohead()\n\nfor change in nohead.collections.schema_changes.list(\"posts\"):\n    print(change)\n",

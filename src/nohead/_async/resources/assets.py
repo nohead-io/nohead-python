@@ -174,7 +174,9 @@ class AsyncAssets(AsyncResource):
         format: Literal["original", "webp", "avif", "jpeg", "png"] | None = None,
         quality: int | None = None,
     ) -> ImageUrl:
-        """A signed, cacheable URL of an image rendition (`url`)."""
+        """A rendition URL (`url`) from a few common options. Image URLs are open, so
+        `nohead.images.image_url` builds any rendition from an asset's `image_url`
+        without a request."""
         return await self._client.request(
             "assets_image_url",
             cast=ImageUrl,
@@ -189,7 +191,7 @@ class AsyncAssets(AsyncResource):
         )
 
     async def download_url(self, asset: str) -> DownloadUrl:
-        """A 15-minute link to download the original file (`url`)."""
+        """A link to download the original file (`url`), valid for 2 minutes."""
         return await self._client.request(
             "assets_download_url", cast=DownloadUrl, path={"asset_id": asset}
         )

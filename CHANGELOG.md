@@ -15,6 +15,22 @@ section is its GitHub release's notes.
   its alt text (`PATCH /v1/assets/{asset_id}`). `Asset` has `alt` (a string
   or `None`), and webhooks can subscribe to `asset.updated`.
 
+- Image URLs are open. `Asset` has `image_url`, the whole image, and the new
+  `nohead.images.image_url` writes any of imgproxy's processing options into
+  it, without a request. `assets.image_url` still asks the API for one, now
+  for exactly the sizes and quality given.
+
+- **Breaking:** `Collection` has no `search_enabled`, and `SearchIndex` no
+  `enabled`, and collections' `create` and `update` no longer take
+  `search_enabled`: API keys search every collection they can read.
+
+- `revisions.get(revision)` reads a revision by its own `rev_` ID, as
+  webhooks and the activity log name it (`GET /v1/revisions/{revision_id}`).
+
+- `records.create` takes `upsert_on`, a unique field's key: the record
+  holding that value is updated instead, if one exists, and `if_match`
+  applies to that update.
+
 ## 0.5.0
 
 - **Breaking:** a field migration is created under its collection:

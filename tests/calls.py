@@ -84,6 +84,7 @@ def every_call(nohead: Any) -> list[Callable[[], Any]]:
         ),
         lambda: nohead.records.revisions.list("rec_01J9ZQ3F8X", filter={"operation": "update"}),
         lambda: nohead.records.revisions.get("rec_01J9ZQ3F8X", 1),
+        lambda: nohead.revisions.get("rev_01J9ZQ3F8X"),
         lambda: nohead.records.revisions.revert("rec_01J9ZQ3F8X", 1, dry_run=True),
         lambda: nohead.search(
             "hello", collections=["posts"], filter={"published_at": {"exists": True}}
