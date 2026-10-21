@@ -66,6 +66,7 @@ OPERATIONS: dict[str, tuple[str, str]] = {
     "records_unpublish": ("DELETE", "/v1/records/{record_id}/publication"),
     "records_unschedule": ("DELETE", "/v1/records/{record_id}/schedule"),
     "records_update": ("PATCH", "/v1/records/{record_id}"),
+    "revisions_get": ("GET", "/v1/revisions/{revision_id}"),
     "scheduled_changes_list": ("GET", "/v1/collections/{collection_id}/scheduled-changes"),
     "schema_changes_get": ("GET", "/v1/schema-changes/{schema_change_id}"),
     "schema_changes_list": ("GET", "/v1/collections/{collection_id}/schema-changes"),

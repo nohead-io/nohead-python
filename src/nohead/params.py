@@ -85,7 +85,6 @@ class BooleanFieldCreate(FieldCreateProperties):
 
 
 class CollectionCreate(TypedDict):
-    search_enabled: NotRequired[bool]
     name: str
     slug: str
     description: NotRequired[str | None]
@@ -93,7 +92,6 @@ class CollectionCreate(TypedDict):
 
 
 class CollectionUpdate(TypedDict):
-    search_enabled: NotRequired[bool]
     name: NotRequired[str]
     slug: NotRequired[str]
     description: NotRequired[str | None]
@@ -327,6 +325,14 @@ class RecordBatchRequest(TypedDict):
     record_ids: list[str]
     data: NotRequired[dict[str, Any]]
     """For `update`, the fields to set on every record (null clears one)."""
+
+
+class RecordCreate(TypedDict):
+    data: RecordData
+    upsert_on: NotRequired[str]
+    """The key of a `unique` field (a slug, or a field with `unique` on) whose value `data`
+    includes: update the record that has it, or create one.
+    """
 
 
 class RecordScheduleUpdate(TypedDict):
