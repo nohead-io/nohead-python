@@ -228,7 +228,6 @@ except PreconditionFailedError as error:
 ```python
 asset = nohead.assets.upload("cover.jpg")
 nohead.records.update(record_id, data={"cover": asset.id})
-
 ```
 
 **Images.** Image URLs are open: an image's `image_url` serves the whole image, and any of [imgproxy's processing options](https://docs.imgproxy.net/usage/processing) written into it transform it. `nohead.images.image_url` builds them without a request:
