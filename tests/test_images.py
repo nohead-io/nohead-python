@@ -40,6 +40,8 @@ def test_refuses_options_that_would_break_the_path() -> None:
         image_url(BASE, gravity="fp:0.5/0.3")
     with pytest.raises(ValueError, match="Not an imgproxy option"):
         image_url(BASE, options=["bl:2@x"])
+    with pytest.raises(ValueError, match="fit must be one of"):
+        image_url(BASE, width=300, fit="crop")  # pyright: ignore[reportArgumentType]
 
 
 def test_refuses_what_is_not_a_ready_images_url() -> None:

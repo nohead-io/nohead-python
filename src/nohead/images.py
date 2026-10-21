@@ -47,6 +47,9 @@ def image_url(
         if option and re.search(r"[/@?#]", option):
             raise ValueError(f"Not an imgproxy option: {option}")
 
+    if fit not in _FITS:
+        raise ValueError(f"fit must be one of {', '.join(_FITS)}")
+
     segments: list[str] = []
     if width or height:
         segments.append(f"rs:{_FITS[fit]}:{width or 0}:{height or 0}")
