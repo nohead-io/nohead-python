@@ -2833,11 +2833,20 @@
       "get": {
         "operationId": "assets_list",
         "summary": "List assets",
-        "description": "The project's assets, newest first, filtered by `filter[deleted]` and\n`filter[content_type]`. Published-only API keys get `403`: sites reach\nassets through records (`expand=`), one at a time.\n",
+        "description": "The project's assets, newest first, filtered by `q`,\n`filter[deleted]` and `filter[content_type]`. Published-only API keys\nget `403`: sites reach assets through records (`expand=`), one at a\ntime.\n",
         "tags": [
           "assets"
         ],
         "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Words that must each appear in the filename or the alt text,\nignoring case: `q=hero jpg` finds `Hero-banner.jpg`. Up to 10\nwords and 200 characters (`400` beyond).\n",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
           {
             "$ref": "#/components/parameters/Limit"
           },
@@ -3348,7 +3357,7 @@
       "get": {
         "operationId": "collections_search",
         "summary": "Search records",
-        "description": "Full-text search in a collection, ranked by relevance (or `sort`).\nAnyone who can read the collection can search it. With an API key the\nwords match its `searchable` fields; members in the web app match all\nits text fields. Filters work as in the records list,\non `published_at` (`exists` only) and on fields marked `filterable`\n(not on `deleted` or the other timestamps); `sort` on `created_at`, `updated_at`, `published_at` and\nfields marked `sortable` (`-` for descending).\nResults are the current records; changes appear within seconds. At\nmost the first 1,000 hits can be paged through. `expand` embeds related\nrecords and assets as in the records list. `409` with a detail code:\n`index_building` while a new collection's index is first built, and\n`rebuilding` when filtering or sorting on a field newly made\n`filterable` or `sortable`, or searching words while the index is\nrebuilt for a field's new key, until the rebuild that adds it has run\n(the index status is `stale` meanwhile).\n",
+        "description": "Full-text search in a collection, ranked by relevance (or `sort`).\nAnyone who can read the collection can search it, and the words match\nits `searchable` fields. Filters work as in the records list,\non `published_at` (`exists` only) and on fields marked `filterable`\n(not on `deleted` or the other timestamps); `sort` on `created_at`, `updated_at`, `published_at` and\nfields marked `sortable` (`-` for descending).\nResults are the current records; changes appear within seconds. At\nmost the first 1,000 hits can be paged through. `expand` embeds related\nrecords and assets as in the records list. `409` with a detail code:\n`index_building` while a new collection's index is first built, and\n`rebuilding` when filtering or sorting on a field newly made\n`filterable` or `sortable`, or searching words while the index is\nrebuilt for a field's new key, until the rebuild that adds it has run\n(the index status is `stale` meanwhile).\n",
         "tags": [
           "search"
         ],
@@ -3426,7 +3435,7 @@
       "get": {
         "operationId": "projects_search",
         "summary": "Search across collections",
-        "description": "One ranked list of matching records from the project's collections (or\nthose in `filter[collection]`), matching their `searchable` fields with\nan API key as in a collection search. `filter[published_at][exists]`\nnarrows to published records (`true`) or unpublished ones.\n",
+        "description": "One ranked list of matching records from the project's collections (or\nthose in `filter[collection]`), matching their `searchable` fields as\nin a collection search. `filter[published_at][exists]`\nnarrows to published records (`true`) or unpublished ones.\n",
         "tags": [
           "search"
         ],
@@ -4848,7 +4857,7 @@
         "in": "query",
         "style": "deepObject",
         "explode": true,
-        "description": "`filter[deleted]=true` lists deleted assets instead.\n`filter[content_type]` lists only assets of a type: a MIME type or a\n`type/*` wildcard, or several with\n`filter[content_type][in]=image/*,application/pdf`, for example the\nones an asset field accepts (its `accepted_types`).\n",
+        "description": "`filter[deleted]=true` lists deleted assets instead.\n`filter[content_type]` lists only assets of a type: a MIME type or a\n`type/*` wildcard, or several with\n`filter[content_type][in]=image/*,application/pdf`, for example the\nones an asset field accepts (its `accepted_types`).\n`filter[kind]` lists only assets of a kind, or several with\n`filter[kind][in]=image,video`: `image`, `video` and `audio` by\ntheir types (`image/*` and so on); `document` for PDFs, plain text,\nMarkdown, CSV, and word processing, spreadsheet and presentation\nfiles (Microsoft Office, OpenDocument, RTF); `other` for every other\nfile.\n",
         "schema": {
           "type": "object",
           "additionalProperties": false,
@@ -4858,6 +4867,29 @@
               "enum": [
                 "true",
                 "false"
+              ]
+            },
+            "kind": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AssetKind"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "in"
+                  ],
+                  "properties": {
+                    "in": {
+                      "type": "string",
+                      "description": "Comma-separated kinds.",
+                      "examples": [
+                        "image,video"
+                      ]
+                    }
+                  }
+                }
               ]
             },
             "content_type": {
@@ -5502,7 +5534,7 @@
           },
           "searchable": {
             "type": "boolean",
-            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+            "description": "Search words match the field, in every search (API keys, search tokens, members). Default true for text, long_text, rich_text and enum."
           },
           "filterable": {
             "type": "boolean",
@@ -5547,7 +5579,7 @@
           },
           "searchable": {
             "type": "boolean",
-            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+            "description": "Search words match the field, in every search (API keys, search tokens, members). Default true for text, long_text, rich_text and enum."
           },
           "filterable": {
             "type": "boolean",
@@ -5578,7 +5610,7 @@
           },
           "searchable": {
             "type": "boolean",
-            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+            "description": "Search words match the field, in every search (API keys, search tokens, members). Default true for text, long_text, rich_text and enum."
           },
           "filterable": {
             "type": "boolean",
@@ -5601,7 +5633,7 @@
           },
           "searchable": {
             "type": "boolean",
-            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+            "description": "Search words match the field, in every search (API keys, search tokens, members). Default true for text, long_text, rich_text and enum."
           },
           "filterable": {
             "type": "boolean",
@@ -5634,7 +5666,7 @@
           },
           "searchable": {
             "type": "boolean",
-            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+            "description": "Search words match the field, in every search (API keys, search tokens, members). Default true for text, long_text, rich_text and enum."
           },
           "filterable": {
             "type": "boolean",
@@ -5663,7 +5695,7 @@
           },
           "searchable": {
             "type": "boolean",
-            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+            "description": "Search words match the field, in every search (API keys, search tokens, members). Default true for text, long_text, rich_text and enum."
           },
           "filterable": {
             "type": "boolean",
@@ -5694,7 +5726,7 @@
           },
           "searchable": {
             "type": "boolean",
-            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+            "description": "Search words match the field, in every search (API keys, search tokens, members). Default true for text, long_text, rich_text and enum."
           },
           "filterable": {
             "type": "boolean",
@@ -5720,7 +5752,7 @@
           },
           "searchable": {
             "type": "boolean",
-            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+            "description": "Search words match the field, in every search (API keys, search tokens, members). Default true for text, long_text, rich_text and enum."
           },
           "filterable": {
             "type": "boolean",
@@ -5754,7 +5786,7 @@
           },
           "searchable": {
             "type": "boolean",
-            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+            "description": "Search words match the field, in every search (API keys, search tokens, members). Default true for text, long_text, rich_text and enum."
           },
           "filterable": {
             "type": "boolean",
@@ -5788,7 +5820,7 @@
           },
           "searchable": {
             "type": "boolean",
-            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+            "description": "Search words match the field, in every search (API keys, search tokens, members). Default true for text, long_text, rich_text and enum."
           },
           "filterable": {
             "type": "boolean",
@@ -5815,7 +5847,7 @@
           },
           "searchable": {
             "type": "boolean",
-            "description": "Search words match the field (API searches). Default true for text, long_text, rich_text and enum."
+            "description": "Search words match the field, in every search (API keys, search tokens, members). Default true for text, long_text, rich_text and enum."
           },
           "filterable": {
             "type": "boolean",
@@ -6210,7 +6242,7 @@
       },
       "FieldUpdate": {
         "type": "object",
-        "description": "Renames, describes or loosens a field. A change to its `type` or `multiple` rewrites record values, so it is a field migration (`POST /v1/fields/{id}/migrations`); either key here is `400` `unknown_parameter`, saying so.",
+        "description": "Renames, describes or loosens a field. A change to its `type` or `multiple` rewrites record values, so it is a field migration (`POST /v1/collections/{collection_id}/migrations`); either key here is `400` `unknown_parameter`, saying so.",
         "additionalProperties": false,
         "properties": {
           "name": {
@@ -9143,6 +9175,16 @@
         ],
         "unevaluatedProperties": false
       },
+      "AssetKind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video",
+          "audio",
+          "document",
+          "other"
+        ]
+      },
       "AssetUpdate": {
         "type": "object",
         "additionalProperties": false,
@@ -9265,7 +9307,7 @@
               "null"
             ],
             "format": "uri",
-            "description": "The URL of a small rendition (fits in 640×640, WebP), for ready images, deleted ones included until they are purged; null otherwise."
+            "description": "The URL of a small rendition (fits in 640×640, WebP), for ready images and SVGs (rasterized; SVGs have no `image_url`), deleted ones included until they are purged; null otherwise."
           },
           "uploaded_at": {
             "$ref": "#/components/schemas/NullableTimestamp"

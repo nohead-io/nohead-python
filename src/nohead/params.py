@@ -11,8 +11,8 @@ class AssetFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""
@@ -70,8 +70,8 @@ class BooleanFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""
@@ -103,8 +103,8 @@ class DateFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""
@@ -129,8 +129,8 @@ class DecimalFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""
@@ -159,8 +159,8 @@ class EnumFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""
@@ -242,8 +242,9 @@ class FieldMigrationRequest(TypedDict):
 
 class FieldUpdate(TypedDict):
     """Renames, describes or loosens a field. A change to its `type` or `multiple` rewrites
-    record values, so it is a field migration (`POST /v1/fields/{id}/migrations`); either
-    key here is `400` `unknown_parameter`, saying so.
+    record values, so it is a field migration (`POST
+    /v1/collections/{collection_id}/migrations`); either key here is `400`
+    `unknown_parameter`, saying so.
     """
 
     name: NotRequired[str]
@@ -264,8 +265,8 @@ class IntegerFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""
@@ -286,8 +287,8 @@ class JsonFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""
@@ -306,8 +307,8 @@ class LongTextFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""
@@ -352,8 +353,8 @@ class RelationFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""
@@ -372,8 +373,8 @@ class RichTextFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""
@@ -392,8 +393,8 @@ class TextFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""

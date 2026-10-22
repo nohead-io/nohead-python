@@ -150,8 +150,8 @@ class TextFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
@@ -175,8 +175,8 @@ class LongTextFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
@@ -190,8 +190,8 @@ class RichTextFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
@@ -203,8 +203,8 @@ class IntegerFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
@@ -220,8 +220,8 @@ class DecimalFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
@@ -235,8 +235,8 @@ class DateFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
@@ -256,8 +256,8 @@ class BooleanFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
@@ -269,8 +269,8 @@ class EnumFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
@@ -283,8 +283,8 @@ class AssetFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
@@ -300,8 +300,8 @@ class RelationFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
@@ -315,8 +315,8 @@ class JsonFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
-    """Search words match the field (API searches). Default true for text, long_text, rich_text
-    and enum.
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long_text, rich_text and enum.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
@@ -410,8 +410,9 @@ class JsonFieldCreate(FieldCreateProperties):
 
 class FieldUpdate(NoheadModel):
     """Renames, describes or loosens a field. A change to its `type` or `multiple` rewrites
-    record values, so it is a field migration (`POST /v1/fields/{id}/migrations`); either
-    key here is `400` `unknown_parameter`, saying so.
+    record values, so it is a field migration (`POST
+    /v1/collections/{collection_id}/migrations`); either key here is `400`
+    `unknown_parameter`, saying so.
     """
 
     name: str | None = None
@@ -1313,8 +1314,9 @@ class AssetProperties(NoheadModel):
     `strip_metadata`) are refused.
     """
     preview_url: str | None
-    """The URL of a small rendition (fits in 640×640, WebP), for ready images, deleted ones
-    included until they are purged; null otherwise.
+    """The URL of a small rendition (fits in 640×640, WebP), for ready images and SVGs
+    (rasterized; SVGs have no `image_url`), deleted ones included until they are purged;
+    null otherwise.
     """
     uploaded_at: NullableTimestamp
     created_at: Timestamp
@@ -1462,6 +1464,7 @@ Webhook: TypeAlias = WebhookProperties
 WebhookSecret: TypeAlias = WebhookSecretProperties
 WebhookDelivery: TypeAlias = WebhookDeliveryProperties
 Asset: TypeAlias = AssetProperties
+AssetKind: TypeAlias = str
 ApiKeyScope: TypeAlias = str
 PublishedOnly: TypeAlias = bool
 ErrorType: TypeAlias = str
