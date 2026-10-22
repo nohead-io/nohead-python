@@ -160,6 +160,14 @@ def test_lists_assets_of_one_type_or_several() -> None:
     }
 
 
+def test_searches_assets_and_lists_them_by_kind() -> None:
+    nohead, calls = make_sync([page([], None), page([], None)])
+    nohead.assets.list(q="hero jpg", kind="image").data  # noqa: B018 (fetches it)
+    nohead.assets.list(kind=["image", "video"]).data  # noqa: B018
+    assert dict(calls.calls[0].url.params) == {"q": "hero jpg", "filter[kind]": "image"}
+    assert dict(calls.calls[1].url.params) == {"filter[kind][in]": "image,video"}
+
+
 def test_record_batch_results_that_failed() -> None:
     batch = {
         "object": "record_batch",

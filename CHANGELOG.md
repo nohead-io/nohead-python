@@ -5,6 +5,12 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- `assets.list(q=..., kind=...)`: `q` finds assets whose filename or alt
+  text has every word, ignoring case; `kind` lists only `image`, `video`,
+  `audio`, `document` or `other` assets, or several kinds as a list.
+
 ## 0.6.0
 
 - API keys now start `nohead_sk_`, or `nohead_pk_` for published-only keys;

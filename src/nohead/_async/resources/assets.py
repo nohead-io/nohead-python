@@ -88,24 +88,30 @@ class AsyncAssets(AsyncResource):
     def list(
         self,
         *,
+        q: str | None = None,
+        kind: str | Sequence[str] | None = None,
         content_type: str | Sequence[str] | None = None,
         deleted: bool | None = None,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> AsyncPaginator[Asset]:
-        """`content_type` lists only assets of a type: a MIME type or a `type/*` wildcard
-        (`"image/*"`), or a list of several (`["image/*", "application/pdf"]`),
-        for example the ones an asset field accepts (its `accepted_types`)."""
-        types: str | dict[str, list[str]] | None = (
-            content_type
-            if content_type is None or isinstance(content_type, str)
-            else {"in": list(content_type)}
-        )
+        """`q` finds assets whose filename or alt text has every word, ignoring case
+        (`"hero jpg"` finds `Hero-banner.jpg`). `kind` lists only assets of a kind
+        (`"image"`, `"video"`, `"audio"`, `"document"` or `"other"`), or a list of
+        several. `content_type` lists only assets of a type: a MIME type or a
+        `type/*` wildcard (`"image/*"`), or a list of several
+        (`["image/*", "application/pdf"]`), for example the ones an asset field
+        accepts (its `accepted_types`)."""
         return self._client.paginate(
             "assets_list",
             item=Asset,
             query={
-                "filter": {"content_type": types, "deleted": deleted},
+                "q": q,
+                "filter": {
+                    "kind": _one_or_in(kind),
+                    "content_type": _one_or_in(content_type),
+                    "deleted": deleted,
+                },
                 "limit": limit,
                 "cursor": cursor,
             },
@@ -168,3 +174,8 @@ class AsyncAssets(AsyncResource):
         return await self._client.request(
             "assets_download_url", cast=DownloadUrl, path={"asset_id": asset}
         )
+
+
+def _one_or_in(value: str | Sequence[str] | None) -> str | dict[str, list[str]] | None:
+    """One value as it is, several as `[in]`."""
+    return value if value is None or isinstance(value, str) else {"in": list(value)}
