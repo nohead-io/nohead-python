@@ -244,8 +244,9 @@ class Records(Resource):
         limit: int | None = None,
         cursor: str | None = None,
     ) -> Page[ScheduledChange]:
-        """A collection's pending scheduled publishes and unpublishes, soonest first:
-        one per change, so a record due to publish and later unpublish appears twice."""
+        """A collection's pending scheduled changes, soonest first: publishes, unpublishes
+        and draft merges, one per change, so a record due to publish and later
+        unpublish appears twice."""
         return self._client.paginate(
             "scheduled_changes_list",
             item=ScheduledChange,
