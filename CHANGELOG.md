@@ -17,8 +17,11 @@ section is its GitHub release's notes.
 
 - Image URLs are open. `Asset` has `image_url`, the whole image, and the new
   `nohead.images.image_url` writes any of imgproxy's processing options into
-  it, without a request. `assets.image_url` still asks the API for one, now
-  for exactly the sizes and quality given.
+  it, without a request.
+
+- **Breaking:** `assets.image_url` is gone, with the API's
+  `GET /v1/assets/{asset_id}/image-url`: use `nohead.images.image_url`, which
+  needs no request.
 
 - **Breaking:** `Collection` has no `search_enabled`, and `SearchIndex` no
   `enabled`, and collections' `create` and `update` no longer take

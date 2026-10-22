@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Literal
 
 from typing_extensions import Unpack
 
 from ..._errors import UploadError
 from ..._pagination import AsyncPaginator
 from ..._uploads import Uploadable, open_upload
-from ...models import Asset, AssetUsage, AssetWithUpload, DownloadUrl, ImageUrl
+from ...models import Asset, AssetUsage, AssetWithUpload, DownloadUrl
 from ...params import AssetUpdate, AssetUploadCreate
 from ._resource import AsyncResource
 
@@ -163,32 +162,6 @@ class AsyncAssets(AsyncResource):
         many of them are published (`published`), and the 10 most recently updated with
         the fields they use it in (`uses`). Needs the `records:read` scope too."""
         return await self._client.request("assets_usage", cast=AssetUsage, path={"asset_id": asset})
-
-    async def image_url(
-        self,
-        asset: str,
-        *,
-        width: int | None = None,
-        height: int | None = None,
-        fit: Literal["contain", "cover", "fill"] | None = None,
-        format: Literal["original", "webp", "avif", "jpeg", "png"] | None = None,
-        quality: int | None = None,
-    ) -> ImageUrl:
-        """A rendition URL (`url`) from a few common options. Image URLs are open, so
-        `nohead.images.image_url` builds any rendition from an asset's `image_url`
-        without a request."""
-        return await self._client.request(
-            "assets_image_url",
-            cast=ImageUrl,
-            path={"asset_id": asset},
-            query={
-                "width": width,
-                "height": height,
-                "fit": fit,
-                "format": format,
-                "quality": quality,
-            },
-        )
 
     async def download_url(self, asset: str) -> DownloadUrl:
         """A link to download the original file (`url`), valid for 2 minutes."""

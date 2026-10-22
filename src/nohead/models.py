@@ -1292,8 +1292,8 @@ class AssetProperties(NoheadModel):
     """The URL of the whole image, for ready images (JPEG, PNG, GIF, WebP or AVIF), deleted
     ones included until they are purged; null otherwise. Image URLs are open and never
     expire. For a rendition, write [imgproxy processing
-    options](https://docs.imgproxy.net/usage/processing) between `/insecure/` and `/plain/`,
-    and a format after `@`: for example `…/insecure/rs:fill:800:600/g:sm/plain/…@webp`.
+    options](https://docs.imgproxy.net/usage/processing) before `/plain/`, and a format
+    after `@`: for example `https://images.nohead.io/rs:fill:800:600/g:sm/plain/…@webp`.
     Renditions are at most 4096 pixels a side, from originals of at most 50 megapixels.
     Options that would return the file as stored (`raw`, `skip_processing`,
     `strip_metadata`) are refused.
@@ -1310,17 +1310,6 @@ class AssetProperties(NoheadModel):
 class AssetList(NoheadModel):
     data: list[Asset]
     meta: ListMeta
-
-
-class ImageUrl(NoheadModel):
-    object: str
-    asset_id: str
-    url: str
-    width: int | None
-    height: int | None
-    fit: str
-    format: str
-    quality: int | None
 
 
 class AssetUsageUses(NoheadModel):

@@ -3,7 +3,6 @@
   "assets_delete": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.assets.delete(\"ast_01J9ZQ3F8X\")\n",
   "assets_download_url": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.assets.download_url(\"ast_01J9ZQ3F8X\")\n",
   "assets_get": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.assets.get(\"ast_01J9ZQ3F8X\")\n",
-  "assets_image_url": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.assets.image_url(\"ast_01J9ZQ3F8X\", width=100, format=\"webp\")\n",
   "assets_list": "from nohead import Nohead\n\nnohead = Nohead()\n\nfor asset in nohead.assets.list(deleted=True):\n    print(asset)\n",
   "assets_purge": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.assets.purge(\"ast_01J9ZQ3F8X\")\n",
   "assets_restore": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.assets.restore(\"ast_01J9ZQ3F8X\")\n",

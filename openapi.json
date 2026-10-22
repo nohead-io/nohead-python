@@ -3147,115 +3147,6 @@
         }
       }
     },
-    "/v1/assets/{asset_id}/image-url": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/AssetId"
-        }
-      ],
-      "get": {
-        "operationId": "assets_image_url",
-        "summary": "Get an image URL",
-        "description": "A rendition URL of a ready image asset (JPEG, PNG, GIF, WebP or AVIF)\nfor a few common options, as a convenience. Image URLs are open: an\nasset's `image_url` serves the whole image, and any\n[imgproxy processing options](https://docs.imgproxy.net/usage/processing)\nwritten into it transform it, so sites and their frameworks' image\ncomponents build renditions without calling the API. Without options\nthis is the `image_url`. URLs do not expire, so they can be cached and\nembedded. `409` with detail code `upload_incomplete` for an upload not\nyet completed, and `deleted` for a deleted asset.\n",
-        "tags": [
-          "assets"
-        ],
-        "parameters": [
-          {
-            "name": "width",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 4096
-            }
-          },
-          {
-            "name": "height",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 4096
-            }
-          },
-          {
-            "name": "fit",
-            "in": "query",
-            "description": "`contain` fits inside width × height; `cover` fills it, cropping; `fill` stretches to it.",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "contain",
-                "cover",
-                "fill"
-              ],
-              "default": "contain"
-            }
-          },
-          {
-            "name": "format",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "original",
-                "webp",
-                "avif",
-                "jpeg",
-                "png"
-              ],
-              "default": "original"
-            }
-          },
-          {
-            "name": "quality",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The image URL.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImageUrl"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
-          }
-        }
-      }
-    },
     "/v1/assets/{asset_id}/download-url": {
       "parameters": [
         {
@@ -9342,9 +9233,9 @@
               "null"
             ],
             "format": "uri",
-            "description": "The URL of the whole image, for ready images (JPEG, PNG, GIF, WebP\nor AVIF), deleted ones included until they are purged; null\notherwise. Image URLs are open and never expire. For a rendition,\nwrite [imgproxy processing options](https://docs.imgproxy.net/usage/processing)\nbetween `/insecure/` and `/plain/`, and a format after `@`: for\nexample `…/insecure/rs:fill:800:600/g:sm/plain/…@webp`. Renditions\nare at most 4096 pixels a side, from originals of at most 50\nmegapixels. Options that would return the file as stored (`raw`,\n`skip_processing`, `strip_metadata`) are refused.\n",
+            "description": "The URL of the whole image, for ready images (JPEG, PNG, GIF, WebP\nor AVIF), deleted ones included until they are purged; null\notherwise. Image URLs are open and never expire. For a rendition,\nwrite [imgproxy processing options](https://docs.imgproxy.net/usage/processing)\nbefore `/plain/`, and a format after `@`: for example\n`https://images.nohead.io/rs:fill:800:600/g:sm/plain/…@webp`. Renditions\nare at most 4096 pixels a side, from originals of at most 50\nmegapixels. Options that would return the file as stored (`raw`,\n`skip_processing`, `strip_metadata`) are refused.\n",
             "examples": [
-              "https://images.nohead.io/insecure/plain/projects/0199f5c2-7b1e-7c3a-9d4f-2a6b8c0e1f3d/assets/0199f5c2-8a2d-7e4b-b1c3-5d7e9f1a2b4c"
+              "https://images.nohead.io/plain/0199f5c2-7b1e-7c3a-9d4f-2a6b8c0e1f3d/0199f5c2-8a2d-7e4b-b1c3-5d7e9f1a2b4c"
             ]
           },
           "preview_url": {
@@ -9382,68 +9273,6 @@
           },
           "meta": {
             "$ref": "#/components/schemas/ListMeta"
-          }
-        }
-      },
-      "ImageUrl": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "object",
-          "asset_id",
-          "url",
-          "width",
-          "height",
-          "fit",
-          "format",
-          "quality"
-        ],
-        "properties": {
-          "object": {
-            "const": "image_url"
-          },
-          "asset_id": {
-            "type": "string"
-          },
-          "url": {
-            "type": "string",
-            "format": "uri"
-          },
-          "width": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "height": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "fit": {
-            "type": "string",
-            "enum": [
-              "contain",
-              "cover",
-              "fill"
-            ]
-          },
-          "format": {
-            "type": "string",
-            "enum": [
-              "original",
-              "webp",
-              "avif",
-              "jpeg",
-              "png"
-            ]
-          },
-          "quality": {
-            "type": [
-              "integer",
-              "null"
-            ]
           }
         }
       },

@@ -6,7 +6,6 @@ OPERATIONS: dict[str, tuple[str, str]] = {
     "assets_delete": ("DELETE", "/v1/assets/{asset_id}"),
     "assets_download_url": ("GET", "/v1/assets/{asset_id}/download-url"),
     "assets_get": ("GET", "/v1/assets/{asset_id}"),
-    "assets_image_url": ("GET", "/v1/assets/{asset_id}/image-url"),
     "assets_list": ("GET", "/v1/projects/{project_id}/assets"),
     "assets_purge": ("POST", "/v1/assets/{asset_id}/purge"),
     "assets_restore": ("POST", "/v1/assets/{asset_id}/restore"),
