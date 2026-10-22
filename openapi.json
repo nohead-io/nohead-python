@@ -6261,7 +6261,7 @@
           "schema_version",
           "deleted_at",
           "purge_after",
-          "site_search",
+          "public_search",
           "fields",
           "created_at",
           "updated_at"
@@ -6302,9 +6302,9 @@
             "description": "When a deleted collection is removed for good, with its fields and records, unless restored first.",
             "$ref": "#/components/schemas/NullableTimestamp"
           },
-          "site_search": {
+          "public_search": {
             "type": "boolean",
-            "description": "Whether sites find its published records with the project's\nsearch tokens (made in the web app), straight from the browser.\nOff by default: every field of those records becomes readable by\nanyone with a token, so turn it on only for collections whose\npublished records are public. A change reaches search tokens\nwithin seconds.\n"
+            "description": "Whether the project's search tokens (made in the web app) find\nits published records, from a browser or a backend. Off by\ndefault: every field of those records becomes readable by anyone\nwith a token, so turn it on only for collections whose published\nrecords are public. A change reaches search tokens within\nseconds.\n"
           },
           "fields": {
             "type": "array",
@@ -6341,7 +6341,7 @@
               "null"
             ]
           },
-          "site_search": {
+          "public_search": {
             "type": "boolean",
             "default": false
           },
@@ -6369,7 +6369,7 @@
               "null"
             ]
           },
-          "site_search": {
+          "public_search": {
             "type": "boolean"
           }
         }
@@ -6424,7 +6424,7 @@
           "deleted_at": {
             "$ref": "#/components/schemas/NullableTimestamp"
           },
-          "site_search": {
+          "public_search": {
             "type": "boolean",
             "description": "Absent from schemas before the setting existed (off)."
           },
@@ -8032,6 +8032,7 @@
         "required": [
           "object",
           "collection_id",
+          "index",
           "status",
           "documents",
           "last_built_at",
@@ -8043,6 +8044,10 @@
           },
           "collection_id": {
             "type": "string"
+          },
+          "index": {
+            "type": "string",
+            "description": "The index's name in the search engine, which search tokens search\n(`indexUid` in Meilisearch's search API). Opaque; it never changes.\n"
           },
           "status": {
             "type": "string",

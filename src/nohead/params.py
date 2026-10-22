@@ -88,7 +88,7 @@ class CollectionCreate(TypedDict):
     name: str
     slug: str
     description: NotRequired[str | None]
-    site_search: NotRequired[bool]
+    public_search: NotRequired[bool]
     fields: NotRequired[list[FieldCreate]]
 
 
@@ -96,7 +96,7 @@ class CollectionUpdate(TypedDict):
     name: NotRequired[str]
     slug: NotRequired[str]
     description: NotRequired[str | None]
-    site_search: NotRequired[bool]
+    public_search: NotRequired[bool]
 
 
 class DateFieldConfiguration(TypedDict):

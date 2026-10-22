@@ -34,9 +34,10 @@ section is its GitHub release's notes.
   holding that value is updated instead, if one exists, and `if_match`
   applies to that update.
 
-- Collections have `site_search`: whether sites find their published records
-  with the project's search tokens, made in the web app. Off by default;
-  `collections.create(site_search=...)` and `collections.update` take it.
+- Collections have `public_search`: whether the project's search tokens find
+  their published records. Off by default;
+  `collections.create(public_search=...)` and `collections.update` take it. A
+  collection's search index has `index`, the name a token searches it by.
 
 ## 0.5.0
 
