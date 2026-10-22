@@ -3,13 +3,13 @@ import pytest
 from nohead.images import image_url
 
 BASE = (
-    "https://images.nohead.io/insecure/plain/projects/0199f5c2-7b1e-7c3a-9d4f-2a6b8c0e1f3d"
-    "/assets/0199f5c2-8a2d-7e4b-b1c3-5d7e9f1a2b4c"
+    "https://images.nohead.io/plain/0199f5c2-7b1e-7c3a-9d4f-2a6b8c0e1f3d"
+    "/0199f5c2-8a2d-7e4b-b1c3-5d7e9f1a2b4c"
 )
 
 
 def at(options: str) -> str:
-    return BASE.replace("/insecure/plain/", f"/insecure/{options}/plain/")
+    return BASE.replace("/plain/", f"/{options}/plain/")
 
 
 class Asset:
