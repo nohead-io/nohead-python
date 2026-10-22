@@ -22,7 +22,7 @@ from ...models import (
     ScheduledChange,
     SearchResultsMeta,
 )
-from ...params import RecordBatchRequest, RecordWrite
+from ...params import RecordBatchRequest, RecordCreate, RecordWrite
 from ...types import IfMatch, RecordFilter, RecordSort, RevisionFilter
 from .._client import APIClient
 from ._resource import Resource
@@ -78,16 +78,22 @@ class Records(Resource):
         self,
         collection: str,
         *,
+        if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
-        **params: Unpack[RecordWrite],
+        **params: Unpack[RecordCreate],
     ) -> Record:
-        """Creates an unpublished record: `create("posts", data={"title": "Hello"})`."""
+        """Creates an unpublished record: `create("posts", data={"title": "Hello"})`.
+
+        With `upsert_on`, the key of a `unique` field, it updates the record holding
+        that value instead, if one exists, so a sync can run again without
+        duplicates; `if_match` then applies to that update."""
         return self._client.request(
             "records_create",
             cast=Record,
             path={"collection_id": collection},
             body=params,
+            if_match=if_match,
             idempotency_key=idempotency_key,
             change_note=change_note,
         )
@@ -305,7 +311,7 @@ class Records(Resource):
         limit: int | None = None,
         cursor: str | None = None,
     ) -> Page[Record, SearchResultsMeta]:
-        """Full-text search in one collection (`search_enabled` collections), most
+        """Full-text search in one collection, matching its `searchable` fields, most
         relevant first, through the first 1,000 hits."""
         return self._client.paginate(
             "collections_search",
@@ -392,4 +398,16 @@ class Revisions(Resource):
             if_match=if_match,
             idempotency_key=idempotency_key,
             change_note=change_note,
+        )
+
+
+class RevisionsById(Resource):
+    """A revision by its own ID (`rev_...`), as webhooks and the activity log name
+    it. Readable while its record is deleted."""
+
+    def get(self, revision: str) -> RecordRevisionDetail:
+        return self._client.request(
+            "revisions_get",
+            cast=RecordRevisionDetail,
+            path={"revision_id": revision},
         )

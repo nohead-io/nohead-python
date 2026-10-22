@@ -94,11 +94,14 @@ nohead.records.delete(post.id)  # soft delete; records.restore() undoes it
 
 Methods return models and raise on failure. Field values are in `record.data`, a dict keyed by field API key.
 
+**Upserts.** With `upsert_on`, the key of a `unique` field, `create` updates the record holding that value instead, if one exists, so a content sync can run again without duplicates: `nohead.records.create("products", data={"sku": "TEE-01", "title": "Tee"}, upsert_on="sku")`.
+
 **More:**
 
 - `count`, and `bulk` (up to 100 records at once, each succeeding or failing on its own: its `results` are `RecordBatchResultsSucceeded` or `RecordBatchResultsFailed`, by `status`)
 - `diff(record, from_revision=1, to_revision=2)`
 - `revisions.list` (`filter` by `operation`, `actor_id` or a `created_at` range), `revisions.get` and `revisions.revert` (with `dry_run=True` for a preview)
+- a revision by its own ID, as webhooks and the activity log name it: `nohead.revisions.get("rev_...")`
 
 ## Drafts
 
@@ -225,9 +228,18 @@ except PreconditionFailedError as error:
 ```python
 asset = nohead.assets.upload("cover.jpg")
 nohead.records.update(record_id, data={"cover": asset.id})
-
-url = nohead.assets.image_url(asset.id, width=1200, format="webp").url
 ```
+
+**Images.** Image URLs are open: an image's `image_url` serves the whole image, and any of [imgproxy's processing options](https://docs.imgproxy.net/usage/processing) written into it transform it. `nohead.images.image_url` builds them without a request:
+
+```python
+from nohead.images import image_url
+
+image_url(asset, width=1200, height=630, fit="cover", gravity="sm", format="webp")
+image_url(asset.image_url, width=400, dpr=2, options=["bl:2"])
+```
+
+Thumbnails: an image's `preview_url` fits in 640×640, as WebP.
 
 **What `upload` accepts:** a path, bytes, or a file opened in binary mode.
 
@@ -267,7 +279,7 @@ results = nohead.search(
 results.meta.total_estimate
 ```
 
-Search needs `search_enabled` collections and the `search:read` scope. It pages through the first 1,000 hits.
+Search needs the `search:read` scope and covers every collection the key can read, matching their `searchable` fields. It pages through the first 1,000 hits. For search straight from a site's browser, without the API, use a search token from the web app with Meilisearch's own clients or InstantSearch.
 
 ## Schema
 
@@ -323,13 +335,14 @@ It's also available as `nohead.webhooks.unwrap(...)` on a client. Events can arr
 | `records` | `list`, `get`, `create`, `update`, `delete`, `restore`, `publish`, `unpublish`, `publication`, `get_schedule`, `schedule`, `unschedule`, `scheduled_changes`, `drafts`, `count`, `bulk`, `diff`, `search` |
 | `drafts` | `create`, `list`, `get`, `update`, `discard`, `merge`, `schedule`, `unschedule` |
 | `records.revisions` | `list`, `get`, `revert` |
+| `revisions` | `get` (by its own `rev_` ID) |
 | `search` | across the project |
 | `collections` | `list`, `get`, `create`, `update`, `delete`, `restore`, `schema` |
 | `collections.schema_changes` | `list`, `get` |
 | `collections.search_index` | `get`, `rebuild` |
 | `fields` | `list`, `get`, `create`, `update`, `delete`, `restore`, `order`, `reorder`, `remove_alias` |
 | `migrations` | `create`, `list`, `get`, `cancel` |
-| `assets` | `upload`, `create_upload`, `complete`, `list`, `get`, `update`, `usage`, `delete`, `restore`, `purge`, `image_url`, `download_url` |
+| `assets` | `upload`, `create_upload`, `complete`, `list`, `get`, `update`, `usage`, `delete`, `restore`, `purge`, `download_url` |
 | `webhooks` | `list`, `get`, `create`, `update`, `delete`, `restore`, `rotate_secret`, `test`, `unwrap` |
 | `webhooks.secrets` | `list`, `retire` |
 | `webhooks.deliveries` | `list`, `get`, `retry` |

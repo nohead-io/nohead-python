@@ -175,13 +175,16 @@
       "post": {
         "operationId": "records_create",
         "summary": "Create a record",
-        "description": "Creates an unpublished record (revision 1).",
+        "description": "Creates an unpublished record (revision 1).\n\nWith `upsert_on`, the field key of a `unique` field whose value\n`data` includes, it updates the active record holding that value\ninstead, if one exists (`200`), as `PATCH /v1/records/{id}` does: keys\nin `data` replace their values. Otherwise it creates one (`201`). So a\ncontent sync can run again without making duplicates. `If-Match`\napplies to the update; with no record to update it is `412`. A\nsoft-deleted record doesn't count: its unique values are free.\n",
         "tags": [
           "records"
         ],
         "parameters": [
           {
             "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
           },
           {
             "$ref": "#/components/parameters/NoheadClient"
@@ -195,12 +198,15 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RecordWrite"
+                "$ref": "#/components/schemas/RecordCreate"
               }
             }
           }
         },
         "responses": {
+          "200": {
+            "$ref": "#/components/responses/Record"
+          },
           "201": {
             "$ref": "#/components/responses/RecordCreated"
           },
@@ -221,6 +227,9 @@
           },
           "409": {
             "$ref": "#/components/responses/Conflict"
+          },
+          "412": {
+            "$ref": "#/components/responses/PreconditionFailed"
           },
           "422": {
             "$ref": "#/components/responses/ValidationFailed"
@@ -945,6 +954,48 @@
       "get": {
         "operationId": "record_revisions_get",
         "summary": "Get a revision",
+        "tags": [
+          "revisions"
+        ],
+        "responses": {
+          "200": {
+            "description": "The revision with its snapshot and changes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordRevisionDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v1/revisions/{revision_id}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/RevisionId"
+        }
+      ],
+      "get": {
+        "operationId": "revisions_get",
+        "summary": "Get a revision by ID",
+        "description": "The same revision `GET /v1/records/{record_id}/revisions/{revision}`\nreturns, by the `rev_` ID that webhooks and the audit log give\n(`revision_id`). Also for a deleted record's revisions.\n",
         "tags": [
           "revisions"
         ],
@@ -3096,115 +3147,6 @@
         }
       }
     },
-    "/v1/assets/{asset_id}/image-url": {
-      "parameters": [
-        {
-          "$ref": "#/components/parameters/AssetId"
-        }
-      ],
-      "get": {
-        "operationId": "assets_image_url",
-        "summary": "Get an image URL",
-        "description": "A signed URL for a transformed rendition of a ready image asset\n(JPEG, PNG, GIF, WebP or AVIF). The same asset and options always give\nthe same URL, so it can be cached and embedded; it does not expire.\nOnly these options can be requested, so nobody can generate other\ntransformations. Without options it serves the original size. A width\nor height on its own rounds up to the next of 16, 32, 48, 64, 96, 128,\n160, 192, 256, 320, 384, 480, 512, 640, 768, 800, 960, 1024, 1200, 1280,\n1536, 1600, 1920, 2048, 2560, 3072, 3840 and 4096; with both, the larger\ndoes and the other keeps its ratio to it, rounded up to a multiple of\n1/32. Quality rounds up to a multiple of 10. The response says what\nwas signed. `409` with detail code `upload_incomplete` for an upload\nnot yet completed, and `deleted` for a deleted asset.\n",
-        "tags": [
-          "assets"
-        ],
-        "parameters": [
-          {
-            "name": "width",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 4096
-            }
-          },
-          {
-            "name": "height",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 4096
-            }
-          },
-          {
-            "name": "fit",
-            "in": "query",
-            "description": "`contain` fits inside width × height; `cover` fills it, cropping; `fill` stretches to it.",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "contain",
-                "cover",
-                "fill"
-              ],
-              "default": "contain"
-            }
-          },
-          {
-            "name": "format",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "original",
-                "webp",
-                "avif",
-                "jpeg",
-                "png"
-              ],
-              "default": "original"
-            }
-          },
-          {
-            "name": "quality",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The image URL.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ImageUrl"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/Forbidden"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "409": {
-            "$ref": "#/components/responses/Conflict"
-          },
-          "422": {
-            "$ref": "#/components/responses/ValidationFailed"
-          },
-          "429": {
-            "$ref": "#/components/responses/RateLimited"
-          },
-          "503": {
-            "$ref": "#/components/responses/ServiceUnavailable"
-          }
-        }
-      }
-    },
     "/v1/assets/{asset_id}/download-url": {
       "parameters": [
         {
@@ -3406,7 +3348,7 @@
       "get": {
         "operationId": "collections_search",
         "summary": "Search records",
-        "description": "Full-text search in a collection, ranked by relevance (or `sort`).\nWith an API key, the collection must be `search_enabled` and the words\nmatch its `searchable` fields only; members in the web app search any\ncollection, on all its text fields. Filters work as in the records list,\non `published_at` (`exists` only) and on fields marked `filterable`\n(not on `deleted` or the other timestamps); `sort` on `created_at`, `updated_at`, `published_at` and\nfields marked `sortable` (`-` for descending).\nResults are the current records; changes appear within seconds. At\nmost the first 1,000 hits can be paged through. `expand` embeds related\nrecords and assets as in the records list. `409` with a detail code:\n`search_disabled` when search is not enabled (API keys),\n`index_building` while a new collection's index is first built, and\n`rebuilding` when filtering or sorting on a field newly made\n`filterable` or `sortable` until the rebuild that adds it has run (the\nindex status is `stale` meanwhile).\n",
+        "description": "Full-text search in a collection, ranked by relevance (or `sort`).\nAnyone who can read the collection can search it. With an API key the\nwords match its `searchable` fields; members in the web app match all\nits text fields. Filters work as in the records list,\non `published_at` (`exists` only) and on fields marked `filterable`\n(not on `deleted` or the other timestamps); `sort` on `created_at`, `updated_at`, `published_at` and\nfields marked `sortable` (`-` for descending).\nResults are the current records; changes appear within seconds. At\nmost the first 1,000 hits can be paged through. `expand` embeds related\nrecords and assets as in the records list. `409` with a detail code:\n`index_building` while a new collection's index is first built, and\n`rebuilding` when filtering or sorting on a field newly made\n`filterable` or `sortable`, or searching words while the index is\nrebuilt for a field's new key, until the rebuild that adds it has run\n(the index status is `stale` meanwhile).\n",
         "tags": [
           "search"
         ],
@@ -3484,7 +3426,7 @@
       "get": {
         "operationId": "projects_search",
         "summary": "Search across collections",
-        "description": "One ranked list of matching records from the project's collections (or\nthose in `filter[collection]`): with an API key, those with\n`search_enabled`, matching their `searchable` fields as in a collection\nsearch. `filter[published_at][exists]` narrows to published records\n(`true`) or unpublished ones.\n",
+        "description": "One ranked list of matching records from the project's collections (or\nthose in `filter[collection]`), matching their `searchable` fields with\nan API key as in a collection search. `filter[published_at][exists]`\nnarrows to published records (`true`) or unpublished ones.\n",
         "tags": [
           "search"
         ],
@@ -4700,6 +4642,15 @@
           "type": "string"
         },
         "example": "drf_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
+      },
+      "RevisionId": {
+        "name": "revision_id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "example": "rev_01J9ZQ3F8X5W2K7M4N6P0R1S2T"
       },
       "RevisionNumber": {
         "name": "revision",
@@ -6310,7 +6261,7 @@
           "schema_version",
           "deleted_at",
           "purge_after",
-          "search_enabled",
+          "public_search",
           "fields",
           "created_at",
           "updated_at"
@@ -6351,9 +6302,9 @@
             "description": "When a deleted collection is removed for good, with its fields and records, unless restored first.",
             "$ref": "#/components/schemas/NullableTimestamp"
           },
-          "search_enabled": {
+          "public_search": {
             "type": "boolean",
-            "description": "Whether API keys can search the collection (`GET /v1/collections/{collection_id}/search`).\nEvery collection is indexed; members can search it in the web app either way.\n"
+            "description": "Whether the project's search tokens (made in the web app) find\nits published records, from a browser or a backend. Off by\ndefault: every field of those records becomes readable by anyone\nwith a token, so turn it on only for collections whose published\nrecords are public. A change reaches search tokens within\nseconds.\n"
           },
           "fields": {
             "type": "array",
@@ -6378,9 +6329,6 @@
           "slug"
         ],
         "properties": {
-          "search_enabled": {
-            "type": "boolean"
-          },
           "name": {
             "type": "string"
           },
@@ -6392,6 +6340,10 @@
               "string",
               "null"
             ]
+          },
+          "public_search": {
+            "type": "boolean",
+            "default": false
           },
           "fields": {
             "type": "array",
@@ -6405,9 +6357,6 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "search_enabled": {
-            "type": "boolean"
-          },
           "name": {
             "type": "string"
           },
@@ -6419,6 +6368,9 @@
               "string",
               "null"
             ]
+          },
+          "public_search": {
+            "type": "boolean"
           }
         }
       },
@@ -6472,8 +6424,9 @@
           "deleted_at": {
             "$ref": "#/components/schemas/NullableTimestamp"
           },
-          "search_enabled": {
-            "type": "boolean"
+          "public_search": {
+            "type": "boolean",
+            "description": "Absent from schemas before the setting existed (off)."
           },
           "fields": {
             "type": "array",
@@ -7280,6 +7233,7 @@
           "api",
           "cli",
           "sdk",
+          "mcp",
           "system",
           "scheduler"
         ]
@@ -7612,6 +7566,25 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/RecordData"
+          }
+        }
+      },
+      "RecordCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RecordData"
+          },
+          "upsert_on": {
+            "type": "string",
+            "description": "The key of a `unique` field (a slug, or a field with `unique` on)\nwhose value `data` includes: update the record that has it, or\ncreate one.\n",
+            "examples": [
+              "slug"
+            ]
           }
         }
       },
@@ -8059,7 +8032,7 @@
         "required": [
           "object",
           "collection_id",
-          "enabled",
+          "index",
           "status",
           "documents",
           "last_built_at",
@@ -8072,9 +8045,9 @@
           "collection_id": {
             "type": "string"
           },
-          "enabled": {
-            "type": "boolean",
-            "description": "The collection's `search_enabled`; the index is kept up to date either way."
+          "index": {
+            "type": "string",
+            "description": "The index's name in the search engine, which search tokens search\n(`indexUid` in Meilisearch's search API). Opaque; it never changes.\n"
           },
           "status": {
             "type": "string",
@@ -9205,6 +9178,7 @@
           "status",
           "deleted_at",
           "purge_after",
+          "image_url",
           "preview_url",
           "uploaded_at",
           "created_at",
@@ -9274,13 +9248,24 @@
             "description": "When a deleted asset and its file are removed for good, unless restored or purged first.",
             "$ref": "#/components/schemas/NullableTimestamp"
           },
+          "image_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "The URL of the whole image, for ready images (JPEG, PNG, GIF, WebP\nor AVIF), deleted ones included until they are purged; null\notherwise. Image URLs are open and never expire. For a rendition,\nwrite [imgproxy processing options](https://docs.imgproxy.net/usage/processing)\nbefore `/plain/`, and a format after `@`: for example\n`https://images.nohead.io/rs:fill:800:600/g:sm/plain/…@webp`. Renditions\nare at most 4096 pixels a side, from originals of at most 50\nmegapixels. Options that would return the file as stored (`raw`,\n`skip_processing`, `strip_metadata`) are refused.\n",
+            "examples": [
+              "https://images.nohead.io/plain/0199f5c2-7b1e-7c3a-9d4f-2a6b8c0e1f3d/0199f5c2-8a2d-7e4b-b1c3-5d7e9f1a2b4c"
+            ]
+          },
           "preview_url": {
             "type": [
               "string",
               "null"
             ],
             "format": "uri",
-            "description": "A signed URL of a small rendition (fits in 640×640, WebP), for ready images, deleted ones included until they are purged; null otherwise."
+            "description": "The URL of a small rendition (fits in 640×640, WebP), for ready images, deleted ones included until they are purged; null otherwise."
           },
           "uploaded_at": {
             "$ref": "#/components/schemas/NullableTimestamp"
@@ -9309,68 +9294,6 @@
           },
           "meta": {
             "$ref": "#/components/schemas/ListMeta"
-          }
-        }
-      },
-      "ImageUrl": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "object",
-          "asset_id",
-          "url",
-          "width",
-          "height",
-          "fit",
-          "format",
-          "quality"
-        ],
-        "properties": {
-          "object": {
-            "const": "image_url"
-          },
-          "asset_id": {
-            "type": "string"
-          },
-          "url": {
-            "type": "string",
-            "format": "uri"
-          },
-          "width": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "height": {
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "fit": {
-            "type": "string",
-            "enum": [
-              "contain",
-              "cover",
-              "fill"
-            ]
-          },
-          "format": {
-            "type": "string",
-            "enum": [
-              "original",
-              "webp",
-              "avif",
-              "jpeg",
-              "png"
-            ]
-          },
-          "quality": {
-            "type": [
-              "integer",
-              "null"
-            ]
           }
         }
       },

@@ -15,7 +15,7 @@ from ._client import AsyncAPIClient
 from .resources.assets import AsyncAssets
 from .resources.drafts import AsyncDrafts
 from .resources.other import AsyncAuditEvents, AsyncFeatureFlags, AsyncHealth, AsyncMe
-from .resources.records import AsyncRecords
+from .resources.records import AsyncRecords, AsyncRevisionsById
 from .resources.schema import AsyncCollections, AsyncFields, AsyncMigrations
 from .resources.webhooks import AsyncWebhooks
 
@@ -29,6 +29,7 @@ class AsyncNohead:
     """
 
     records: AsyncRecords
+    revisions: AsyncRevisionsById
     drafts: AsyncDrafts
     collections: AsyncCollections
     fields: AsyncFields
@@ -78,6 +79,7 @@ class AsyncNohead:
     def _setup(self, client: AsyncAPIClient) -> None:
         self._client = client
         self.records = AsyncRecords(client)
+        self.revisions = AsyncRevisionsById(client)
         self.drafts = AsyncDrafts(client)
         self.collections = AsyncCollections(client)
         self.fields = AsyncFields(client)

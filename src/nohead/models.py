@@ -447,10 +447,11 @@ class Collection(NoheadModel):
     """When a deleted collection is removed for good, with its fields and records, unless
     restored first.
     """
-    search_enabled: bool
-    """Whether API keys can search the collection (`GET
-    /v1/collections/{collection_id}/search`). Every collection is indexed; members can
-    search it in the web app either way.
+    public_search: bool
+    """Whether the project's search tokens (made in the web app) find its published records,
+    from a browser or a backend. Off by default: every field of those records becomes
+    readable by anyone with a token, so turn it on only for collections whose published
+    records are public. A change reaches search tokens within seconds.
     """
     fields: list[Field]
     """Active fields in position order."""
@@ -459,18 +460,18 @@ class Collection(NoheadModel):
 
 
 class CollectionCreate(NoheadModel):
-    search_enabled: bool | None = None
     name: str
     slug: str
     description: str | None = None
+    public_search: bool | None = None
     fields: list[FieldCreate] | None = None
 
 
 class CollectionUpdate(NoheadModel):
-    search_enabled: bool | None = None
     name: str | None = None
     slug: str | None = None
     description: str | None = None
+    public_search: bool | None = None
 
 
 class CollectionList(NoheadModel):
@@ -498,7 +499,8 @@ class SchemaDefinition(NoheadModel):
     slug: str
     description: str | None
     deleted_at: NullableTimestamp
-    search_enabled: bool | None = None
+    public_search: bool | None = None
+    """Absent from schemas before the setting existed (off)."""
     fields: list[SchemaDefinitionFields]
 
 
@@ -839,6 +841,14 @@ class RecordWrite(NoheadModel):
     data: RecordData
 
 
+class RecordCreate(NoheadModel):
+    data: RecordData
+    upsert_on: str | None = None
+    """The key of a `unique` field (a slug, or a field with `unique` on) whose value `data`
+    includes: update the record that has it, or create one.
+    """
+
+
 class RecordList(NoheadModel):
     data: list[Record]
     meta: ListMeta
@@ -954,8 +964,10 @@ class SearchResults(NoheadModel):
 class SearchIndex(NoheadModel):
     object: str
     collection_id: str
-    enabled: bool
-    """The collection's `search_enabled`; the index is kept up to date either way."""
+    index: str
+    """The index's name in the search engine, which search tokens search (`indexUid` in
+    Meilisearch's search API). Opaque; it never changes.
+    """
     status: str
     """`building` until first built; `stale` from the change that queues a rebuild until it has
     run; `failed` if the last rebuild failed (it is retried).
@@ -1290,9 +1302,19 @@ class AssetProperties(NoheadModel):
     """When the asset was deleted; null unless it is."""
     purge_after: NullableTimestamp
     """When a deleted asset and its file are removed for good, unless restored or purged first."""
+    image_url: str | None
+    """The URL of the whole image, for ready images (JPEG, PNG, GIF, WebP or AVIF), deleted
+    ones included until they are purged; null otherwise. Image URLs are open and never
+    expire. For a rendition, write [imgproxy processing
+    options](https://docs.imgproxy.net/usage/processing) before `/plain/`, and a format
+    after `@`: for example `https://images.nohead.io/rs:fill:800:600/g:sm/plain/…@webp`.
+    Renditions are at most 4096 pixels a side, from originals of at most 50 megapixels.
+    Options that would return the file as stored (`raw`, `skip_processing`,
+    `strip_metadata`) are refused.
+    """
     preview_url: str | None
-    """A signed URL of a small rendition (fits in 640×640, WebP), for ready images, deleted
-    ones included until they are purged; null otherwise.
+    """The URL of a small rendition (fits in 640×640, WebP), for ready images, deleted ones
+    included until they are purged; null otherwise.
     """
     uploaded_at: NullableTimestamp
     created_at: Timestamp
@@ -1302,17 +1324,6 @@ class AssetProperties(NoheadModel):
 class AssetList(NoheadModel):
     data: list[Asset]
     meta: ListMeta
-
-
-class ImageUrl(NoheadModel):
-    object: str
-    asset_id: str
-    url: str
-    width: int | None
-    height: int | None
-    fit: str
-    format: str
-    quality: int | None
 
 
 class AssetUsageUses(NoheadModel):

@@ -16,7 +16,7 @@ from ._client import APIClient
 from .resources.assets import Assets
 from .resources.drafts import Drafts
 from .resources.other import AuditEvents, FeatureFlags, Health, Me
-from .resources.records import Records
+from .resources.records import Records, RevisionsById
 from .resources.schema import Collections, Fields, Migrations
 from .resources.webhooks import Webhooks
 
@@ -30,6 +30,7 @@ class Nohead:
     """
 
     records: Records
+    revisions: RevisionsById
     drafts: Drafts
     collections: Collections
     fields: Fields
@@ -79,6 +80,7 @@ class Nohead:
     def _setup(self, client: APIClient) -> None:
         self._client = client
         self.records = Records(client)
+        self.revisions = RevisionsById(client)
         self.drafts = Drafts(client)
         self.collections = Collections(client)
         self.fields = Fields(client)
