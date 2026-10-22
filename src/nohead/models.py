@@ -447,6 +447,12 @@ class Collection(NoheadModel):
     """When a deleted collection is removed for good, with its fields and records, unless
     restored first.
     """
+    site_search: bool
+    """Whether sites find its published records with the project's search tokens (made in the
+    web app), straight from the browser. Off by default: every field of those records
+    becomes readable by anyone with a token, so turn it on only for collections whose
+    published records are public. A change reaches search tokens within seconds.
+    """
     fields: list[Field]
     """Active fields in position order."""
     created_at: Timestamp
@@ -457,6 +463,7 @@ class CollectionCreate(NoheadModel):
     name: str
     slug: str
     description: str | None = None
+    site_search: bool | None = None
     fields: list[FieldCreate] | None = None
 
 
@@ -464,6 +471,7 @@ class CollectionUpdate(NoheadModel):
     name: str | None = None
     slug: str | None = None
     description: str | None = None
+    site_search: bool | None = None
 
 
 class CollectionList(NoheadModel):
@@ -491,6 +499,8 @@ class SchemaDefinition(NoheadModel):
     slug: str
     description: str | None
     deleted_at: NullableTimestamp
+    site_search: bool | None = None
+    """Absent from schemas before the setting existed (off)."""
     fields: list[SchemaDefinitionFields]
 
 
