@@ -5,7 +5,7 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
-## Unreleased
+## 0.7.0
 
 - `assets.list(q=..., kind=...)`: `q` finds assets whose filename or alt
   text has every word, ignoring case; `kind` lists only `image`, `video`,
