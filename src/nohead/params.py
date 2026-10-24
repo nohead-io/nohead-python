@@ -63,7 +63,9 @@ class AssetUploadCreate(TypedDict):
     filename: str
     content_type: str
     byte_size: int
-    """Exact size of the file in bytes (at most 100 MB by default)."""
+    """Exact size of the file in bytes, at most the plan's largest upload (10 MB on Free, 100
+    MB on paid plans).
+    """
 
 
 class BooleanFieldConfiguration(TypedDict):
