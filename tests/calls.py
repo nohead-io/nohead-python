@@ -129,7 +129,6 @@ def every_call(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.assets.restore("ast_01J9ZQ3F8X"),
         lambda: nohead.assets.purge("ast_01J9ZQ3F8X"),
         lambda: nohead.assets.usage("ast_01J9ZQ3F8X"),
-        lambda: nohead.assets.download_url("ast_01J9ZQ3F8X"),
         lambda: nohead.webhooks.list(deleted=True),
         lambda: nohead.webhooks.get("wh_01J9ZQ3F8X"),
         lambda: nohead.webhooks.create(url="https://example.com/hook", event_types=["*"]),

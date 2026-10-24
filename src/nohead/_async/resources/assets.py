@@ -8,7 +8,7 @@ from typing_extensions import Unpack
 from ..._errors import UploadError
 from ..._pagination import AsyncPaginator
 from ..._uploads import Uploadable, open_upload
-from ...models import Asset, AssetUsage, AssetWithUpload, DownloadUrl
+from ...models import Asset, AssetUsage, AssetWithUpload
 from ...params import AssetUpdate, AssetUploadCreate
 from ._resource import AsyncResource
 
@@ -168,12 +168,6 @@ class AsyncAssets(AsyncResource):
         many of them are published (`published`), and the 10 most recently updated with
         the fields they use it in (`uses`). Needs the `records:read` scope too."""
         return await self._client.request("assets_usage", cast=AssetUsage, path={"asset_id": asset})
-
-    async def download_url(self, asset: str) -> DownloadUrl:
-        """A link to download the original file (`url`), valid for 2 minutes."""
-        return await self._client.request(
-            "assets_download_url", cast=DownloadUrl, path={"asset_id": asset}
-        )
 
 
 def _one_or_in(value: str | Sequence[str] | None) -> str | dict[str, list[str]] | None:

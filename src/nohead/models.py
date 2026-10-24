@@ -1318,6 +1318,17 @@ class AssetProperties(NoheadModel):
     (rasterized; SVGs have no `image_url`), deleted ones included until they are purged;
     null otherwise.
     """
+    file_url: str | None
+    """The URL of the file as uploaded, for ready assets of any type, deleted ones included
+    until they are purged; null otherwise. It downloads the file under its `filename` (a
+    rename applies within a minute or so), is open and never expires, and is cached on a
+    CDN.
+    """
+    media_url: str | None
+    """The URL that plays a ready video or audio file inline, for `<video>` and `<audio>` (with
+    range requests, so players can seek), deleted ones included until they are purged; null
+    for other types. Open, never expiring and cached on a CDN, like `file_url`.
+    """
     uploaded_at: NullableTimestamp
     created_at: Timestamp
     updated_at: Timestamp
@@ -1343,13 +1354,6 @@ class AssetUsage(NoheadModel):
     """Of those, the published ones whose content uses it (what sites show)."""
     uses: list[AssetUsageUses]
     """The most recently updated records that use the asset."""
-
-
-class DownloadUrl(NoheadModel):
-    object: str
-    asset_id: str
-    url: str
-    expires_at: Timestamp
 
 
 class AssetUploadCreate(NoheadModel):

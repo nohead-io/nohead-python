@@ -342,7 +342,7 @@ It's also available as `nohead.webhooks.unwrap(...)` on a client. Events can arr
 | `collections.search_index` | `get`, `rebuild` |
 | `fields` | `list`, `get`, `create`, `update`, `delete`, `restore`, `order`, `reorder`, `remove_alias` |
 | `migrations` | `create`, `list`, `get`, `cancel` |
-| `assets` | `upload`, `create_upload`, `complete`, `list`, `get`, `update`, `usage`, `delete`, `restore`, `purge`, `download_url` |
+| `assets` | `upload`, `create_upload`, `complete`, `list`, `get`, `update`, `usage`, `delete`, `restore`, `purge` |
 | `webhooks` | `list`, `get`, `create`, `update`, `delete`, `restore`, `rotate_secret`, `test`, `unwrap` |
 | `webhooks.secrets` | `list`, `retire` |
 | `webhooks.deliveries` | `list`, `get`, `retry` |
