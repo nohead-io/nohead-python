@@ -5,7 +5,7 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
-## Unreleased
+## 0.8.0
 
 - `Asset` has `file_url`, the file as uploaded, which downloads under its
   filename, and for video and audio `media_url`, which plays it inline (in
