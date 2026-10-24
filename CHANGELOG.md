@@ -5,6 +5,20 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- `Asset` has `file_url`, the file as uploaded, which downloads under its
+  filename, and for video and audio `media_url`, which plays it inline (in
+  `<video>` and `<audio>`, with range requests). Both are open, never expire
+  and are cached on a CDN, like `image_url`.
+
+- `assets.download_url` is removed, with the API's
+  `GET /v1/assets/{asset_id}/download-url` and its 2-minute links: use the
+  asset's `file_url`.
+
+- An upload larger than the plan allows (10 MB a file on Free, 100 MB on paid
+  plans) is refused with a `PlanLimitExceededError` when it starts.
+
 ## 0.7.0
 
 - `assets.list(q=..., kind=...)`: `q` finds assets whose filename or alt
