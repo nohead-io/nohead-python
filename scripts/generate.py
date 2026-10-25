@@ -3,7 +3,8 @@
 - src/nohead/models.py: Pydantic models of the API's schemas, for responses.
   They are lenient on purpose: unknown fields are kept and enums are plain
   strings, because the API adds fields and enum values without notice. Only
-  the property that tells a union's variants apart is a Literal.
+  the property that tells a union's variants apart is a Literal, and that
+  union is a discriminated union on it (Field: `type`).
 - src/nohead/params.py: TypedDicts of the request bodies, for type checkers.
   Enums are Literals here: what the SDK sends should be checked.
 - src/nohead/_generated/operations.py: the method and path of every
@@ -56,6 +57,18 @@ def docstring(text: str | None, indent: str) -> list[str]:
     return [f'{indent}"""{lines[0]}', *(f"{indent}{line}" for line in lines[1:]), f'{indent}"""']
 
 
+def split(union: str) -> list[str]:
+    """The parts of a union type, `A | B`, not splitting inside brackets."""
+    parts: list[str] = []
+    depth = start = 0
+    for index, char in enumerate(union):
+        depth += {"[": 1, "(": 1, "]": -1, ")": -1}.get(char, 0)
+        if depth == 0 and union.startswith(" | ", index):
+            parts.append(union[start:index])
+            start = index + 3
+    return [*parts, union[start:]]
+
+
 class Generator:
     """Writes one module of classes and aliases from the component schemas."""
 
@@ -84,7 +97,7 @@ class Generator:
             if key in schema:
                 variants = schema[key]
                 names = self.variant_names(variants, parent)
-                return self.union(
+                return self.discriminated(
                     [self.type_of(s, n) for s, n in zip(variants, names, strict=True)]
                 )
         if "allOf" in schema and len(schema["allOf"]) == 1:
@@ -150,10 +163,27 @@ class Generator:
         named = {id(v): parent + suffix for v, suffix in zip(inline, suffixes, strict=True)}
         return [named.get(id(v), parent) for v in variants]
 
+    def discriminated(self, types: list[str]) -> str:
+        """A union of models whose variants each have their own value of one Literal
+        property (Field's `type`) as Pydantic's discriminated union: a reply validates
+        as the variant that value names, so one that doesn't match reports that variant's
+        differences, not every variant's, and an unknown value is a single error."""
+        union = self.union(types)
+        variants = [part for part in split(union) if part != "None"]
+        tags = [self.discriminators.get(variant) for variant in variants]
+        if self.mode != "model" or len(variants) < 2 or None in tags:
+            return union
+        props = {tag[0] for tag in tags if tag}
+        if len(props) != 1 or len({tag[1] for tag in tags if tag}) != len(tags):
+            return union
+        prop = json.dumps(props.pop())
+        annotated = f"Annotated[{' | '.join(variants)}, _Field(discriminator={prop})]"
+        return self.union([annotated, "None"]) if "None" in split(union) else annotated
+
     def union(self, types: list[str]) -> str:
         parts: list[str] = []
         for t in types:
-            for part in t.split(" | "):
+            for part in split(t):
                 if part not in parts:
                     parts.append(part)
         if "Any" in parts:
@@ -327,7 +357,7 @@ def main() -> None:
             '"""The API\'s resources, as the SDK returns them."""\n\n'
             "from __future__ import annotations\n\n"
             "from datetime import datetime\n"
-            "from typing import Any, Literal, TypeAlias\n\n"
+            "from typing import Annotated, Any, Literal, TypeAlias\n\n"
             "from pydantic import BaseModel as _BaseModel\n"
             "from pydantic import ConfigDict as _ConfigDict\n"
             "from pydantic import Field as _Field\n\n\n"
