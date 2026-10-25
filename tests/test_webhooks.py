@@ -217,6 +217,12 @@ def test_rejects(body: str, headers: dict[str, str]) -> None:
         unwrap(body, headers, secret=SECRET)
 
 
+@pytest.mark.parametrize("secret", ["", "whsec_"])
+def test_rejects_an_empty_secret(secret: str) -> None:
+    with pytest.raises(WebhookVerificationError, match="empty"):
+        unwrap(BODY, sign(BODY), secret=secret)
+
+
 def test_rejects_a_secret_that_is_not_base64() -> None:
     with pytest.raises(WebhookVerificationError, match="not base64"):
         unwrap(BODY, sign(BODY), secret="whsec_not base64!")
