@@ -128,16 +128,18 @@ def test_a_purged_asset_is_only_its_id() -> None:
 def test_parts_that_do_not_match_come_unvalidated() -> None:
     body = event("asset.created", {"asset": {"id": "ast_1", "object": "asset", "status": 7}})
     received = unwrap(body, sign(body), secret=SECRET)
-    with pytest.warns(NoheadWarning):
+    with pytest.warns(NoheadWarning) as warned:
         asset = received.asset
+    assert warned[0].filename == __file__  # where it was read
     assert isinstance(asset, Asset)
     assert (asset.id, asset.status) == ("ast_1", 7)
 
 
 def test_an_envelope_that_does_not_match_comes_unvalidated() -> None:
     body = event("record.published", {"record": None}, created_at="yesterday", via=["api"])
-    with pytest.warns(NoheadWarning):
+    with pytest.warns(NoheadWarning) as warned:
         received = unwrap(body, sign(body), secret=SECRET)
+    assert warned[0].filename == __file__
     assert (received.id, received.created_at) == ("wev_3", "yesterday")
     assert received.record is None
 
@@ -180,39 +182,27 @@ def test_accepts_timestamps_up_to_the_tolerance_off() -> None:
 @pytest.mark.parametrize(
     ("body", "headers"),
     [
-        (BODY.replace("Hi", "Bye"), sign(BODY)),
-        (BODY, sign(BODY) | {"webhook-id": "msg_2"}),
-        (BODY, {k: v.replace("v1,", "v2,") for k, v in sign(BODY).items()}),
-        (BODY, sign(BODY, secret=OTHER_SECRET)),
-        (BODY, sign(BODY, NOW - 301)),
-        (BODY, sign(BODY, NOW + 301)),
-        (BODY, sign(BODY) | {"webhook-timestamp": "soon"}),
         (BODY, sign(BODY) | {"webhook-signature": "v1,ü"}),
         (BODY, sign(BODY) | {"webhook-signature": "v1,\udc80"}),
         (BODY, sign(BODY) | {"webhook-id": "msg_\udc80"}),
-        (BODY, sign(BODY) | {"webhook-timestamp": str(NOW).translate(ARABIC_DIGITS)}),
         (BODY + "\udc80", sign(BODY)),
-        (BODY, {}),
         ("not json", sign("not json")),
+        (BODY, sign(BODY) | {"webhook-timestamp": str(NOW).translate(ARABIC_DIGITS)}),
     ],
     ids=[
-        "changed body",
-        "changed webhook-id",
-        "signature of another version",
-        "wrong secret",
-        "old timestamp",
-        "future timestamp",
-        "timestamp not a number",
         "signature not ascii",
         "signature with a lone surrogate",
         "webhook-id with a lone surrogate",
-        "timestamp in other digits",
         "body with a lone surrogate",
-        "missing headers",
         "body not json",
+        "timestamp in other digits",
     ],
 )
-def test_rejects(body: str, headers: dict[str, str]) -> None:
+def test_rejects_what_the_standard_webhooks_library_fails_on(
+    body: str, headers: dict[str, str]
+) -> None:
+    # The library raises ValueError, UnicodeEncodeError or JSONDecodeError on these, or
+    # (other digits) accepts the timestamp; unwrap raises only WebhookVerificationError.
     with pytest.raises(WebhookVerificationError):
         unwrap(body, headers, secret=SECRET)
 
@@ -293,6 +283,8 @@ def test_accepts_one_matching_signature_among_several(order: list[int]) -> None:
         (BODY, sign(BODY) | {"webhook-id": "msg_2"}, SECRET),
         (BODY, {k: v.replace("v1,", "v2,") for k, v in sign(BODY).items()}, SECRET),
         (BODY, {k: v for k, v in sign(BODY).items() if k != "webhook-signature"}, SECRET),
+        (BODY, {}, SECRET),
+        (BODY, sign(BODY) | {"webhook-timestamp": "soon"}, SECRET),
     ],
     ids=[
         "tampered non-ascii body",
@@ -306,6 +298,8 @@ def test_accepts_one_matching_signature_among_several(order: list[int]) -> None:
         "changed webhook-id",
         "only another version's signature",
         "no signature",
+        "no headers",
+        "timestamp not a number",
     ],
 )
 def test_rejects_what_the_standard_webhooks_library_rejects(
