@@ -71,4 +71,4 @@ def image_url(
 def _number(value: float) -> str:
     """A number as the other SDKs write it: a whole one without `.0` (2.0 is 2), any
     other in full (1.2345678, not rounded)."""
-    return str(int(value)) if isinstance(value, float) and value.is_integer() else repr(value)
+    return str(int(value)) if isinstance(value, float) and value.is_integer() else str(value)

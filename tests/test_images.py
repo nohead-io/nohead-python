@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 import pytest
 
 from nohead.images import image_url
@@ -42,6 +44,11 @@ def test_writes_numbers_as_the_other_sdks_do() -> None:
     assert image_url(BASE, width=400, dpr=1.2345678) == at("rs:fit:400:0/dpr:1.2345678")
     assert image_url(BASE, width=400, dpr=0, quality=0) == at("rs:fit:400:0")
     assert image_url(BASE, width=0.0, height=300, dpr=0.0, quality=0.0) == at("rs:fit:0:300")
+
+
+def test_writes_other_number_types_plainly() -> None:
+    # Decimal (or a NumPy float) as 0.8.0 wrote it, never its repr.
+    assert "/dpr:1.5/" in image_url(BASE, dpr=Decimal("1.5"))  # pyright: ignore[reportArgumentType]
 
 
 def test_refuses_options_that_would_break_the_path() -> None:
