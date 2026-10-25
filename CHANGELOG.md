@@ -7,6 +7,14 @@ section is its GitHub release's notes.
 
 ## Unreleased
 
+- A field (`Field`, `FieldCreate`) is validated as the model its `type`
+  names, and a batch result as the one its `status` names, instead of
+  against every variant: a response that doesn't match the models warns with
+  that model's name and its own differences (3, say, instead of 43), and an
+  unknown `type` is a single difference. `Field` and `FieldCreate` are now
+  `Annotated` unions, so `isinstance(value, Field)` raises `TypeError`; check
+  the model (`isinstance(field, TextField)`) or `field.type` instead.
+
 - A `NoheadWarning` (a deprecated operation, usage over a plan limit, or a
   response that doesn't match the models) points at the line of your code
   that made the call, iterated the pages or read the webhook event, instead of

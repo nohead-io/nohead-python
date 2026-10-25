@@ -5,11 +5,11 @@ from datetime import UTC, date, datetime
 
 import pytest
 
-from nohead import NoheadError
-from nohead.models import RecordBatchResultsFailed, RecordBatchResultsSucceeded
+from nohead import NoheadError, models
+from nohead.models import RecordBatchResultsFailed, RecordBatchResultsSucceeded, TextField
 
 from .conftest import LAST_PAGE, Make, json_response, make_sync, page, raw, record, resolve
-from .spec import example_of
+from .spec import SPEC, example_of
 
 
 def test_encodes_path_parameters() -> None:
@@ -289,6 +289,47 @@ def test_parses_what_it_can_of_a_response_missing_a_field() -> None:
     with pytest.warns(nohead_warning()):
         post = nohead.records.get("rec_1")
     assert post.created_at == datetime(2026, 10, 2, 12, tzinfo=UTC)
+
+
+FIELD_TYPES = SPEC["components"]["schemas"]["Field"]["discriminator"]["mapping"]
+
+
+@pytest.mark.parametrize("kind", FIELD_TYPES)
+def test_parses_every_field_type_as_its_model(kind: str) -> None:
+    model = FIELD_TYPES[kind].rsplit("/", 1)[1]
+    body = example_of(model)
+    nohead, _ = make_sync([json_response(200, body), page([body], has_more=False)])
+    field = nohead.fields.get("fld_1")
+    listed = next(iter(nohead.fields.list("posts")))
+    for parsed in (field, listed):
+        assert type(parsed) is getattr(models, model)
+        assert (parsed.type, parsed.id) == (kind, body["id"])
+
+
+def test_a_field_that_does_not_match_counts_only_its_types_differences() -> None:
+    # Field is a union discriminated by `type`: a text field is checked as a text
+    # field only, not against every field type (43 differences, not 3).
+    body = example_of("TextField")
+    del body["name"], body["key"], body["configuration"]
+    nohead, _ = make_sync([raw(json_response(200, body))])
+    with pytest.warns(
+        nohead_warning(), match=r"SDK's TextField model; returning it unvalidated \(3 differences\)"
+    ):
+        field = nohead.fields.get("fld_1")
+    assert isinstance(field, TextField)
+    assert (field.id, field.type) == (body["id"], "text")
+
+
+def test_a_field_of_a_type_the_sdk_does_not_know_comes_unvalidated() -> None:
+    body = example_of("TextField", type="geo", configuration={"precision": 6})
+    nohead, _ = make_sync([raw(json_response(200, body))])
+    with pytest.warns(nohead_warning(), match=r"\(1 differences\)"):
+        field = nohead.fields.get("fld_1")
+    # Built as the model it fits best, keeping what it says.
+    assert isinstance(field, TextField)
+    assert (field.id, field.type) == (body["id"], "geo")
+    assert field.configuration.model_extra == {"precision": 6}
+    assert field.created_at == datetime(2026, 9, 27, 12, tzinfo=UTC)
 
 
 def nohead_warning() -> type[Warning]:

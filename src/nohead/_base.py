@@ -9,6 +9,7 @@ import platform
 import random
 import re
 import threading
+import types
 import typing
 import urllib.parse
 import uuid
@@ -232,7 +233,9 @@ def validate(kind: Any, data: Any) -> Any:
     try:
         return _adapter(kind).validate_python(data)
     except PydanticValidationError as error:
-        name = getattr(kind, "__name__", str(kind))
+        # Of a union (Field), the model it is returned as.
+        model = _model_of(kind, data) if isinstance(data, dict) else None  # pyright: ignore[reportUnknownArgumentType]
+        name = model.__name__ if model else getattr(kind, "__name__", str(kind))
         if first_warning(f"shape:{name}"):
             _warnings.warn(
                 f"The API's response did not match the SDK's {name} "
@@ -281,23 +284,33 @@ def _field(kind: Any, value: Any) -> Any:
         return value
 
 
+def _parts(kind: Any) -> list[Any]:
+    """The types of a union, `X | None`, also inside `Annotated[...]` (a discriminated
+    union, such as Field); `[kind]` when it is not one."""
+    origin = typing.get_origin(kind)
+    if origin is typing.Annotated:
+        return _parts(typing.get_args(kind)[0])
+    if origin is typing.Union or origin is types.UnionType:
+        return [part for arg in typing.get_args(kind) for part in _parts(arg)]
+    return [kind]
+
+
 def _item_of(kind: Any) -> Any:
     """The item type of `list[X]`, also inside `list[X] | None`; else Any."""
-    if typing.get_origin(kind) is list:
-        return typing.get_args(kind)[0]
-    lists = [arg for arg in typing.get_args(kind) if typing.get_origin(arg) is list]
+    lists = [part for part in _parts(kind) if typing.get_origin(part) is list]
     return typing.get_args(lists[0])[0] if lists else Any
 
 
 def _model_of(kind: Any, data: dict[str, Any]) -> type[BaseModel] | None:
-    """The model class in `kind`, also inside `X | None` and `list[X]`. Of a union of
-    models, the one `data` fits best: its Literal fields match, and its required ones
-    are there."""
-    if isinstance(kind, type) and issubclass(kind, BaseModel):
-        return kind
-    models = [
-        arg for arg in typing.get_args(kind) if isinstance(arg, type) and issubclass(arg, BaseModel)
+    """The model class in `kind`, also inside `X | None`, `list[X]` and `Annotated[X,
+    ...]`. Of a union of models, the one `data` fits best: its Literal fields match, and
+    its required ones are there."""
+    parts = [
+        item
+        for part in _parts(kind)
+        for item in (_parts(_item_of(part)) if typing.get_origin(part) is list else [part])
     ]
+    models = [part for part in parts if isinstance(part, type) and issubclass(part, BaseModel)]
     if not models:
         return None
     return max(models, key=lambda model: _fit(model, data))

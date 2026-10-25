@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal, TypeAlias
+from typing import Annotated, Any, Literal, TypeAlias
 
 from pydantic import BaseModel as _BaseModel
 from pydantic import ConfigDict as _ConfigDict
@@ -1053,7 +1053,11 @@ class RecordBatch(NoheadModel):
     action: str
     succeeded: int
     failed: int
-    results: list[RecordBatchResultsSucceeded | RecordBatchResultsFailed]
+    results: list[
+        Annotated[
+            RecordBatchResultsSucceeded | RecordBatchResultsFailed, _Field(discriminator="status")
+        ]
+    ]
 
 
 class AuditEventProject(NoheadModel):
@@ -1422,7 +1426,7 @@ Timestamp: TypeAlias = datetime
 NullableTimestamp: TypeAlias = datetime | None
 RecordFilterValue: TypeAlias = str | RecordFilterValueObject
 FieldType: TypeAlias = str
-Field: TypeAlias = (
+Field: TypeAlias = Annotated[
     TextField
     | LongTextField
     | RichTextField
@@ -1433,8 +1437,9 @@ Field: TypeAlias = (
     | EnumField
     | AssetField
     | RelationField
-    | JsonField
-)
+    | JsonField,
+    _Field(discriminator="type"),
+]
 FieldConfiguration: TypeAlias = (
     TextFieldConfiguration
     | LongTextFieldConfiguration
@@ -1448,7 +1453,7 @@ FieldConfiguration: TypeAlias = (
     | RelationFieldConfiguration
     | JsonFieldConfiguration
 )
-FieldCreate: TypeAlias = (
+FieldCreate: TypeAlias = Annotated[
     TextFieldCreate
     | LongTextFieldCreate
     | RichTextFieldCreate
@@ -1459,8 +1464,9 @@ FieldCreate: TypeAlias = (
     | EnumFieldCreate
     | AssetFieldCreate
     | RelationFieldCreate
-    | JsonFieldCreate
-)
+    | JsonFieldCreate,
+    _Field(discriminator="type"),
+]
 SchemaChange: TypeAlias = SchemaChangeProperties
 RecordRevisionOperation: TypeAlias = str
 Via: TypeAlias = str
