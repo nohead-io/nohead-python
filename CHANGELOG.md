@@ -5,6 +5,13 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- `unwrap` raises `WebhookVerificationError`, not `TypeError`, when a
+  `webhook-signature` header has a non-ASCII character.
+
+- The package declares its `typing-extensions` dependency (4.12 or later).
+
 ## 0.8.0
 
 - `Asset` has `file_url`, the file as uploaded, which downloads under its

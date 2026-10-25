@@ -179,10 +179,13 @@ def unwrap(
     except binascii.Error:
         raise WebhookVerificationError("The webhook secret is not base64") from None
     signed = webhook_id.encode() + b"." + timestamp.encode() + b"." + raw
-    expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest()).decode()
+    expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest())
     for entry in signatures.split(" "):
         version, _, signature = entry.partition(",")
-        if version == "v1" and hmac.compare_digest(signature, expected):
+        # As bytes: compare_digest refuses str with non-ASCII characters (a TypeError),
+        # and "replace" keeps a lone surrogate from failing to encode.
+        candidate = signature.encode(errors="replace")
+        if version == "v1" and hmac.compare_digest(candidate, expected):
             try:
                 event: object = json.loads(raw)
             except ValueError:
