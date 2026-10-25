@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import os
 import platform
@@ -33,6 +34,22 @@ MAX_RETRY_AFTER_SECONDS = 60.0
 
 class NoheadWarning(UserWarning):
     """A deprecated operation, or usage over a soft plan limit. Shown once each."""
+
+
+_PACKAGE = os.path.dirname(os.path.abspath(__file__)) + os.sep
+
+
+def _outside_the_sdk() -> int:
+    """The `stacklevel` that points a warning at the code that called the SDK, for the
+    function that calls this one: the number of frames up to the first one outside the
+    package (a method, a page fetched while iterating, a model's property...)."""
+    here = inspect.currentframe()
+    frame = here.f_back if here is not None else None  # the function that warns
+    level = 1
+    while frame is not None and frame.f_code.co_filename.startswith(_PACKAGE):
+        frame = frame.f_back
+        level += 1
+    return level
 
 
 _warned_deprecations: set[str] = set()
@@ -199,7 +216,7 @@ def validate(kind: Any, data: Any) -> Any:
             f"model; returning it unvalidated ({error.error_count()} differences). "
             "Updating the SDK should fix this.",
             NoheadWarning,
-            stacklevel=4,
+            stacklevel=_outside_the_sdk(),
         )
         return _unvalidated(kind, data)
 
@@ -318,8 +335,8 @@ def warn(settings: Settings, operation: str, response: httpx.Response) -> None:
             message += f" and will be removed after {sunset}"
         if link:
             message += f". See {link}"
-        _warnings.warn(message, NoheadWarning, stacklevel=4)
+        _warnings.warn(message, NoheadWarning, stacklevel=_outside_the_sdk())
     usage = response.headers.get("nohead-usage-warning")
     if usage and not _warned_usage:
         _warned_usage = True
-        _warnings.warn(f"Over a plan limit: {usage}", NoheadWarning, stacklevel=4)
+        _warnings.warn(f"Over a plan limit: {usage}", NoheadWarning, stacklevel=_outside_the_sdk())
