@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 
 from typing_extensions import Unpack
 
+from ..._base import one_or_in
 from ..._errors import UploadError
 from ..._pagination import AsyncPaginator
 from ..._uploads import Uploadable, open_upload
@@ -108,8 +109,8 @@ class AsyncAssets(AsyncResource):
             query={
                 "q": q,
                 "filter": {
-                    "kind": _one_or_in(kind),
-                    "content_type": _one_or_in(content_type),
+                    "kind": one_or_in(kind),
+                    "content_type": one_or_in(content_type),
                     "deleted": deleted,
                 },
                 "limit": limit,
@@ -168,8 +169,3 @@ class AsyncAssets(AsyncResource):
         many of them are published (`published`), and the 10 most recently updated with
         the fields they use it in (`uses`). Needs the `records:read` scope too."""
         return await self._client.request("assets_usage", cast=AssetUsage, path={"asset_id": asset})
-
-
-def _one_or_in(value: str | Sequence[str] | None) -> str | dict[str, list[str]] | None:
-    """One value as it is, several as `[in]`."""
-    return value if value is None or isinstance(value, str) else {"in": list(value)}

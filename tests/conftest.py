@@ -172,7 +172,5 @@ BACKOFF = _base.backoff
 def no_backoff(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Retries wait no time in tests, and each test warns afresh."""
     monkeypatch.setattr(_base, "backoff", lambda attempt: 0.0)  # pyright: ignore[reportUnknownLambdaType]
-    monkeypatch.setattr(_base, "_warned_shapes", set[str]())
-    monkeypatch.setattr(_base, "_warned_deprecations", set[str]())
-    monkeypatch.setattr(_base, "_warned_usage", False)
+    monkeypatch.setattr(_base, "_warned", set[str]())
     yield

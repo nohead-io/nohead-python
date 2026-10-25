@@ -23,6 +23,32 @@ section is its GitHub release's notes.
 
 - The package declares its `typing-extensions` dependency (4.12 or later).
 
+- `assets.upload` of a pipe or socket without `byte_size` raises
+  `UploadError` ("needs byte_size"), as for any stream that cannot seek,
+  instead of declaring the size of what the pipe had buffered (nothing, on
+  Linux).
+
+- A missing or empty path value, such as `records.get("")`, raises
+  `NoheadError` ("Missing record_id") before sending anything, instead of
+  requesting another URL (`GET /v1/records/`, a `NotFoundError`).
+
+- `assets.upload` guesses the content type from the filename's extension with
+  the same table as the other Nohead SDKs (images, PDF, JSON, text, Markdown,
+  CSV, MP3, MP4, WebM and ZIP), else `application/octet-stream`, so it no
+  longer depends on the platform and Python version (`mimetypes`). Pass
+  `content_type` for any other type.
+
+- A request that cannot be sent at all (a `base_url` with an unsupported
+  scheme, a header httpx refuses) raises `NoheadError` straight away
+  ("Could not send the request"), instead of being retried and reported as
+  `APIConnectionError` ("Could not reach"). A dropped connection, a timeout
+  and a network or proxy error are still retried.
+
+- `image_url` writes numbers as the other Nohead SDKs do: a whole float
+  without `.0` (`width=800.0` is `800`, `quality=80.0` is `q:80`) and `dpr`
+  in full (`1.2345678`, which was cut to 6 significant digits). `width`,
+  `height` and `quality` are typed as `float`, so computed sizes type-check.
+
 ## 0.8.0
 
 - `Asset` has `file_url`, the file as uploaded, which downloads under its

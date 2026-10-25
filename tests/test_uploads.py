@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -118,6 +119,36 @@ async def test_needs_byte_size_for_a_stream(make: Make) -> None:
     nohead, _ = make([CREATED])
     with pytest.raises(UploadError):
         await resolve(nohead.assets.upload(Stream(b"hello")))
+
+
+async def test_needs_byte_size_for_a_pipe(make: Make) -> None:
+    # fstat knows only what a pipe has buffered (nothing, on Linux), not its size.
+    read, write = os.pipe()
+    os.write(write, b"hello")
+    os.close(write)
+    nohead, calls = make([CREATED])
+    with os.fdopen(read, "rb") as pipe, pytest.raises(UploadError, match="byte_size"):
+        await resolve(nohead.assets.upload(pipe))
+    assert calls.calls == []
+
+
+@pytest.mark.parametrize(
+    ("filename", "content_type"),
+    [
+        ("notes.md", "text/markdown"),
+        ("Photo.JPG", "image/jpeg"),
+        ("data.json.gz", "application/octet-stream"),
+        ("page.html", "application/octet-stream"),
+        ("README", "application/octet-stream"),
+        (".png", "application/octet-stream"),
+    ],
+)
+async def test_guesses_the_content_type_as_the_other_sdks_do(
+    make: Make, filename: str, content_type: str
+) -> None:
+    nohead, calls = make([CREATED, STORED, READY])
+    await resolve(nohead.assets.upload(b"x", filename=filename))
+    assert calls.body(0)["content_type"] == content_type
 
 
 async def test_retries_the_bytes_on_a_server_error(make: Make) -> None:

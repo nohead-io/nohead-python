@@ -22,11 +22,11 @@ class _Image(Protocol):
 def image_url(
     image: str | _Image,
     *,
-    width: int | None = None,
-    height: int | None = None,
+    width: float | None = None,
+    height: float | None = None,
     fit: Literal["contain", "cover", "fill"] = "contain",
     format: Literal["webp", "avif", "jpeg", "png"] | None = None,
-    quality: int | None = None,
+    quality: float | None = None,
     dpr: float | None = None,
     gravity: str | None = None,
     options: Sequence[str] = (),
@@ -52,13 +52,13 @@ def image_url(
 
     segments: list[str] = []
     if width or height:
-        segments.append(f"rs:{_FITS[fit]}:{width or 0}:{height or 0}")
+        segments.append(f"rs:{_FITS[fit]}:{_number(width or 0)}:{_number(height or 0)}")
     if gravity:
         segments.append(f"g:{gravity}")
     if dpr:
-        segments.append(f"dpr:{dpr:g}")
+        segments.append(f"dpr:{_number(dpr)}")
     if quality:
-        segments.append(f"q:{quality}")
+        segments.append(f"q:{_number(quality)}")
     segments.extend(options)
 
     # The source comes last; a format replaces any the URL already names.
@@ -66,3 +66,9 @@ def image_url(
     if format:
         source = f"{re.sub(r'@[a-z]+$', '', source)}@{format}"
     return base[:at] + "".join(f"/{segment}" for segment in segments) + source
+
+
+def _number(value: float) -> str:
+    """A number as the other SDKs write it: a whole one without `.0` (2.0 is 2), any
+    other in full (1.2345678, not rounded)."""
+    return str(int(value)) if isinstance(value, float) and value.is_integer() else str(value)

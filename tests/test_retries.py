@@ -13,10 +13,12 @@ from nohead import (
     APIError,
     APITimeoutError,
     InternalServerError,
+    NoheadError,
     _base,
 )
 
 from .conftest import BACKOFF, Make, api_error, json_response, record, resolve
+from .spec import example_of
 
 NOW = {"retry-after": "0"}
 BACKOFF_WAIT = 0.25
@@ -59,6 +61,7 @@ RETRIES: list[tuple[str, httpx.Response | Exception, list[float] | None]] = [
         [BACKOFF_WAIT],
     ),
     ("connection error", httpx.ConnectError("refused"), [BACKOFF_WAIT]),
+    ("dropped connection", httpx.RemoteProtocolError("Server disconnected"), [BACKOFF_WAIT]),
     ("timeout", httpx.ReadTimeout("slow"), [BACKOFF_WAIT]),
 ]
 
@@ -136,6 +139,43 @@ async def test_stops_after_max_retries(make: Make) -> None:
     with pytest.raises(APIConnectionError):
         await resolve(nohead.records.get("r"))
     assert len(calls.calls) == 1
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        httpx.UnsupportedProtocol("Request URL has an unsupported protocol 'ftp://'."),
+        httpx.LocalProtocolError("Illegal header value"),
+    ],
+)
+async def test_does_not_retry_a_request_that_cannot_be_sent(
+    make: Make, error: httpx.TransportError, waits: list[float]
+) -> None:
+    nohead, calls = make([error])
+    with pytest.raises(NoheadError, match="Could not send the request") as caught:
+        await resolve(nohead.records.get("r"))
+    assert not isinstance(caught.value, APIConnectionError)
+    assert len(calls.calls) == 1
+    assert waits == []
+
+
+async def test_does_not_retry_an_upload_that_cannot_be_sent(make: Make) -> None:
+    created = json_response(
+        201,
+        {
+            **example_of("Asset", id="ast_1", project_id="prj_1", status="pending"),
+            "upload": {
+                "method": "PUT",
+                "url": "ftp://storage.test/uploads/ast_1",
+                "headers": {},
+                "expires_at": "2999-01-01T00:00:00Z",
+            },
+        },
+    )
+    nohead, calls = make([created, httpx.UnsupportedProtocol("unsupported protocol")])
+    with pytest.raises(NoheadError, match="Could not send the request"):
+        await resolve(nohead.assets.upload(b"x"))
+    assert [c.method for c in calls.calls] == ["POST", "PUT"]
 
 
 async def test_takes_max_retries_and_timeout_per_client_copy(make: Make) -> None:

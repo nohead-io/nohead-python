@@ -1,6 +1,7 @@
 # pyright: reportPrivateUsage=false
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Mapping, Sequence
 from types import TracebackType
 from typing import Any, Self
@@ -101,14 +102,11 @@ class AsyncNohead:
         """A client with other settings that shares this one's connections:
         `nohead.with_options(timeout=5).records.get(id)`."""
         current = self._client.settings
-        settings = _base.Settings(
-            api_key=current.api_key,
-            base_url=current.base_url,
-            project_id=current.project_id,
+        settings = dataclasses.replace(
+            current,
             max_retries=current.max_retries if max_retries is None else max_retries,
             timeout=current.timeout if timeout is None else timeout,
             headers={**current.headers, **(headers or {})},
-            warnings=current.warnings,
         )
         copy = object.__new__(type(self))
         copy._setup(self._client.copy(settings))
