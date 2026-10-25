@@ -135,9 +135,8 @@ class AsyncAPIClient:
                     timeout=settings.timeout,
                 )
             except httpx.TransportError as error:
-                failure = _connection_error(error, settings.timeout, url)
-                if attempt >= settings.max_retries:
-                    raise failure from error
+                if attempt >= settings.max_retries or not _retryable(error):
+                    raise _connection_error(error, settings.timeout, url) from error
                 await asyncio.sleep(_base.backoff(attempt))
                 attempt += 1
                 continue
@@ -171,13 +170,21 @@ class AsyncAPIClient:
                 if response.status_code not in _base.RETRYABLE_STATUSES or attempt >= retries:
                     return response
             except httpx.TransportError as error:
-                if attempt >= retries:
+                if attempt >= retries or not _retryable(error):
                     raise _connection_error(error, settings.timeout, url) from error
             await asyncio.sleep(_base.backoff(attempt))
             attempt += 1
 
 
+def _retryable(error: httpx.TransportError) -> bool:
+    return isinstance(error, _base.RETRYABLE_TRANSPORT_ERRORS)
+
+
 def _connection_error(error: httpx.TransportError, timeout: float, url: str) -> NoheadError:
+    if not _retryable(error):
+        # The request itself can't be sent (an unsupported URL scheme, say): not a
+        # connection problem.
+        return NoheadError(f"Could not send the request: {error}")
     host = httpx.URL(url).host
     if isinstance(error, httpx.TimeoutException):
         return APITimeoutError(f"The request to {host} timed out after {timeout} s")

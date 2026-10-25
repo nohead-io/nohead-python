@@ -8,11 +8,12 @@ import os
 import platform
 import random
 import re
+import threading
 import typing
 import urllib.parse
 import uuid
 import warnings as _warnings
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from functools import cache
@@ -23,12 +24,20 @@ import httpx
 from pydantic import BaseModel, TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 
-from ._errors import APIError, NoheadError
+from ._errors import APIError, NoheadError, retry_after_seconds
 from ._version import __version__
 from .types import IfMatch
 
 DEFAULT_BASE_URL = "https://api.nohead.io"
 RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
+RETRYABLE_TRANSPORT_ERRORS = (
+    httpx.TimeoutException,
+    httpx.NetworkError,
+    httpx.RemoteProtocolError,  # a dropped connection
+    httpx.ProxyError,
+)
+"""Transport errors a retry can fix. The others (an unsupported URL scheme, a header
+httpx can't send) fail the same way every time."""
 MAX_RETRY_AFTER_SECONDS = 60.0
 
 
@@ -53,9 +62,17 @@ def _outside_the_sdk() -> int:
     return level
 
 
-_warned_deprecations: set[str] = set()
-_warned_shapes: set[str] = set()
-_warned_usage = False
+_warned: set[str] = set()
+_warned_lock = threading.Lock()
+
+
+def first_warning(key: str) -> bool:
+    """Whether `key` hasn't been warned about yet in this process (then it has)."""
+    with _warned_lock:
+        if key in _warned:
+            return False
+        _warned.add(key)
+        return True
 
 
 @dataclass(frozen=True)
@@ -99,12 +116,19 @@ def url(settings: Settings, template: str, values: Mapping[str, str | int]) -> s
     # A value the template doesn't take is a method out of step with its operation.
     if unknown := set(values) - set(re.findall(r"\{(\w+)\}", template)):
         raise TypeError(f"{', '.join(sorted(unknown))} is not a path parameter of {template}")
-    path = template
-    for name, value in values.items():
-        path = path.replace("{" + name + "}", quote(str(value), safe=""))
-    if "{" in path:
-        raise NoheadError(f"Missing a path parameter of {template}")
-    return settings.base_url + path
+
+    def value(match: re.Match[str]) -> str:
+        name = match[1]
+        if values.get(name) in (None, ""):
+            raise NoheadError(f"Missing {name}")
+        return quote(str(values[name]), safe="")
+
+    return settings.base_url + re.sub(r"\{(\w+)\}", value, template)
+
+
+def one_or_in(value: str | Sequence[str] | None) -> str | dict[str, list[str]] | None:
+    """A filter value as the API takes it: one as it is, several as `{"in": [...]}`."""
+    return value if value is None or isinstance(value, str) else {"in": list(value)}
 
 
 def query(params: Mapping[str, Any] | None) -> tuple[tuple[str, str], ...]:
@@ -209,16 +233,14 @@ def validate(kind: Any, data: Any) -> Any:
         return _adapter(kind).validate_python(data)
     except PydanticValidationError as error:
         name = getattr(kind, "__name__", str(kind))
-        if name in _warned_shapes:
-            return _unvalidated(kind, data)
-        _warned_shapes.add(name)
-        _warnings.warn(
-            f"The API's response did not match the SDK's {name} "
-            f"model; returning it unvalidated ({error.error_count()} differences). "
-            "Updating the SDK should fix this.",
-            NoheadWarning,
-            stacklevel=_outside_the_sdk(),
-        )
+        if first_warning(f"shape:{name}"):
+            _warnings.warn(
+                f"The API's response did not match the SDK's {name} "
+                f"model; returning it unvalidated ({error.error_count()} differences). "
+                "Updating the SDK should fix this.",
+                NoheadWarning,
+                stacklevel=_outside_the_sdk(),
+            )
         return _unvalidated(kind, data)
 
 
@@ -305,8 +327,6 @@ def parse(response: httpx.Response) -> Any:
 
 def retry_delay(error: APIError, attempt: int, max_retries: int) -> float | None:
     """Seconds to wait before retrying `error`, or None to raise it."""
-    from ._errors import retry_after_seconds
-
     if attempt >= max_retries:
         return None
     in_progress = error.status == 409 and any(d.code == "in_progress" for d in error.details)
@@ -324,11 +344,9 @@ def backoff(attempt: int) -> float:
 
 
 def warn(settings: Settings, operation: str, response: httpx.Response) -> None:
-    global _warned_usage
     if not settings.warnings:
         return
-    if response.headers.get("deprecation") and operation not in _warned_deprecations:
-        _warned_deprecations.add(operation)
+    if response.headers.get("deprecation") and first_warning(f"deprecation:{operation}"):
         sunset = response.headers.get("sunset")
         link = response.headers.get("link", "").partition("<")[2].partition(">")[0]
         message = f"{operation} is deprecated"
@@ -338,6 +356,5 @@ def warn(settings: Settings, operation: str, response: httpx.Response) -> None:
             message += f". See {link}"
         _warnings.warn(message, NoheadWarning, stacklevel=_outside_the_sdk())
     usage = response.headers.get("nohead-usage-warning")
-    if usage and not _warned_usage:
-        _warned_usage = True
+    if usage and first_warning("usage"):
         _warnings.warn(f"Over a plan limit: {usage}", NoheadWarning, stacklevel=_outside_the_sdk())

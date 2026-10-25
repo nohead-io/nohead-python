@@ -35,6 +35,15 @@ def test_writes_the_options_before_the_source_and_the_format_after_it() -> None:
     assert image_url(BASE + "@png", format="avif") == BASE + "@avif"
 
 
+def test_writes_numbers_as_the_other_sdks_do() -> None:
+    url = image_url(BASE, width=800.0, height=600.0, dpr=2.0, quality=80.0)
+    assert url == at("rs:fit:800:600/dpr:2/q:80")
+    assert image_url(BASE, width=400, dpr=1.5) == at("rs:fit:400:0/dpr:1.5")
+    assert image_url(BASE, width=400, dpr=1.2345678) == at("rs:fit:400:0/dpr:1.2345678")
+    assert image_url(BASE, width=400, dpr=0, quality=0) == at("rs:fit:400:0")
+    assert image_url(BASE, width=0.0, height=300, dpr=0.0, quality=0.0) == at("rs:fit:0:300")
+
+
 def test_refuses_options_that_would_break_the_path() -> None:
     with pytest.raises(ValueError, match="Not an imgproxy option"):
         image_url(BASE, gravity="fp:0.5/0.3")

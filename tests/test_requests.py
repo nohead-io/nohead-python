@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 
 import pytest
 
+from nohead import NoheadError
 from nohead.models import RecordBatchResultsFailed, RecordBatchResultsSucceeded
 
 from .conftest import LAST_PAGE, Make, json_response, make_sync, page, raw, record, resolve
@@ -15,6 +16,14 @@ def test_encodes_path_parameters() -> None:
     nohead, calls = make_sync([LAST_PAGE])
     nohead.records.list("my posts/1")
     assert calls.calls[0].url.raw_path.startswith(b"/v1/collections/my%20posts%2F1/records")
+
+
+@pytest.mark.parametrize("value", ["", None])
+def test_refuses_a_missing_path_parameter(value: str | None) -> None:
+    nohead, calls = make_sync([LAST_PAGE])
+    with pytest.raises(NoheadError, match="Missing record_id"):
+        nohead.records.get(value)  # pyright: ignore[reportArgumentType]
+    assert calls.calls == []
 
 
 def test_serializes_filters_sorts_and_expansions() -> None:

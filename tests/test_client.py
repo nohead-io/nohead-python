@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import platform
 import tomllib
 from contextlib import AsyncExitStack
@@ -98,7 +99,9 @@ def test_with_options_shares_the_connection() -> None:
     faster = nohead.with_options(timeout=5, headers={"X-Job": "import"})
     faster.records.get("rec_1")
     assert faster._client.http is nohead._client.http
-    assert faster._client.settings.timeout == 5
+    assert faster._client.settings == dataclasses.replace(
+        nohead._client.settings, timeout=5, headers={"X-Job": "import"}
+    )
     assert calls.calls[0].headers["x-job"] == "import"
 
 
