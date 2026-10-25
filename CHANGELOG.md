@@ -7,6 +7,12 @@ section is its GitHub release's notes.
 
 ## Unreleased
 
+- A `NoheadWarning` (a deprecated operation, usage over a plan limit, or a
+  response that doesn't match the models) points at the line of your code
+  that made the call, iterated the pages or read the webhook event, instead of
+  a line inside the SDK, so `warnings` filters by module and the default
+  once-per-location display work.
+
 - `unwrap` refuses an empty secret (`""` or `"whsec_"`, as from an unset
   environment variable) with `WebhookVerificationError` ("The webhook secret
   is empty"), instead of reporting that no signature matches.

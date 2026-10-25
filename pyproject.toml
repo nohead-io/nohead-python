@@ -67,3 +67,5 @@ reportPrivateUsage = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# A fixture that no longer matches the models warns: tests that expect a warning say so.
+filterwarnings = ["error::nohead.NoheadWarning"]

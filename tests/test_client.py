@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import platform
 import tomllib
+from contextlib import AsyncExitStack
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
 
 from nohead import AsyncNohead, Nohead, NoheadError, __version__
 
-from .conftest import json_response, make_async, make_sync, page, record
+from .conftest import LAST_PAGE, Make, json_response, make_sync, record, resolve
 
 
 def test_needs_an_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -73,21 +75,10 @@ ME = json_response(
 )
 
 
-def test_looks_up_the_project_once() -> None:
-    nohead, calls = make_sync([ME, page([], None)], project_id=None)
-    nohead.collections.list()
-    nohead.webhooks.list()
-    assert [c.url.path for c in calls.calls] == [
-        "/v1/me",
-        "/v1/projects/prj_9/collections",
-        "/v1/projects/prj_9/webhooks",
-    ]
-
-
-async def test_async_looks_up_the_project_once() -> None:
-    nohead, calls = make_async([ME, page([], None)], project_id=None)
-    await nohead.collections.list()
-    await nohead.assets.list()
+async def test_looks_up_the_project_once(make: Make) -> None:
+    nohead, calls = make([ME, LAST_PAGE], project_id=None)
+    await resolve(nohead.collections.list())
+    await resolve(nohead.assets.list())
     assert [c.url.path for c in calls.calls] == [
         "/v1/me",
         "/v1/projects/prj_9/collections",
@@ -111,13 +102,19 @@ def test_with_options_shares_the_connection() -> None:
     assert calls.calls[0].headers["x-job"] == "import"
 
 
-def test_context_managers() -> None:
-    with Nohead(api_key="nohead_sk_x") as nohead:
+@pytest.mark.parametrize("client", [Nohead, AsyncNohead])
+async def test_closes_its_connections_on_leaving_its_context(client: type[Any]) -> None:
+    async with AsyncExitStack() as stack:
+        nohead = client(api_key="nohead_sk_x")
+        if isinstance(nohead, AsyncNohead):
+            await stack.enter_async_context(nohead)
+        else:
+            stack.enter_context(nohead)
         assert not nohead._client.http.is_closed
     assert nohead._client.http.is_closed
 
 
-async def test_async_context_manager() -> None:
-    async with AsyncNohead(api_key="nohead_sk_x") as nohead:
-        assert not nohead._client.http.is_closed
-    assert nohead._client.http.is_closed
+async def test_leaves_a_given_http_client_open(make: Make) -> None:
+    nohead, _ = make([])
+    await resolve(nohead.close())
+    assert not nohead._client.http.is_closed

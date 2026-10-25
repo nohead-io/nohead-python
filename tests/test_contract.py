@@ -12,63 +12,21 @@ clients are checked."""
 from __future__ import annotations
 
 import inspect
-import json
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime
-from functools import cache
 from typing import Any
 
 import httpx
 import pytest
-from jsonschema import Draft202012Validator
 from pydantic import BaseModel
-from referencing import Registry, Resource
-from referencing.jsonschema import DRAFT202012
 
-from nohead import AsyncNohead, AsyncPage, Nohead, Page
+from nohead import AsyncNohead, AsyncPage, Nohead, NoheadWarning, Page
 from nohead._generated.operations import OPERATIONS
 
 from .calls import every_call, example_reply, mock_replies
-from .conftest import Recorder, make_async, make_sync
-from .spec import ROUTES, SPEC, VARIANTS, Parameter, at, pointer, route_of
-
-CONTRACT = "urn:nohead:openapi.json"
-REGISTRY = Registry().with_resource(
-    CONTRACT, Resource.from_contents(SPEC, default_specification=DRAFT202012)
-)
-
-
-@cache
-def _validator(pointer: str) -> Draft202012Validator:
-    return Draft202012Validator({"$ref": CONTRACT + pointer}, registry=REGISTRY)
-
-
-def errors(pointer: str, value: Any) -> list[str]:
-    """The errors of `value` against the schema at `pointer` in the contract."""
-    return [error.message for error in _validator(pointer).iter_errors(value)]
-
-
-def query_values(url: httpx.URL, params: list[Parameter]) -> dict[str, Any]:
-    """A request's query parameters by name, as their schemas read them: `filter[a][b]=v`
-    nests, and numbers and booleans are parsed when declared."""
-    types = {p.name: p.schema.get("type") for p in params}
-    values: dict[str, Any] = {}
-    for key, value in url.params.multi_items():
-        name, *path = [part for part in re.split(r"[\[\]]+", key) if part]
-        if path:
-            node = values.setdefault(name, {})
-            for part in path[:-1]:
-                node = node.setdefault(part, {})
-            node[path[-1]] = value
-        elif types.get(name) in ("integer", "number") and re.fullmatch(r"-?\d+(\.\d+)?", value):
-            values[name] = float(value) if "." in value else int(value)
-        elif types.get(name) == "boolean" and value in ("true", "false"):
-            values[name] = value == "true"
-        else:
-            values[name] = value
-    return values
-
+from .conftest import Recorder, api_error, json_response, make_async, make_sync, raw, record
+from .spec import ROUTES, VARIANTS, declared_headers, errors, route_of_request
 
 TIMESTAMP = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(Z|[+-]\d\d:\d\d)")
 
@@ -133,52 +91,18 @@ def every_parameter(nohead: Any) -> list[Callable[[], Any]]:
     ]
 
 
-# Headers that some operations declare and others don't.
-OPTIONAL_HEADERS = {"idempotency-key", "if-match", "nohead-change-note"}
-
-
-@cache
-def declared_headers(operation: str) -> frozenset[str]:
-    """The header parameters an operation declares, lowercased."""
-    method, path = OPERATIONS[operation]
-    owners = [pointer("paths", path), pointer("paths", path, method.lower())]
-    found: set[str] = set()
-    for owner in owners:
-        for index in range(len(at(owner)[1].get("parameters", []))):
-            parameter = at(f"{owner}/parameters/{index}")[1]
-            if parameter["in"] == "header":
-                found.add(parameter["name"].lower())
-    return frozenset(found)
-
-
 def check_requests(requests: list[httpx.Request], sent: dict[str, set[str]]) -> None:
-    """Checks one call's requests against their operations, noting the parameters sent."""
+    """Notes the query parameters one call's requests sent. (The mock transport checks
+    each request against its operation: tests/spec.py, check_request.)"""
     for request in requests:
-        route = route_of(request.method, request.url.path)
-        extra = (OPTIONAL_HEADERS & set(request.headers)) - declared_headers(route.id)
-        assert not extra, f"{route.id} sends undeclared headers {extra}"
-        keys = {key.split("[", 1)[0] for key in request.url.params}
-        declared = {p.name for p in route.query}
-        assert keys <= declared, f"{route.id} sends undeclared query parameters {keys - declared}"
-        values = query_values(request.url, route.query)
-        for param in route.query:
-            if param.name in values:
-                problems = errors(param.schema_at, values[param.name])
-                assert problems == [], f"{route.id} {param.name}"
-        if request.content:
-            assert route.body is not None, f"{route.id} takes no body"
-            assert errors(route.body.schema_at, json.loads(request.content)) == [], (
-                f"{route.id} body"
-            )
-        else:
-            assert not route.body_required, f"{route.id} needs a body"
-        sent.setdefault(route.id, set()).update(keys)
+        route = route_of_request(request)
+        sent.setdefault(route.id, set()).update(k.split("[", 1)[0] for k in request.url.params)
 
 
 def check_result(requests: list[httpx.Request], result: Any, variant: int) -> None:
     """The method returns the response its last request got."""
     last = requests[-1]
-    reply = example_reply(route_of(last.method, last.url.path), last, variant)
+    reply = example_reply(route_of_request(last), last, variant)
     assert comparable(result) == comparable(reply)
 
 
@@ -197,7 +121,6 @@ def api_requests(recorder: Recorder, start: int) -> list[httpx.Request]:
     return [r for r in recorder.calls[start:] if r.url.host == "api.test"]
 
 
-@pytest.mark.filterwarnings("error::nohead.NoheadWarning")
 @pytest.mark.parametrize("variant", range(VARIANTS))
 def test_the_sync_client_covers_the_contract(variant: int) -> None:
     nohead, recorder = make_sync([mock_replies(variant)])
@@ -210,7 +133,6 @@ def test_the_sync_client_covers_the_contract(variant: int) -> None:
     check_coverage(sent)
 
 
-@pytest.mark.filterwarnings("error::nohead.NoheadWarning")
 @pytest.mark.parametrize("variant", range(VARIANTS))
 async def test_the_async_client_covers_the_contract(variant: int) -> None:
     nohead, recorder = make_async([mock_replies(variant)])
@@ -278,3 +200,20 @@ def test_both_clients_have_the_same_methods() -> None:
     sync = set(public_methods(Nohead(api_key="nohead_sk_x")))
     assert sync == set(public_methods(AsyncNohead(api_key="nohead_sk_x")))
     assert "records.revisions.revert" in sync
+
+
+def test_the_mock_transport_checks_requests_and_replies() -> None:
+    """Every test's requests and replies are checked against the contract (conftest.py)."""
+    nohead, _ = make_sync([json_response(200, {"id": "rec_1"})])
+    with pytest.raises(AssertionError, match="records_get 200 reply does not match"):
+        nohead.records.get("rec_1")
+    nohead, _ = make_sync([api_error(500, "internal_error", detail="extra")])
+    with pytest.raises(AssertionError, match="records_get 500 reply does not match"):
+        nohead.records.get("rec_1")
+    nohead, _ = make_sync([json_response(200, record("rec_1"))])
+    with pytest.raises(AssertionError, match="undeclared query parameters"):
+        nohead._client.send("records_get", path={"record_id": "rec_1"}, query={"bogus": 1})
+    # raw() lets a reply that breaks the contract on purpose through.
+    nohead, _ = make_sync([raw(json_response(200, {"id": "rec_1"}))])
+    with pytest.warns(NoheadWarning):
+        assert nohead.records.get("rec_1").id == "rec_1"

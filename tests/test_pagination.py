@@ -1,75 +1,90 @@
-from __future__ import annotations
+"""Pages of lists, with each client (the `make` fixture)."""
 
-from itertools import islice
+from __future__ import annotations
 
 import pytest
 
 from nohead import AsyncPage, NoheadError, Page
 
-from .conftest import json_response, make_async, make_sync, page, record
+from .conftest import LAST_PAGE, Make, items, json_response, page, record, resolve
 
 
-def test_returns_the_first_page_then_pages_by_hand() -> None:
-    nohead, calls = make_sync([page([record("rec_1")], "c2"), page([record("rec_2")], None)])
-    first = nohead.records.list("posts", limit=1)
-    assert isinstance(first, Page)
+async def test_returns_the_first_page_then_pages_by_hand(make: Make) -> None:
+    nohead, calls = make(
+        [page([record("rec_1")], "c2", has_more=True), page([record("rec_2")], has_more=False)]
+    )
+    first = await resolve(nohead.records.list("posts", limit=1))
+    assert isinstance(first, Page | AsyncPage)
     assert [r.id for r in first.data] == ["rec_1"]
     assert first.meta.next_cursor == "c2"
     assert first.has_next_page()
     assert "cursor" not in calls.calls[0].url.params
-    second = first.get_next_page()
+    second = await resolve(first.get_next_page())
     assert second.data[0].id == "rec_2"
     assert calls.calls[1].url.params["cursor"] == "c2"
     assert not second.has_next_page()
     with pytest.raises(NoheadError):
-        second.get_next_page()
+        await resolve(second.get_next_page())
 
 
-def test_iterates_across_pages_keeping_the_parameters() -> None:
-    nohead, calls = make_sync(
-        [page([record("rec_1"), record("rec_2")], "c2"), page([record("rec_3")], None)]
+async def test_iterates_across_pages_keeping_the_parameters(make: Make) -> None:
+    nohead, calls = make(
+        [
+            page([record("rec_1"), record("rec_2")], "c2", has_more=True),
+            page([record("rec_3")], has_more=False),
+        ]
     )
-    ids = [r.id for r in nohead.records.list("posts", filter={"published_at": {"exists": False}})]
-    assert ids == ["rec_1", "rec_2", "rec_3"]
+    found = await items(nohead.records.list("posts", filter={"published_at": {"exists": False}}))
+    assert [r.id for r in found] == ["rec_1", "rec_2", "rec_3"]
     assert calls.calls[1].url.params["cursor"] == "c2"
     assert calls.calls[1].url.params["filter[published_at][exists]"] == "false"
 
 
-def test_stops_fetching_once_it_has_enough() -> None:
-    nohead, calls = make_sync([page([record("rec_1"), record("rec_2")], "c2")])
-    assert [r.id for r in islice(nohead.records.list("posts"), 1)] == ["rec_1"]
+async def test_stops_fetching_once_it_has_enough(make: Make) -> None:
+    nohead, calls = make([page([record("rec_1"), record("rec_2")], "c2", has_more=True)])
+    assert [r.id for r in await items(nohead.records.list("posts"), limit=1)] == ["rec_1"]
     assert len(calls.calls) == 1
 
 
-def test_resumes_from_a_cursor() -> None:
-    nohead, calls = make_sync([page([], None)])
-    nohead.records.list("posts", cursor="saved")
+@pytest.mark.parametrize(
+    ("next_cursor", "has_more"), [(None, True), ("c2", False)], ids=["no cursor", "no more"]
+)
+async def test_stops_unless_there_is_more_and_a_cursor(
+    make: Make, next_cursor: str | None, has_more: bool
+) -> None:
+    stop = page([record("rec_1")], next_cursor, has_more=has_more)
+    nohead, calls = make([stop, page([record("rec_2")], has_more=False)])
+    first = await resolve(nohead.records.list("posts"))
+    assert not first.has_next_page()
+    assert [r.id for r in await items(first)] == ["rec_1"]
+    assert len(calls.calls) == 1
+
+
+async def test_walks_past_an_empty_page(make: Make) -> None:
+    nohead, calls = make(
+        [
+            page([], "c2", has_more=True),
+            page([record("rec_1")], "c3", has_more=True),
+            page([], has_more=False),
+        ]
+    )
+    assert [r.id for r in await items(nohead.records.list("posts"))] == ["rec_1"]
+    assert [c.url.params.get("cursor") for c in calls.calls] == [None, "c2", "c3"]
+
+
+async def test_resumes_from_a_cursor(make: Make) -> None:
+    nohead, calls = make([LAST_PAGE])
+    await resolve(nohead.records.list("posts", cursor="saved"))
     assert calls.calls[0].url.params["cursor"] == "saved"
 
 
-def test_search_totals() -> None:
+async def test_search_totals(make: Make) -> None:
     body = {
         "data": [record("r")],
         "meta": {"next_cursor": None, "has_more": False, "total_estimate": 1},
     }
-    nohead, calls = make_sync([json_response(200, body)])
-    hits = nohead.search("hello", collections=["posts", "pages"])
+    nohead, calls = make([json_response(200, body)])
+    hits = await resolve(nohead.search("hello", collections=["posts", "pages"]))
     assert hits.meta.total_estimate == 1
     assert calls.calls[0].url.path == "/v1/projects/prj_1/search"
     assert calls.calls[0].url.params["filter[collection][in]"] == "posts,pages"
-
-
-async def test_async_iterates_across_pages() -> None:
-    nohead, calls = make_async([page([record("rec_1")], "c2"), page([record("rec_2")], None)])
-    ids = [r.id async for r in nohead.records.list("posts")]
-    assert ids == ["rec_1", "rec_2"]
-    assert len(calls.calls) == 2
-
-
-async def test_async_pages_by_hand() -> None:
-    nohead, _ = make_async([page([record("rec_1")], "c2"), page([record("rec_2")], None)])
-    first = await nohead.records.list("posts")
-    assert isinstance(first, AsyncPage)
-    assert first.data[0].id == "rec_1"
-    second = await first.get_next_page()
-    assert second.data[0].id == "rec_2"

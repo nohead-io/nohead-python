@@ -7,17 +7,18 @@ import pytest
 
 from nohead.models import RecordBatchResultsFailed, RecordBatchResultsSucceeded
 
-from .conftest import json_response, make_async, make_sync, page, record
+from .conftest import LAST_PAGE, Make, json_response, make_sync, page, raw, record, resolve
+from .spec import example_of
 
 
 def test_encodes_path_parameters() -> None:
-    nohead, calls = make_sync([page([], None)])
+    nohead, calls = make_sync([LAST_PAGE])
     nohead.records.list("my posts/1")
     assert calls.calls[0].url.raw_path.startswith(b"/v1/collections/my%20posts%2F1/records")
 
 
 def test_serializes_filters_sorts_and_expansions() -> None:
-    nohead, calls = make_sync([page([], None)])
+    nohead, calls = make_sync([LAST_PAGE])
     nohead.records.list(
         "posts",
         filter={
@@ -44,7 +45,7 @@ def test_serializes_filters_sorts_and_expansions() -> None:
 
 
 def test_serializes_filter_operators_escaping_commas_in_lists() -> None:
-    nohead, calls = make_sync([page([], None)])
+    nohead, calls = make_sync([LAST_PAGE])
     nohead.records.list(
         "products",
         filter={
@@ -66,12 +67,25 @@ def test_serializes_filter_operators_escaping_commas_in_lists() -> None:
     assert params["sort"] == "-price"
 
 
-def test_sends_bodies_as_json() -> None:
-    nohead, calls = make_sync([json_response(201, record("rec_1"))])
-    created = nohead.records.create("posts", data={"title": "Hi"})
+def test_leaves_missing_list_items_out_and_a_list_of_none() -> None:
+    nohead, calls = make_sync([LAST_PAGE])
+    nohead.records.list(
+        "products",
+        filter={"category": {"in": ["shoes", None]}, "tag": {"in": [None]}, "size": {"in": []}},
+        expand=[],
+    )
+    assert dict(calls.calls[0].url.params) == {"filter[category][in]": "shoes"}
+
+
+async def test_sends_bodies_as_json(make: Make) -> None:
+    nohead, calls = make([json_response(201, record("rec_1"))])
+    created = await resolve(
+        nohead.records.create("posts", data={"title": "Hi"}, change_note="Import")
+    )
     assert created.id == "rec_1"
     assert calls.calls[0].method == "POST"
     assert calls.calls[0].headers["content-type"] == "application/json"
+    assert calls.calls[0].headers["nohead-change-note"] == "Import"
     assert calls.body(0) == {"data": {"title": "Hi"}}
 
 
@@ -125,7 +139,7 @@ def test_if_match_from_a_revision_or_a_record() -> None:
 
 
 def test_search_filters_and_collections() -> None:
-    nohead, calls = make_sync([page([], None, total_estimate=0)])
+    nohead, calls = make_sync([page([], has_more=False, total_estimate=0)])
     nohead.search("hi", collections=["posts", "pages"], filter={"published_at": {"exists": True}})
     params = calls.calls[0].url.params
     assert params["filter[collection][in]"] == "posts,pages"
@@ -133,7 +147,7 @@ def test_search_filters_and_collections() -> None:
 
 
 def test_audit_events_filter_several_resource_types_and_a_time_range() -> None:
-    nohead, calls = make_sync([page([], None)])
+    nohead, calls = make_sync([LAST_PAGE])
     nohead.audit_events.list(
         filter={
             "type": "field.*",
@@ -151,7 +165,7 @@ def test_audit_events_filter_several_resource_types_and_a_time_range() -> None:
 
 
 def test_lists_assets_of_one_type_or_several() -> None:
-    nohead, calls = make_sync([page([], None), page([], None)])
+    nohead, calls = make_sync([LAST_PAGE, LAST_PAGE])
     nohead.assets.list(content_type="image/*").data  # noqa: B018 (fetches it)
     nohead.assets.list(content_type=["image/*", "application/pdf"]).data  # noqa: B018
     assert dict(calls.calls[0].url.params) == {"filter[content_type]": "image/*"}
@@ -161,7 +175,7 @@ def test_lists_assets_of_one_type_or_several() -> None:
 
 
 def test_searches_assets_and_lists_them_by_kind() -> None:
-    nohead, calls = make_sync([page([], None), page([], None)])
+    nohead, calls = make_sync([LAST_PAGE, LAST_PAGE])
     nohead.assets.list(q="hero jpg", kind="image").data  # noqa: B018 (fetches it)
     nohead.assets.list(kind=["image", "video"]).data  # noqa: B018
     assert dict(calls.calls[0].url.params) == {"q": "hero jpg", "filter[kind]": "image"}
@@ -202,7 +216,7 @@ def test_record_batch_results_a_newer_api_changed() -> None:
         "failed": 1,
         "results": [{"id": "rec_2", "status": "failed", "error": {"code": 7}}],
     }
-    nohead, _ = make_sync([json_response(200, batch)])
+    nohead, _ = make_sync([raw(json_response(200, batch))])
     with pytest.warns(nohead_warning()):
         result = nohead.records.bulk("posts", action="publish", record_ids=["rec_2"])
     # Unvalidated, it is still the variant it says it is.
@@ -221,9 +235,8 @@ def test_change_note_in_any_language_percent_encoded() -> None:
     assert calls.calls[2].headers["nohead-change-note"] == "Cut%20%EF%BF%BD"
 
 
-@pytest.mark.filterwarnings("ignore::nohead.NoheadWarning")
 def test_dry_runs_are_query_parameters() -> None:
-    preview = {"object": "field_migration_preview", "field_id": "fld_1"}
+    preview = example_of("FieldMigrationPreview", field_id="fld_1")
     nohead, calls = make_sync([json_response(200, preview)])
     nohead.migrations.create("posts", field_id="fld_1", type="integer", dry_run=True)
     assert calls.calls[0].url.path == "/v1/collections/posts/migrations"
@@ -241,24 +254,16 @@ def test_diff_names_its_revisions() -> None:
 
 def test_keeps_unknown_fields_and_values() -> None:
     body = record("rec_1", title="Hi") | {"collection": "archive", "brand_new": True}
-    nohead, _ = make_sync([json_response(200, body)])
+    nohead, _ = make_sync([raw(json_response(200, body))])
     post = nohead.records.get("rec_1")
     assert post.collection == "archive"
     assert post.model_extra == {"brand_new": True}
     assert post.created_at == datetime(2026, 10, 2, 12, tzinfo=UTC)
 
 
-async def test_async_requests() -> None:
-    nohead, calls = make_async([json_response(201, record("rec_1"))])
-    created = await nohead.records.create("posts", data={"title": "Hi"}, change_note="Import")
-    assert created.id == "rec_1"
-    assert calls.calls[0].headers["nohead-change-note"] == "Import"
-    assert calls.body(0) == {"data": {"title": "Hi"}}
-
-
 def test_builds_responses_that_do_not_match_the_models() -> None:
     odd = record("rec_1") | {"revision": "not a number", "published_at": "not a time"}
-    nohead, _ = make_sync([json_response(200, odd)])
+    nohead, _ = make_sync([raw(json_response(200, odd))])
     with pytest.warns(nohead_warning()):
         post = nohead.records.get("rec_1")
     assert post.id == "rec_1"
@@ -271,7 +276,7 @@ def test_builds_responses_that_do_not_match_the_models() -> None:
 def test_parses_what_it_can_of_a_response_missing_a_field() -> None:
     # An older API, without a field this SDK expects.
     body = {key: value for key, value in record("rec_1").items() if key != "revision"}
-    nohead, _ = make_sync([json_response(200, body)])
+    nohead, _ = make_sync([raw(json_response(200, body))])
     with pytest.warns(nohead_warning()):
         post = nohead.records.get("rec_1")
     assert post.created_at == datetime(2026, 10, 2, 12, tzinfo=UTC)

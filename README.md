@@ -364,6 +364,14 @@ uv run python scripts/unasync.py         # after changing src/nohead/_async
 uv run python scripts/samples.py         # after changing tests/calls.py (the docs' code samples)
 ```
 
+Before pushing, run CI's checks, including that the generated files are current:
+
+```bash
+uv run ruff format --check . && uv run ruff check . && uv run pyright && uv run pytest
+uv run python scripts/generate.py && uv run python scripts/unasync.py && uv run python scripts/samples.py
+git diff --exit-code                     # fails if a generated file was stale
+```
+
 **How the code is organized:**
 
 - `openapi.json` is the API's published contract. `scripts/generate.py` derives three files from it:
@@ -371,6 +379,7 @@ uv run python scripts/samples.py         # after changing tests/calls.py (the do
   - `src/nohead/params.py`
   - the operation table, `src/nohead/_generated/operations.py`
 - **The async client is the source.** `src/nohead/_async` is written by hand, and `scripts/unasync.py` generates the sync client in `src/nohead/_sync` from it. Edit only the async code.
+- The tests' mock transport (`tests/conftest.py`) checks every request against its operation in the contract, and every reply against what the operation documents for its status (`tests/spec.py`), so a fixture can't drift from the API. Build replies from the contract's examples (`example_of("Asset", status="ready")`); wrap one that breaks the contract on purpose, such as a gateway's error page, in `raw()`. A `NoheadWarning` fails a test that doesn't expect it.
 - `tests/test_contract.py` calls every public method of both clients. It fails when an API-key operation in the contract has no method, when a query parameter is never sent (no method takes it, or no call passes it), or when a request doesn't match its operation (method, path, query parameters and JSON body, against their schemas). Each call gets an example of its operation's response, built from the contract's schema, and must return it, parsed without a `NoheadWarning`.
 
 The smoke test (`smoke/smoke.py`) runs the core flow against a real API, with both clients, using the built package. Nohead's own CI runs it on every API contract change.

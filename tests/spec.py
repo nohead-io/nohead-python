@@ -1,13 +1,21 @@
-"""The contract (openapi.json) as the tests read it: which operation a request is, and an
-example of any schema, which the mock replies in tests/calls.py are made of."""
+"""The contract (openapi.json) as the tests read it: which operation a request is, whether a
+request or a reply matches it (every test's mock transport checks both, tests/conftest.py),
+and an example of any schema, which the mock replies and fixtures are made of."""
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 from dataclasses import dataclass
+from functools import cache
 from pathlib import Path
 from typing import Any
+
+import httpx
+from jsonschema import Draft202012Validator
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
 
 from nohead._generated.operations import OPERATIONS
 
@@ -56,6 +64,8 @@ class Route:
     status: int
     """The first success status."""
     response: Body
+    responses: dict[int, str]
+    """Where each documented status's JSON schema is in the contract."""
 
 
 def _query(owner: dict[str, Any], path: str) -> list[Parameter]:
@@ -87,6 +97,10 @@ def _route(operation_id: str, method: str, path: str) -> Route:
         body_required=operation.get("requestBody", {}).get("required", False),
         status=int(status),
         response=_json(f"{operation_at}/responses/{status}"),
+        responses={
+            int(code): _json(f"{operation_at}/responses/{code}").schema_at
+            for code in operation["responses"]
+        },
     )
 
 
@@ -98,6 +112,111 @@ def route_of(method: str, path: str) -> Route:
         if route.method == method and route.pattern.match(path):
             return route
     raise AssertionError(f"No operation for {method} {path}")
+
+
+CONTRACT = "urn:nohead:openapi.json"
+REGISTRY = Registry().with_resource(
+    CONTRACT, Resource.from_contents(SPEC, default_specification=DRAFT202012)
+)
+
+
+@cache
+def _validator(pointer: str) -> Draft202012Validator:
+    return Draft202012Validator({"$ref": CONTRACT + pointer}, registry=REGISTRY)
+
+
+def errors(pointer: str, value: Any) -> list[str]:
+    """The errors of `value` against the schema at `pointer` in the contract."""
+    return [error.message for error in _validator(pointer).iter_errors(value)]
+
+
+def query_values(url: httpx.URL, params: list[Parameter]) -> dict[str, Any]:
+    """A request's query parameters by name, as their schemas read them: `filter[a][b]=v`
+    nests, and numbers and booleans are parsed when declared."""
+    types = {p.name: p.schema.get("type") for p in params}
+    values: dict[str, Any] = {}
+    for key, value in url.params.multi_items():
+        name, *path = [part for part in re.split(r"[\[\]]+", key) if part]
+        if path:
+            node = values.setdefault(name, {})
+            for part in path[:-1]:
+                node = node.setdefault(part, {})
+            node[path[-1]] = value
+        elif types.get(name) in ("integer", "number") and re.fullmatch(r"-?\d+(\.\d+)?", value):
+            values[name] = float(value) if "." in value else int(value)
+        elif types.get(name) == "boolean" and value in ("true", "false"):
+            values[name] = value == "true"
+        else:
+            values[name] = value
+    return values
+
+
+@cache
+def declared_headers(operation: str) -> frozenset[str]:
+    """The header parameters an operation declares, lowercased."""
+    method, path = OPERATIONS[operation]
+    owners = [pointer("paths", path), pointer("paths", path, method.lower())]
+    found: set[str] = set()
+    for owner in owners:
+        for index in range(len(at(owner)[1].get("parameters", []))):
+            parameter = at(f"{owner}/parameters/{index}")[1]
+            if parameter["in"] == "header":
+                found.add(parameter["name"].lower())
+    return frozenset(found)
+
+
+# Headers that some operations declare and others don't.
+OPTIONAL_HEADERS = {"idempotency-key", "if-match", "nohead-change-note"}
+
+
+def route_of_request(request: httpx.Request) -> Route:
+    """The operation a request is, by its path as sent (`%2F` in an ID stays in it)."""
+    return route_of(request.method, request.url.raw_path.decode().partition("?")[0])
+
+
+def check_request(request: httpx.Request) -> Route:
+    """Asserts that a request matches its operation: method and path, declared headers,
+    declared query parameters and their values, and the JSON body. Returns the operation."""
+    route = route_of_request(request)
+    extra = (OPTIONAL_HEADERS & set(request.headers)) - declared_headers(route.id)
+    assert not extra, f"{route.id} sends undeclared headers {extra}"
+    keys = {key.split("[", 1)[0] for key in request.url.params}
+    declared = {p.name for p in route.query}
+    assert keys <= declared, f"{route.id} sends undeclared query parameters {keys - declared}"
+    values = query_values(request.url, route.query)
+    for param in route.query:
+        if param.name in values:
+            problems = errors(param.schema_at, values[param.name])
+            assert problems == [], f"{route.id} {param.name}: {problems}"
+    if request.content:
+        assert route.body is not None, f"{route.id} takes no body"
+        problems = errors(route.body.schema_at, json.loads(request.content))
+        assert problems == [], f"{route.id} body: {problems}"
+    else:
+        assert not route.body_required, f"{route.id} needs a body"
+    return route
+
+
+ERROR = pointer("components", "schemas", "Error")
+
+
+def check_reply(route: Route, response: httpx.Response) -> None:
+    """Asserts that a reply matches what its operation documents for its status. An error
+    status the operation doesn't document (a 500, a gateway's 502) is still the API's
+    error envelope."""
+    where = route.responses.get(response.status_code)
+    if where is None:
+        assert response.status_code >= 400, f"{route.id} documents no {response.status_code}"
+        where = ERROR
+    assert "json" in response.headers.get("content-type", ""), (
+        f"The {route.id} reply is not JSON: build it from the contract, or mark it raw()"
+    )
+    problems = errors(where, response.json())
+    assert problems == [], (
+        f"The {route.id} {response.status_code} reply does not match the contract: {problems}. "
+        "Build it from the contract's example (tests/spec.py, example_of), or mark it raw() "
+        "if it breaks the contract on purpose."
+    )
 
 
 def example(schema: dict[str, Any], variant: int = 0) -> Any:
@@ -155,3 +274,12 @@ def _widest(value: Any) -> int:
 
 VARIANTS = _widest(SPEC)
 """How many examples of a schema it takes to have every variant of its unions."""
+
+
+def example_of(name: str, **overrides: Any) -> dict[str, Any]:
+    """The contract's example of the schema `name` (`"Record"`), with some of its
+    properties replaced, so a fixture has every property the contract has and no other."""
+    built = copy.deepcopy(example({"$ref": pointer("components", "schemas", name)}))
+    unknown = set(overrides) - set(built)
+    assert not unknown, f"{name} has no {', '.join(sorted(unknown))} in the contract"
+    return built | overrides

@@ -12,27 +12,19 @@ import pytest
 from nohead import UploadError, ValidationError
 
 from .conftest import Make, api_error, json_response, resolve
+from .spec import example_of
 
 
 def asset(status: str) -> dict[str, object]:
-    return {
-        "id": "ast_1",
-        "object": "asset",
-        "project_id": "prj_1",
-        "filename": "a.png",
-        "alt": None,
-        "content_type": "image/png",
-        "byte_size": 3,
-        "width": None,
-        "height": None,
-        "status": status,
-        "deleted_at": None,
-        "purge_after": None,
-        "preview_url": None,
-        "uploaded_at": None,
-        "created_at": "2026-10-02T12:00:00.000Z",
-        "updated_at": "2026-10-02T12:00:00.000Z",
-    }
+    return example_of(
+        "Asset",
+        id="ast_1",
+        project_id="prj_1",
+        filename="a.png",
+        content_type="image/png",
+        byte_size=3,
+        status=status,
+    )
 
 
 def created(expires_at: str) -> httpx.Response:
@@ -123,10 +115,6 @@ async def test_uploads_a_file_object(make: Make) -> None:
 
 
 async def test_needs_byte_size_for_a_stream(make: Make) -> None:
-    class Stream(io.BytesIO):
-        def seekable(self) -> bool:
-            return False
-
     nohead, _ = make([CREATED])
     with pytest.raises(UploadError):
         await resolve(nohead.assets.upload(Stream(b"hello")))
@@ -155,3 +143,36 @@ async def test_a_file_that_fails_the_checks(make: Make) -> None:
     nohead, _ = make([CREATED, STORED, api_error(422, "validation_error")], max_retries=0)
     with pytest.raises(ValidationError):
         await resolve(nohead.assets.upload(b"x"))
+
+
+class Stream(io.BytesIO):
+    """A stream that cannot seek, as from a pipe or a socket."""
+
+    def seekable(self) -> bool:
+        return False
+
+
+async def test_does_not_retry_a_stream_it_cannot_send_again(make: Make) -> None:
+    nohead, calls = make([CREATED, httpx.Response(503), STORED, READY])
+    with pytest.raises(UploadError) as caught:
+        await resolve(nohead.assets.upload(Stream(b"hello"), byte_size=5))
+    assert caught.value.status == 503
+    assert [c.method for c in calls.calls] == ["POST", "PUT"]
+    assert calls.calls[1].content == b"hello"
+
+
+async def test_sends_a_file_again_from_where_it_started(make: Make) -> None:
+    file = io.BytesIO(b"header:hello")
+    file.seek(7)
+    nohead, calls = make([CREATED, httpx.Response(503), STORED, READY])
+    await resolve(nohead.assets.upload(file, filename="hello.txt"))
+    assert calls.body(0)["byte_size"] == 5
+    assert [c.content for c in calls.calls[1:3]] == [b"hello", b"hello"]
+
+
+async def test_gives_up_when_storage_fails_every_attempt(make: Make) -> None:
+    nohead, calls = make([CREATED, httpx.Response(503)])
+    with pytest.raises(UploadError, match=r"\(503\)") as caught:
+        await resolve(nohead.assets.upload(b"x"))
+    assert caught.value.status == 503
+    assert [c.method for c in calls.calls] == ["POST", "PUT", "PUT", "PUT"]
