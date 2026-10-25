@@ -7,6 +7,10 @@ section is its GitHub release's notes.
 
 ## Unreleased
 
+- `unwrap` refuses an empty secret (`""` or `"whsec_"`, as from an unset
+  environment variable) with `WebhookVerificationError` ("The webhook secret
+  is empty"), instead of reporting that no signature matches.
+
 - `unwrap` raises `WebhookVerificationError` for every malformed request:
   a webhook header with a non-ASCII character raised `TypeError` or
   `UnicodeEncodeError`, and a secret with one `ValueError`.
