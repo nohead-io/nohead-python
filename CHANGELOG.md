@@ -7,8 +7,9 @@ section is its GitHub release's notes.
 
 ## Unreleased
 
-- `unwrap` raises `WebhookVerificationError`, not `TypeError`, when a
-  `webhook-signature` header has a non-ASCII character.
+- `unwrap` raises `WebhookVerificationError` for every malformed request:
+  a webhook header with a non-ASCII character raised `TypeError` or
+  `UnicodeEncodeError`, and a secret with one `ValueError`.
 
 - The package declares its `typing-extensions` dependency (4.12 or later).
 

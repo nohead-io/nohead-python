@@ -10,7 +10,6 @@ if event.type == "record.published" and event.record:
 from __future__ import annotations
 
 import base64
-import binascii
 import hashlib
 import hmac
 import json
@@ -166,6 +165,9 @@ def unwrap(
         raise WebhookVerificationError(
             "Missing webhook-id, webhook-timestamp or webhook-signature header"
         )
+    # Every valid header is ASCII; anything else could only fail to encode or compare.
+    if not (webhook_id + timestamp + signatures).isascii():
+        raise WebhookVerificationError("A webhook header is not ASCII")
     try:
         sent_at = int(timestamp)
     except ValueError:
@@ -173,19 +175,17 @@ def unwrap(
     if abs(time.time() - sent_at) > tolerance:
         raise WebhookVerificationError("The webhook timestamp is too far from the current time")
 
-    raw = body.encode() if isinstance(body, str) else body
+    # A character that can't be encoded can't have been signed: it fails to match.
+    raw = body.encode(errors="replace") if isinstance(body, str) else body
     try:
         key = base64.b64decode(secret.removeprefix("whsec_"), validate=True)
-    except binascii.Error:
+    except ValueError:  # not base64, or not ASCII
         raise WebhookVerificationError("The webhook secret is not base64") from None
     signed = webhook_id.encode() + b"." + timestamp.encode() + b"." + raw
-    expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest())
+    expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest()).decode()
     for entry in signatures.split(" "):
         version, _, signature = entry.partition(",")
-        # As bytes: compare_digest refuses str with non-ASCII characters (a TypeError),
-        # and "replace" keeps a lone surrogate from failing to encode.
-        candidate = signature.encode(errors="replace")
-        if version == "v1" and hmac.compare_digest(candidate, expected):
+        if version == "v1" and hmac.compare_digest(signature, expected):
             try:
                 event: object = json.loads(raw)
             except ValueError:
