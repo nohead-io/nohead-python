@@ -18,7 +18,7 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Typing :: Typed",
 ]
-dependencies = ["httpx>=0.28,<1", "pydantic>=2.10,<3"]
+dependencies = ["httpx>=0.28,<1", "pydantic>=2.10,<3", "typing-extensions>=4.12,<5"]
 
 [project.urls]
 Homepage = "https://nohead.io"

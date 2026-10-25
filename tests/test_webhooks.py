@@ -19,6 +19,8 @@ NOW = 1790942400  # 2026-10-02 12:00 UTC
 
 SECRET = "whsec_" + base64.b64encode(b"a-very-secret-key").decode()
 OTHER_SECRET = "whsec_" + base64.b64encode(b"another-secret-key").decode()
+# int() reads these too: ١٧٩٠٩٤٢٤٠٠ is NOW.
+ARABIC_DIGITS = str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩")
 BODY = json.dumps(
     {
         "id": "wev_1",
@@ -176,6 +178,11 @@ def test_accepts_timestamps_up_to_the_tolerance_off() -> None:
         (BODY, sign(BODY, NOW - 301)),
         (BODY, sign(BODY, NOW + 301)),
         (BODY, sign(BODY) | {"webhook-timestamp": "soon"}),
+        (BODY, sign(BODY) | {"webhook-signature": "v1,ü"}),
+        (BODY, sign(BODY) | {"webhook-signature": "v1,\udc80"}),
+        (BODY, sign(BODY) | {"webhook-id": "msg_\udc80"}),
+        (BODY, sign(BODY) | {"webhook-timestamp": str(NOW).translate(ARABIC_DIGITS)}),
+        (BODY + "\udc80", sign(BODY)),
         (BODY, {}),
         ("not json", sign("not json")),
     ],
@@ -187,6 +194,11 @@ def test_accepts_timestamps_up_to_the_tolerance_off() -> None:
         "old timestamp",
         "future timestamp",
         "timestamp not a number",
+        "signature not ascii",
+        "signature with a lone surrogate",
+        "webhook-id with a lone surrogate",
+        "timestamp in other digits",
+        "body with a lone surrogate",
         "missing headers",
         "body not json",
     ],
@@ -199,3 +211,5 @@ def test_rejects(body: str, headers: dict[str, str]) -> None:
 def test_rejects_a_secret_that_is_not_base64() -> None:
     with pytest.raises(WebhookVerificationError, match="not base64"):
         unwrap(BODY, sign(BODY), secret="whsec_not base64!")
+    with pytest.raises(WebhookVerificationError, match="not base64"):
+        unwrap(BODY, sign(BODY), secret="whsec_ünicode")
