@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import base64
-import hashlib
-import hmac
 import json
 import time
 import warnings
+from datetime import UTC, datetime, tzinfo
 
 import pytest
+import standardwebhooks
+import standardwebhooks.webhooks
 
 from nohead import Asset, NoheadWarning, WebhookVerificationError
 from nohead.models import AssetEventDataAsset
@@ -35,20 +36,28 @@ BODY = json.dumps(
 )
 
 
+class FrozenDatetime(datetime):
+    @classmethod
+    def now(cls, tz: tzinfo | None = None) -> FrozenDatetime:
+        return cls.fromtimestamp(NOW, tz)
+
+
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(time, "time", lambda: float(NOW))
+    # The Standard Webhooks library's clock, for its verify().
+    monkeypatch.setattr(standardwebhooks.webhooks, "datetime", FrozenDatetime)
 
 
 def sign(
     body: str, timestamp: int = NOW, id: str = "msg_1", secret: str = SECRET
 ) -> dict[str, str]:
-    key = base64.b64decode(secret.removeprefix("whsec_"))
-    digest = hmac.new(key, f"{id}.{timestamp}.{body}".encode(), hashlib.sha256).digest()
+    """Signs as a sender does, with the official Standard Webhooks library."""
+    sent_at = datetime.fromtimestamp(timestamp, UTC)
     return {
         "webhook-id": id,
         "webhook-timestamp": str(timestamp),
-        "webhook-signature": "v1," + base64.b64encode(digest).decode(),
+        "webhook-signature": standardwebhooks.Webhook(secret).sign(id, sent_at, body),
     }
 
 
@@ -213,3 +222,96 @@ def test_rejects_a_secret_that_is_not_base64() -> None:
         unwrap(BODY, sign(BODY), secret="whsec_not base64!")
     with pytest.raises(WebhookVerificationError, match="not base64"):
         unwrap(BODY, sign(BODY), secret="whsec_ünicode")
+
+
+# The API's secrets are 32 bytes; SECRET's are 17.
+API_SECRET = "whsec_" + base64.b64encode(bytes(range(32))).decode()
+# Sent as UTF-8, unescaped.
+NON_ASCII_BODY = json.dumps(
+    json.loads(BODY)
+    | {
+        "actor": {"type": "user", "id": "usr_1", "name": "Zoë Ångström"},
+        "data": {"record": record("rec_1", title="Grüße aus 東京 🌸"), "revision": 2},
+    },
+    ensure_ascii=False,
+)
+
+
+@pytest.mark.parametrize("secret", [SECRET, API_SECRET], ids=["secret", "api secret"])
+@pytest.mark.parametrize("body", [BODY, NON_ASCII_BODY], ids=["ascii", "non-ascii"])
+@pytest.mark.parametrize("as_bytes", [False, True], ids=["str", "bytes"])
+def test_accepts_what_the_standard_webhooks_library_signs(
+    secret: str, body: str, as_bytes: bool
+) -> None:
+    headers = sign(body, secret=secret)
+    received = body.encode() if as_bytes else body
+    sent = json.loads(body)
+    assert standardwebhooks.Webhook(secret).verify(received, headers) == sent
+    event = unwrap(received, headers, secret=secret)
+    assert event.actor.name == sent["actor"]["name"]
+    assert event.record is not None
+    assert event.record.data["title"] == sent["data"]["record"]["data"]["title"]
+
+
+def test_the_non_ascii_body_is_sent_unescaped() -> None:
+    assert "東京 🌸" in NON_ASCII_BODY
+    assert "Zoë" in NON_ASCII_BODY
+
+
+@pytest.mark.parametrize(
+    "order",
+    [[0, 1, 2], [2, 1, 0], [1, 2, 0]],
+    ids=["matching first", "matching last", "matching in the middle"],
+)
+def test_accepts_one_matching_signature_among_several(order: list[int]) -> None:
+    # As during a secret rotation: one signature per secret, and one of another version.
+    signatures = [
+        sign(NON_ASCII_BODY, secret=API_SECRET)["webhook-signature"],
+        sign(NON_ASCII_BODY, secret=OTHER_SECRET)["webhook-signature"].replace("v1,", "v2,"),
+        sign(NON_ASCII_BODY, secret=OTHER_SECRET)["webhook-signature"],
+    ]
+    headers = sign(NON_ASCII_BODY, secret=API_SECRET) | {
+        "webhook-signature": " ".join(signatures[i] for i in order)
+    }
+    assert standardwebhooks.Webhook(API_SECRET).verify(NON_ASCII_BODY, headers)
+    assert unwrap(NON_ASCII_BODY, headers, secret=API_SECRET).id == "wev_1"
+    assert unwrap(NON_ASCII_BODY, headers, secret=OTHER_SECRET).id == "wev_1"
+
+
+@pytest.mark.parametrize(
+    ("body", "headers", "secret"),
+    [
+        (NON_ASCII_BODY.replace("東京", "大阪"), sign(NON_ASCII_BODY), SECRET),
+        (NON_ASCII_BODY.replace("ë", "e"), sign(NON_ASCII_BODY), SECRET),
+        (BODY.replace("Hi", "Bye"), sign(BODY), SECRET),
+        (BODY, sign(BODY), OTHER_SECRET),
+        (BODY, sign(BODY, secret=API_SECRET), SECRET),
+        (BODY, sign(BODY, NOW - 301), SECRET),
+        (BODY, sign(BODY, NOW - 86400), SECRET),
+        (BODY, sign(BODY, NOW + 301), SECRET),
+        (BODY, sign(BODY) | {"webhook-id": "msg_2"}, SECRET),
+        (BODY, {k: v.replace("v1,", "v2,") for k, v in sign(BODY).items()}, SECRET),
+        (BODY, {k: v for k, v in sign(BODY).items() if k != "webhook-signature"}, SECRET),
+    ],
+    ids=[
+        "tampered non-ascii body",
+        "non-ascii body with its accent dropped",
+        "tampered body",
+        "wrong secret",
+        "another secret's signature",
+        "old timestamp",
+        "day-old timestamp",
+        "future timestamp",
+        "changed webhook-id",
+        "only another version's signature",
+        "no signature",
+    ],
+)
+def test_rejects_what_the_standard_webhooks_library_rejects(
+    body: str, headers: dict[str, str], secret: str
+) -> None:
+    with pytest.raises(standardwebhooks.WebhookVerificationError):
+        standardwebhooks.Webhook(secret).verify(body, headers)
+    # Only WebhookVerificationError: any other exception fails the test.
+    with pytest.raises(WebhookVerificationError):
+        unwrap(body, headers, secret=secret)
