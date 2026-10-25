@@ -181,6 +181,8 @@ def unwrap(
         key = base64.b64decode(secret.removeprefix("whsec_"), validate=True)
     except ValueError:  # not base64, or not ASCII
         raise WebhookVerificationError("The webhook secret is not base64") from None
+    if not key:  # unset, as from a missing environment variable
+        raise WebhookVerificationError("The webhook secret is empty")
     signed = webhook_id.encode() + b"." + timestamp.encode() + b"." + raw
     expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest()).decode()
     for entry in signatures.split(" "):
