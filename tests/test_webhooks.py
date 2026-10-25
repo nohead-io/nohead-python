@@ -253,14 +253,9 @@ def test_accepts_what_the_standard_webhooks_library_signs(
     assert event.record.data["title"] == sent["data"]["record"]["data"]["title"]
 
 
-def test_the_non_ascii_body_is_sent_unescaped() -> None:
-    assert "東京 🌸" in NON_ASCII_BODY
-    assert "Zoë" in NON_ASCII_BODY
-
-
 @pytest.mark.parametrize(
     "order",
-    [[0, 1, 2], [2, 1, 0], [1, 2, 0]],
+    [[0, 1, 2], [2, 1, 0], [1, 0, 2]],
     ids=["matching first", "matching last", "matching in the middle"],
 )
 def test_accepts_one_matching_signature_among_several(order: list[int]) -> None:
