@@ -36,7 +36,8 @@ class NoheadWarning(UserWarning):
     """A deprecated operation, or usage over a soft plan limit. Shown once each."""
 
 
-_PACKAGE = os.path.dirname(os.path.abspath(__file__)) + os.sep
+# Resolved, so a symlinked install compares like for like.
+_PACKAGE = os.path.dirname(os.path.realpath(__file__)) + os.sep
 
 
 def _outside_the_sdk() -> int:
@@ -46,7 +47,7 @@ def _outside_the_sdk() -> int:
     here = inspect.currentframe()
     frame = here.f_back if here is not None else None  # the function that warns
     level = 1
-    while frame is not None and frame.f_code.co_filename.startswith(_PACKAGE):
+    while frame is not None and os.path.realpath(frame.f_code.co_filename).startswith(_PACKAGE):
         frame = frame.f_back
         level += 1
     return level
