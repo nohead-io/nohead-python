@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import math
+import re
 import warnings
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta, timezone
+from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -336,3 +340,86 @@ def nohead_warning() -> type[Warning]:
     from nohead import NoheadWarning
 
     return NoheadWarning
+
+
+@pytest.mark.parametrize("value", [".", ".."])
+def test_refuses_a_path_value_that_urls_resolve(value: str) -> None:
+    # Encoded or not, `..` would request the parent: GET /v1/records/.. is /v1/.
+    nohead, calls = make_sync([LAST_PAGE])
+    with pytest.raises(NoheadError, match=f'^Invalid record_id: "{re.escape(value)}"$'):
+        nohead.records.get(value)
+    assert calls.calls == []
+
+
+def test_sends_each_header_once_whatever_its_case() -> None:
+    nohead, calls = make_sync(
+        [json_response(201, record("rec_1"))],
+        headers={
+            "authorization": "Bearer nohead_sk_other",
+            "accept": "application/json; charset=utf-8",
+            "CONTENT-TYPE": "text/plain",
+            "idempotency-key": "from-the-client",
+            "x-extra": "yes",
+        },
+    )
+    nohead.records.create("posts", data={}, idempotency_key="import-1", change_note="Import")
+    headers = calls.calls[0].headers
+    # The client's headers replace the defaults; the request's options win over both.
+    assert headers.get_list("authorization") == ["Bearer nohead_sk_other"]
+    assert headers.get_list("accept") == ["application/json; charset=utf-8"]
+    assert headers.get_list("content-type") == ["application/json"]
+    assert headers.get_list("idempotency-key") == ["import-1"]
+    assert headers.get_list("x-extra") == ["yes"]
+
+
+def test_with_options_replaces_a_header_whatever_its_case() -> None:
+    nohead, calls = make_sync([json_response(200, record("rec_1"))], headers={"X-Job": "a"})
+    nohead.with_options(headers={"x-job": "b"}).records.get("rec_1")
+    assert calls.calls[0].headers.get_list("x-job") == ["b"]
+
+
+def test_if_match_from_a_mapping_with_a_revision() -> None:
+    nohead, calls = make_sync([json_response(200, record("rec_1"))])
+    nohead.records.update("rec_1", data={}, if_match={"revision": 5})
+    assert calls.calls[0].headers["if-match"] == '"5"'
+
+
+@pytest.mark.parametrize("value", ["3", True, 3.0, None, {"rev": 3}, {"revision": "3"}, object()])
+def test_if_match_refuses_anything_else(value: object) -> None:
+    nohead, calls = make_sync([json_response(200, record("rec_1"))])
+    if_match: Any = value if value is not None else SimpleNamespace(revision=None)
+    with pytest.raises(TypeError, match="if_match takes a revision number"):
+        nohead.records.publish("rec_1", if_match=if_match)
+    assert calls.calls == []
+
+
+def test_refuses_a_time_without_a_time_zone() -> None:
+    nohead, calls = make_sync([json_response(200, SCHEDULE), LAST_PAGE])
+    with pytest.raises(ValueError, match="has no time zone: pass an aware datetime"):
+        nohead.records.schedule("rec_1", publish_at=datetime(2027, 1, 1, 9))
+    with pytest.raises(ValueError, match="has no time zone"):
+        nohead.records.list("posts", filter={"published_at": {"gte": datetime(2027, 1, 1)}})
+    assert calls.calls == []
+
+
+def test_sends_aware_times_in_utc() -> None:
+    nohead, calls = make_sync([json_response(200, SCHEDULE)])
+    plus_two = timezone(timedelta(hours=2))
+    nohead.records.schedule("rec_1", publish_at=datetime(2027, 1, 1, 11, tzinfo=plus_two))
+    assert calls.body(0) == {"publish_at": "2027-01-01T09:00:00Z"}
+
+
+@pytest.mark.parametrize("number", [math.nan, math.inf, -math.inf])
+def test_refuses_numbers_json_cannot_carry(number: float) -> None:
+    nohead, calls = make_sync([json_response(201, record("rec_1"))])
+    with pytest.raises(ValueError, match="not JSON compliant"):
+        nohead.records.create("posts", data={"price": number})
+    assert calls.calls == []
+
+
+def test_empty_request_options_count_as_not_given() -> None:
+    nohead, calls = make_sync([json_response(201, record("rec_1"))])
+    nohead.records.create("posts", data={}, idempotency_key="", change_note="")
+    headers = calls.calls[0].headers
+    assert len(headers["idempotency-key"]) == 36
+    assert "nohead-change-note" not in headers

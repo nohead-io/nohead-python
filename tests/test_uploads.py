@@ -10,9 +10,16 @@ from pathlib import Path
 import httpx
 import pytest
 
-from nohead import UploadError, ValidationError
+from nohead import (
+    APIConnectionError,
+    APITimeoutError,
+    Nohead,
+    RetryEvent,
+    UploadError,
+    ValidationError,
+)
 
-from .conftest import Make, api_error, json_response, resolve
+from .conftest import Make, Recorder, api_error, json_response, resolve
 from .spec import example_of
 
 
@@ -207,3 +214,64 @@ async def test_gives_up_when_storage_fails_every_attempt(make: Make) -> None:
         await resolve(nohead.assets.upload(b"x"))
     assert caught.value.status == 503
     assert [c.method for c in calls.calls] == ["POST", "PUT", "PUT", "PUT"]
+
+
+@pytest.mark.parametrize(
+    ("failure", "cause", "reason"),
+    [
+        (
+            httpx.ConnectError("refused"),
+            APIConnectionError,
+            "Could not reach storage.test: refused",
+        ),
+        (
+            httpx.WriteTimeout("slow"),
+            APITimeoutError,
+            "The request to storage.test timed out after 60.0 s",
+        ),
+    ],
+)
+async def test_storage_out_of_reach(
+    make: Make, failure: Exception, cause: type[Exception], reason: str
+) -> None:
+    nohead, calls = make([CREATED, failure])
+    with pytest.raises(UploadError) as caught:
+        await resolve(nohead.assets.upload(b"x", filename="a.png"))
+    assert str(caught.value) == f"Could not upload a.png: {reason}"
+    assert caught.value.status is None
+    connection_error = caught.value.__cause__
+    assert isinstance(connection_error, cause) and type(connection_error) is cause
+    assert connection_error.__cause__ is failure  # httpx's own error
+    assert [c.method for c in calls.calls] == ["POST", "PUT", "PUT", "PUT"]
+
+
+async def test_reports_upload_retries_to_on_retry(make: Make) -> None:
+    events: list[RetryEvent] = []
+    nohead, _ = make(
+        [CREATED, httpx.Response(503), httpx.ConnectError("refused"), STORED, READY],
+        on_retry=events.append,
+    )
+    await resolve(nohead.assets.upload(b"x"))
+    url = "https://storage.test/uploads/prj_1/ast_1?signature=x"
+    assert [(e.attempt, e.url, e.status, type(e.error)) for e in events] == [
+        (1, url, 503, type(None)),
+        (2, url, None, APIConnectionError),
+    ]
+
+
+async def test_does_not_follow_a_redirect_from_storage() -> None:
+    moved = httpx.Response(307, headers={"location": "https://elsewhere.test/"})
+    recorder = Recorder([CREATED, moved])
+    http = httpx.Client(transport=httpx.MockTransport(recorder), follow_redirects=True)
+    nohead = Nohead(api_key="k", base_url="https://api.test", project_id="prj_1", http_client=http)
+    with pytest.raises(UploadError, match=r"^Storage refused the upload of upload \(307\)$"):
+        nohead.assets.upload(b"x")
+    assert [c.url.host for c in recorder.calls] == ["api.test", "storage.test"]
+
+
+@pytest.mark.parametrize("filename", ["", None])
+async def test_empty_upload_options_count_as_not_given(make: Make, filename: str | None) -> None:
+    nohead, calls = make([CREATED, STORED, READY])
+    await resolve(nohead.assets.upload(b"x", filename=filename, content_type=""))
+    assert calls.body(0)["filename"] == "upload"
+    assert calls.body(0)["content_type"] == "application/octet-stream"

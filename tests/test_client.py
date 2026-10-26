@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import platform
+import time
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import AsyncExitStack
 from pathlib import Path
 from typing import Any
@@ -12,7 +15,7 @@ import pytest
 
 from nohead import AsyncNohead, Nohead, NoheadError, __version__
 
-from .conftest import LAST_PAGE, Make, json_response, make_sync, record, resolve
+from .conftest import LAST_PAGE, Make, json_response, make_sync, raw, record, resolve
 
 
 def test_needs_an_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -121,3 +124,109 @@ async def test_leaves_a_given_http_client_open(make: Make) -> None:
     nohead, _ = make([])
     await resolve(nohead.close())
     assert not nohead._client.http.is_closed
+
+
+def test_empty_options_count_as_not_given(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NOHEAD_API_KEY", "nohead_sk_env")
+    monkeypatch.setenv("NOHEAD_API_URL", "https://env.test")
+    nohead, calls = make_sync([ME, LAST_PAGE], api_key="", base_url="", project_id="")
+    nohead.collections.list()
+    assert [str(c.url) for c in calls.calls] == [
+        "https://env.test/v1/me",
+        "https://env.test/v1/projects/prj_9/collections",
+    ]
+    assert calls.calls[0].headers["authorization"] == "Bearer nohead_sk_env"
+
+
+def test_removes_every_trailing_slash_of_the_base_url() -> None:
+    assert Nohead(api_key="k", base_url="http://localhost:3000///")._client.settings.base_url == (
+        "http://localhost:3000"
+    )
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    ["ftp://api.test", "api.nohead.io", "localhost:3000", "http://", "https:///v1", "http://[::1"],
+)
+def test_refuses_a_base_url_that_is_not_http(
+    base_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(NoheadError, match=r"^base_url must be an http or https URL$"):
+        Nohead(api_key="k", base_url=base_url)
+    monkeypatch.setenv("NOHEAD_API_URL", base_url)
+    with pytest.raises(NoheadError, match=r"^base_url must be an http or https URL$"):
+        AsyncNohead(api_key="k")
+
+
+def fresh(response: httpx.Response) -> httpx.Response:
+    """A copy of a reply to send: a response object can be sent only once."""
+    return httpx.Response(response.status_code, headers=response.headers, content=response.content)
+
+
+async def test_calls_at_the_same_time_share_one_project_lookup() -> None:
+    seen: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        await asyncio.sleep(0.01)  # the others start meanwhile
+        return fresh(ME if request.url.path == "/v1/me" else LAST_PAGE)
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    nohead = AsyncNohead(api_key="k", base_url="https://api.test", http_client=http)
+    copy = nohead.with_options(timeout=5)
+    await asyncio.gather(nohead.collections.list(), nohead.webhooks.list(), copy.collections.list())
+    assert seen.count("/v1/me") == 1
+    await copy.collections.list()
+    assert seen.count("/v1/me") == 1
+
+
+def test_threads_share_one_project_lookup() -> None:
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        time.sleep(0.05)  # the others start meanwhile
+        return fresh(ME if request.url.path == "/v1/me" else LAST_PAGE)
+
+    http = httpx.Client(transport=httpx.MockTransport(handler))
+    nohead = Nohead(api_key="k", base_url="https://api.test", http_client=http)
+    copy = nohead.with_options(timeout=5)
+    with ThreadPoolExecutor(3) as pool:
+        for future in [
+            pool.submit(nohead.collections.list),
+            pool.submit(nohead.webhooks.list),
+            pool.submit(copy.collections.list),
+        ]:
+            future.result()
+    assert seen.count("/v1/me") == 1
+
+
+async def test_looks_up_the_project_again_after_a_failure(make: Make) -> None:
+    nohead, calls = make(
+        [raw(json_response(500, {})), ME, LAST_PAGE], project_id=None, max_retries=0
+    )
+    with pytest.raises(NoheadError):
+        await resolve(nohead.collections.list())
+    await resolve(nohead.collections.list())
+    assert [c.url.path for c in calls.calls] == [
+        "/v1/me",
+        "/v1/me",
+        "/v1/projects/prj_9/collections",
+    ]
+
+
+async def test_calls_at_the_same_time_share_a_failed_lookup() -> None:
+    seen: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.path)
+        await asyncio.sleep(0.01)
+        return httpx.Response(401, json={"error": {"type": "authentication_error"}})
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    nohead = AsyncNohead(api_key="k", base_url="https://api.test", http_client=http)
+    results = await asyncio.gather(
+        nohead.collections.list(), nohead.webhooks.list(), return_exceptions=True
+    )
+    assert [type(result).__name__ for result in results] == ["AuthenticationError"] * 2
+    assert seen == ["/v1/me"]

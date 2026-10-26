@@ -34,6 +34,7 @@ from ._sync._nohead import Nohead
 from ._uploads import Uploadable
 from ._version import __version__
 from .models import Asset, Collection, Draft, Field, Record, Schema, Webhook
+from .types import RetryEvent
 from .webhooks import WebhookEvent
 
 __all__ = [
@@ -62,6 +63,7 @@ __all__ = [
     "PreconditionFailedError",
     "RateLimitError",
     "Record",
+    "RetryEvent",
     "Schema",
     "ServiceUnavailableError",
     "UploadError",

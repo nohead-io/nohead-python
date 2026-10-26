@@ -52,19 +52,22 @@ nohead = Nohead(
 | Option | Default | |
 |---|---|---|
 | `api_key` | `NOHEAD_API_KEY` | A project API key (`nohead_sk_...`, or `nohead_pk_...` when published-only). Required. |
-| `base_url` | `NOHEAD_API_URL`, else `https://api.nohead.io` | |
-| `project_id` | the key's project | Looked up once with `GET /v1/me` when omitted. |
+| `base_url` | `NOHEAD_API_URL`, else `https://api.nohead.io` | An `http` or `https` URL; anything else raises `NoheadError`. |
+| `project_id` | the key's project | Looked up once with `GET /v1/me` when omitted (calls made at the same time share the lookup). |
 | `max_retries` | `2` | See [retries](#retries-and-idempotency). |
-| `timeout` | `60.0` | Seconds per attempt. |
-| `headers` | none | Added to every request. |
+| `timeout` | `60.0` | Seconds an attempt may go without progress: to connect, to send, to get the response, and between reads of it. A response that keeps arriving doesn't time out. |
+| `headers` | none | Added to every request. They replace the SDK's own (`Authorization`, `User-Agent`...) whatever the case of their names, but not the ones it sets from a call's options (`Content-Type`, `Idempotency-Key`, `If-Match`, `Nohead-Change-Note`). |
 | `warnings` | `True` | Warns (`NoheadWarning`) about deprecated operations and plan usage, once each. |
+| `on_retry` | none | Called before each retry's wait, with a `RetryEvent`. See [retries](#retries-and-idempotency). |
 | `http_client` | a new `httpx.Client` | Bring your own for proxies or custom transports. |
+
+An empty string counts as not given: `api_key=""` reads `NOHEAD_API_KEY`, and so on.
 
 API keys belong to a project, so methods like `collections.list()` need no project ID. Collections can be named by ID or slug everywhere.
 
 Close the client when you're done with it, or use it as a context manager: `with Nohead() as nohead: ...`.
 
-`nohead.with_options(timeout=5, max_retries=0)` returns a client with other settings that shares the same connections.
+`nohead.with_options(timeout=5, max_retries=0)` returns a client with other settings that shares the same connections and project. It takes `timeout`, `max_retries`, `headers` (added to the client's) and `on_retry`.
 
 ## Async
 
@@ -176,11 +179,16 @@ Every exception is a `NoheadError`. API errors are `APIError`s with `status`, `t
 | `InternalServerError` | 500 and other 5xx |
 | `ServiceUnavailableError` | 503 |
 
+The API never redirects, so a redirect (a base URL that does, such as `http://` to `https://`) isn't followed: it raises an `APIError` whose `type` is `redirect`, such as `301 redirect: The API answered with a redirect to https://api.nohead.io/v1/records; check the base URL`.
+
 Other errors:
 
 - `APIConnectionError`, and `APITimeoutError`, which is a kind of `APIConnectionError`
 - `UploadError`
 - `WebhookVerificationError`
+- `NoheadError` itself, for a list response that isn't a list (`The API's response could not be read (HTTP 200)`, from a proxy, say), and for a path value that is empty, `.` or `..`, before sending anything
+
+Values that can't be sent raise Python's own errors before sending: `TypeError` for an `if_match` that isn't a revision number and has no `revision`, and `ValueError` for a `datetime` without a time zone, `nan` or an infinity.
 
 ```python
 from nohead import ValidationError
@@ -197,7 +205,20 @@ except ValidationError as error:
 Failed requests are retried twice by default (`max_retries`), with exponential backoff:
 
 - what's retried: connection errors, timeouts, 429, 500, 502, 503, 504, and a 409 for a request that is still running
-- `Retry-After` is honored up to 60 seconds; a longer one raises `RateLimitError` straight away
+- `Retry-After` is honored up to 60 seconds; a longer one raises `RateLimitError` straight away. It is a number of seconds (`5`, `1.5`) or an HTTP date; anything else is ignored, and the usual backoff applies
+
+`on_retry` is called before each retry's wait, also for an upload's bytes, with a `RetryEvent`: the `attempt` (1 for the first retry), the `delay` in seconds, the `url`, and the `status` that failed (None when the connection did) and the `error` (an `APIError` or `APIConnectionError`; None for a status from storage):
+
+```python
+from nohead import Nohead, RetryEvent
+
+
+def log_retry(retry: RetryEvent) -> None:
+    log.warning("Retry %d in %.1f s: %s", retry.attempt, retry.delay, retry.error)
+
+
+nohead = Nohead(on_retry=log_retry)
+```
 
 Every write gets an `Idempotency-Key` that stays the same across its retries, so a retry after a lost response never writes twice. To make a write safe across your own retries (a job that may run twice), pass a key:
 
@@ -221,7 +242,7 @@ except PreconditionFailedError as error:
     ...  # changed since (now at error.current_revision): reload, and merge or ask
 ```
 
-`if_match` takes a record or a revision number, on the records' `update`, `delete`, `restore`, `publish`, `unpublish` and `revisions.revert`, and the drafts' `update`, `discard` and `merge` (with the draft's `revision`).
+`if_match` takes a record, a revision number, or a mapping with a `revision` (`{"revision": 3}`), on the records' `update`, `delete`, `restore`, `publish`, `unpublish` and `revisions.revert`, and the drafts' `update`, `discard` and `merge` (with the draft's `revision`).
 
 ## Assets
 
@@ -239,6 +260,8 @@ image_url(asset, width=1200, height=630, fit="cover", gravity="sm", format="webp
 image_url(asset.image_url, width=400, dpr=2, options=["bl:2"])
 ```
 
+It takes an asset, as a model or a mapping (`{"image_url": ...}`), or its `image_url`.
+
 Thumbnails: an image's `preview_url` fits in 640×640, as WebP.
 
 **What `upload` accepts:** a path, bytes, or a file opened in binary mode.
@@ -249,7 +272,7 @@ Thumbnails: an image's `preview_url` fits in 640×640, as WebP.
 2. Sends the bytes straight to storage.
 3. Completes the upload, which checks the file, and returns the `ready` asset.
 
-**Errors:** `UploadError` if storage refuses the bytes; `ValidationError` if the file fails the checks.
+**Errors:** `UploadError` if the bytes don't reach storage: it refuses them (`Storage refused the upload of photo.jpg (403)`, with its `status`), or it can't be reached or times out (`Could not upload photo.jpg: ...`, with the `APIConnectionError` or `APITimeoutError` as its `__cause__`). `ValidationError` if the file fails the checks.
 
 **Resuming:** with an `idempotency_key`, running the same upload again resumes it: an asset that is already `ready` is returned without sending the bytes again. Once the upload's URL has expired (its `upload.expires_at`), it raises `UploadError`: start over with a new key.
 
@@ -312,7 +335,7 @@ if event.type == "record.published" and event.record:
     rebuild(event.record.collection)
 ```
 
-Event types are the activity log's (`record.published`, `record.restored`, `field.updated`, `asset.purged`, ...), and a webhook subscribes to types or wildcards (`record.*`, `*`). `unwrap` checks the signature and the timestamp (Standard Webhooks), and raises `WebhookVerificationError` if either is off. After `rotate_secret`, requests carry a signature for the old secret and the new one for 24 hours, so switch the receiver's secret within that day (or end it sooner with `webhooks.secrets.retire`). Pass the raw body: parsing and re-serializing JSON changes the bytes.
+Event types are the activity log's (`record.published`, `record.restored`, `field.updated`, `asset.purged`, ...), and a webhook subscribes to types or wildcards (`record.*`, `*`). `unwrap` checks the signature and the timestamp (Standard Webhooks), and raises `WebhookVerificationError` if either is off, or if the secret is unset (`None` or empty, as from a missing environment variable). A header repeated as a list of values, as some frameworks give it, counts as its values separated by spaces. After `rotate_secret`, requests carry a signature for the old secret and the new one for 24 hours, so switch the receiver's secret within that day (or end it sooner with `webhooks.secrets.retire`). Pass the raw body: parsing and re-serializing JSON changes the bytes.
 
 `event.data` is the payload. For convenience, `event.record`, `event.asset`, `event.collection`, `event.schema_change`, `event.field`, `event.draft` and `event.webhook` give its parts, and are None when the event has no such part; so do the IDs `event.draft_id` and `event.record_id` (`draft.*`, also once the draft is gone) and `event.field_id` (`field.*`). A purged asset (`asset.purged`) is only its `id` and `object`, an `AssetEventDataAsset`. `event.actor` and `event.via` say who made the change, through which client (`via` is None when not known). Like responses, an event that doesn't match the models is still returned, unvalidated, with a `NoheadWarning`.
 

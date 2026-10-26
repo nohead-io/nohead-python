@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
 import os
@@ -14,11 +15,11 @@ import typing
 import urllib.parse
 import uuid
 import warnings as _warnings
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from functools import cache
-from typing import Any
+from typing import Any, Generic, TypeVar, cast
 from urllib.parse import quote
 
 import httpx
@@ -27,7 +28,9 @@ from pydantic import ValidationError as PydanticValidationError
 
 from ._errors import APIError, NoheadError, retry_after_seconds
 from ._version import __version__
-from .types import IfMatch
+from .types import IfMatch, RetryEvent
+
+T = TypeVar("T")
 
 DEFAULT_BASE_URL = "https://api.nohead.io"
 RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
@@ -85,6 +88,7 @@ class Settings:
     timeout: float
     headers: Mapping[str, str] = field(default_factory=dict[str, str])
     warnings: bool = True
+    on_retry: Callable[[RetryEvent], object] | None = None
 
 
 def settings(
@@ -96,21 +100,33 @@ def settings(
     timeout: float,
     headers: Mapping[str, str] | None,
     warnings: bool,
+    on_retry: Callable[[RetryEvent], object] | None,
 ) -> Settings:
-    # Empty environment variables count as unset.
+    # Empty values, given or from the environment, count as unset.
     api_key = api_key or os.environ.get("NOHEAD_API_KEY") or None
     if not api_key:
         raise NoheadError("Missing API key: pass api_key or set NOHEAD_API_KEY")
-    base_url = base_url or os.environ.get("NOHEAD_API_URL") or DEFAULT_BASE_URL
+    base_url = (base_url or os.environ.get("NOHEAD_API_URL") or DEFAULT_BASE_URL).rstrip("/")
+    if not _is_http_url(base_url):
+        raise NoheadError("base_url must be an http or https URL")
     return Settings(
         api_key=api_key,
-        base_url=base_url.rstrip("/"),
-        project_id=project_id,
+        base_url=base_url,
+        project_id=project_id or None,
         max_retries=max_retries,
         timeout=timeout,
-        headers=dict(headers or {}),
+        headers=merge_headers(headers or {}),
         warnings=warnings,
+        on_retry=on_retry,
     )
+
+
+def _is_http_url(value: str) -> bool:
+    try:
+        parts = urllib.parse.urlsplit(value)
+        return parts.scheme.lower() in ("http", "https") and bool(parts.hostname)
+    except ValueError:  # not a URL, such as an unclosed IPv6 address
+        return False
 
 
 def url(settings: Settings, template: str, values: Mapping[str, str | int]) -> str:
@@ -122,7 +138,11 @@ def url(settings: Settings, template: str, values: Mapping[str, str | int]) -> s
         name = match[1]
         if values.get(name) in (None, ""):
             raise NoheadError(f"Missing {name}")
-        return quote(str(values[name]), safe="")
+        text = str(values[name])
+        # Encoded or not, URL parsers resolve these as the current or parent path.
+        if text in (".", ".."):
+            raise NoheadError(f'Invalid {name}: "{text}"')
+        return quote(text, safe="")
 
     return settings.base_url + re.sub(r"\{(\w+)\}", value, template)
 
@@ -172,9 +192,12 @@ def scalar(value: Any) -> str:
 
 def iso(value: datetime | date) -> str:
     if isinstance(value, datetime):
-        if value.tzinfo is not None:
-            value = value.astimezone(UTC)
-        return value.isoformat().replace("+00:00", "Z")
+        # A naive datetime's moment depends on where the code runs: the API can't tell.
+        if value.utcoffset() is None:
+            raise ValueError(
+                f"The datetime {value.isoformat()} has no time zone: pass an aware datetime"
+            )
+        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
     return value.isoformat()
 
 
@@ -184,10 +207,21 @@ def encode(body: Any) -> bytes:
             return iso(value)
         raise TypeError(f"{type(value).__name__} is not JSON serializable")
 
-    return json.dumps(body, default=default, separators=(",", ":")).encode()
+    # NaN and infinities aren't JSON: refuse them (ValueError) rather than send them.
+    return json.dumps(body, default=default, separators=(",", ":"), allow_nan=False).encode()
 
 
 USER_AGENT = f"nohead-python/{__version__} python/{platform.python_version()}"
+
+
+def merge_headers(*layers: Mapping[str, str]) -> dict[str, str]:
+    """Headers with each name once, matched without regard to case: a later layer's
+    value (and spelling of the name) replaces an earlier one's."""
+    merged: dict[str, tuple[str, str]] = {}
+    for layer in layers:
+        for name, value in layer.items():
+            merged[name.lower()] = (name, value)
+    return dict(merged.values())
 
 
 def headers(
@@ -199,27 +233,42 @@ def headers(
     change_note: str | None,
     if_match: IfMatch | None,
 ) -> dict[str, str]:
-    out = {
+    defaults = {
         "Accept": "application/json",
         "Authorization": f"Bearer {settings.api_key}",
         "Nohead-Client": f"sdk-python/{__version__}",
         "User-Agent": USER_AGENT,
-        **settings.headers,
     }
+    # The headers the request's options set win over the client's `headers`.
+    options: dict[str, str] = {}
     if has_body:
-        out["Content-Type"] = "application/json"
+        options["Content-Type"] = "application/json"
     if method != "GET":
-        out["Idempotency-Key"] = idempotency_key or str(uuid.uuid4())
+        options["Idempotency-Key"] = idempotency_key or str(uuid.uuid4())
     if if_match is not None:
-        revision = if_match if isinstance(if_match, int) else if_match.revision
-        out["If-Match"] = f'"{revision}"'
+        options["If-Match"] = f'"{revision_of(if_match)}"'
     if change_note:
         # Percent-encoded UTF-8, as encodeURIComponent: header values are
         # bytes (the API decodes it). A lone surrogate becomes U+FFFD.
         # (A Python string holds surrogates only unpaired.)
         well_formed = re.sub("[\ud800-\udfff]", "\ufffd", change_note)
-        out["Nohead-Change-Note"] = urllib.parse.quote(well_formed, safe="-_.!~*'()")
-    return out
+        options["Nohead-Change-Note"] = urllib.parse.quote(well_formed, safe="-_.!~*'()")
+    return merge_headers(defaults, settings.headers, options)
+
+
+def revision_of(if_match: object) -> int:
+    """The revision an `if_match` names: a number, or the `revision` of a record or
+    draft or of a mapping (`{"revision": 3}`)."""
+    revision: object = (
+        cast("Mapping[str, object]", if_match).get("revision")
+        if isinstance(if_match, Mapping)
+        else getattr(if_match, "revision", if_match)
+    )
+    if not isinstance(revision, int) or isinstance(revision, bool):
+        raise TypeError(
+            "if_match takes a revision number, or a record, draft or mapping with a revision"
+        )
+    return revision
 
 
 @cache
@@ -325,6 +374,84 @@ def _fit(model: type[BaseModel], data: dict[str, Any]) -> tuple[bool, bool]:
         if info.is_required():
             required = required and key in data
     return literals, required
+
+
+class AsyncOnce(Generic[T]):
+    """A value worked out once, by the first call that needs it: calls made while it is
+    on its way wait for the same lookup (a task), and share its failure, after which
+    the next call tries again."""
+
+    def __init__(self, value: T | None = None) -> None:
+        self.value = value
+        self._task: asyncio.Task[T] | None = None
+
+    async def get(self, compute: Callable[[], Awaitable[T]]) -> T:
+        if self.value is not None:
+            return self.value
+        task = self._task
+        # A task of a loop that has gone (asyncio.run called again) never finishes.
+        if task is None or task.get_loop() is not asyncio.get_running_loop():
+            task = self._task = asyncio.ensure_future(self._run(compute))
+        # Shielded: a caller that is cancelled doesn't cancel the others' lookup.
+        return await asyncio.shield(task)
+
+    async def _run(self, compute: Callable[[], Awaitable[T]]) -> T:
+        try:
+            self.value = await compute()
+            return self.value
+        finally:
+            self._task = None
+
+
+class Once(Generic[T]):
+    """A value worked out once, by the first call that needs it: calls made while it is
+    on its way wait for it (a lock), and try again themselves if it failed."""
+
+    def __init__(self, value: T | None = None) -> None:
+        self.value = value
+        self._lock = threading.Lock()
+
+    def get(self, compute: Callable[[], T]) -> T:
+        if self.value is not None:
+            return self.value
+        with self._lock:
+            if self.value is None:
+                self.value = compute()
+            return self.value
+
+
+def full_url(url: str, params: tuple[tuple[str, str], ...]) -> str:
+    """A request's URL with its query, as on_retry reports it."""
+    return str(httpx.URL(url, params=params)) if params else url
+
+
+def notify_retry(
+    settings: Settings,
+    attempt: int,
+    delay: float,
+    url: str,
+    *,
+    status: int | None = None,
+    error: NoheadError | None = None,
+) -> None:
+    """Tells `on_retry` about a retry before its wait. `attempt` is the failed one,
+    counting from 0; the event counts retries from 1."""
+    if settings.on_retry is not None:
+        settings.on_retry(
+            RetryEvent(attempt=attempt + 1, delay=delay, url=url, status=status, error=error)
+        )
+
+
+def list_body(response: httpx.Response) -> dict[str, Any]:
+    """A list response's body: an object with a `data` list and a `meta` object."""
+    data = parse(response)
+    if (
+        not isinstance(data, dict)
+        or not isinstance(data.get("data"), list)  # pyright: ignore[reportUnknownMemberType]
+        or not isinstance(data.get("meta"), dict)  # pyright: ignore[reportUnknownMemberType]
+    ):
+        raise NoheadError(f"The API's response could not be read (HTTP {response.status_code})")
+    return cast("dict[str, Any]", data)
 
 
 def parse(response: httpx.Response) -> Any:

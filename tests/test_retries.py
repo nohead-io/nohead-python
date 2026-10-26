@@ -14,6 +14,8 @@ from nohead import (
     APITimeoutError,
     InternalServerError,
     NoheadError,
+    RetryEvent,
+    ServiceUnavailableError,
     _base,
 )
 
@@ -21,6 +23,7 @@ from .conftest import BACKOFF, Make, api_error, json_response, record, resolve
 from .spec import example_of
 
 NOW = {"retry-after": "0"}
+LAST_PAGE_BODY = {"data": [], "meta": {"next_cursor": None, "has_more": False}}
 BACKOFF_WAIT = 0.25
 """What the backoff waits in test_retries_what_can_succeed_on_a_retry."""
 
@@ -60,6 +63,16 @@ RETRIES: list[tuple[str, httpx.Response | Exception, list[float] | None]] = [
         api_error(503, "service_unavailable", {"retry-after": "soon"}),
         [BACKOFF_WAIT],
     ),
+    ("Retry-After fraction", api_error(429, "rate_limited", {"retry-after": "1.5"}), [1.5]),
+    ("Retry-After spaced", api_error(429, "rate_limited", {"retry-after": " 2 "}), [2]),
+    *[
+        (
+            f"Retry-After {value}",
+            api_error(429, "rate_limited", {"retry-after": value}),
+            [BACKOFF_WAIT],
+        )
+        for value in ["-1", "+5", ".5", "5.", "1e3", "inf", "nan", "0x10", "2026-10-02T12:00:05Z"]
+    ],
     ("connection error", httpx.ConnectError("refused"), [BACKOFF_WAIT]),
     ("dropped connection", httpx.RemoteProtocolError("Server disconnected"), [BACKOFF_WAIT]),
     ("timeout", httpx.ReadTimeout("slow"), [BACKOFF_WAIT]),
@@ -196,3 +209,75 @@ async def test_times_out_slow_attempts(make: Make) -> None:
     with pytest.raises(APITimeoutError):
         await resolve(nohead.records.get("r"))
     assert calls.calls[0].extensions["timeout"]["read"] == 7
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "Fri, 02 Oct 2026 12:00:05 GMT",
+        "Friday, 02-Oct-26 12:00:05 GMT",
+        "Fri Oct  2 12:00:05 2026",
+    ],
+    ids=["IMF-fixdate", "RFC 850", "asctime"],
+)
+async def test_reads_retry_after_dates_in_every_http_form_as_gmt(
+    make: Make, waits: list[float], monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    # Far from UTC, so a date read as local time would be hours off.
+    monkeypatch.setenv("TZ", "America/Los_Angeles")
+    time.tzset()
+    monkeypatch.setattr(time, "time", lambda: 1790942400.0)  # 2026-10-02 12:00 UTC
+    try:
+        nohead, _ = make(
+            [
+                api_error(429, "rate_limited", {"retry-after": value}),
+                json_response(200, record("r")),
+            ]
+        )
+        await resolve(nohead.records.get("r"))
+    finally:
+        monkeypatch.undo()
+        time.tzset()
+    assert waits == [5]
+
+
+async def test_reports_each_retry_to_on_retry(make: Make, waits: list[float]) -> None:
+    events: list[RetryEvent] = []
+    nohead, _ = make(
+        [
+            api_error(503, "service_unavailable", {"retry-after": "2"}),
+            httpx.ConnectError("refused"),
+            json_response(200, LAST_PAGE_BODY),
+        ],
+        on_retry=events.append,
+    )
+    await resolve(nohead.records.list("posts", limit=5))
+    url = "https://api.test/v1/collections/posts/records?limit=5"
+    assert [(e.attempt, e.delay, e.url, e.status) for e in events] == [
+        (1, 2, url, 503),
+        (2, 0, url, None),
+    ]
+    assert waits == [2, 0]
+    assert isinstance(events[0].error, ServiceUnavailableError)
+    assert isinstance(events[1].error, APIConnectionError)
+    assert str(events[1].error) == "Could not reach api.test: refused"
+
+
+async def test_on_retry_is_not_called_without_a_retry(make: Make) -> None:
+    events: list[RetryEvent] = []
+    nohead, _ = make([api_error(500, "internal_error")], max_retries=0, on_retry=events.append)
+    with pytest.raises(InternalServerError):
+        await resolve(nohead.records.get("r"))
+    assert events == []
+
+
+async def test_takes_on_retry_per_client_copy(make: Make) -> None:
+    first: list[RetryEvent] = []
+    second: list[RetryEvent] = []
+    nohead, _ = make([api_error(500, "internal_error")], max_retries=1, on_retry=first.append)
+    copy = nohead.with_options(on_retry=second.append)
+    with pytest.raises(InternalServerError):
+        await resolve(copy.records.get("r"))
+    with pytest.raises(InternalServerError):
+        await resolve(nohead.with_options(timeout=5).records.get("r"))
+    assert (len(first), len(second)) == (1, 1)

@@ -14,9 +14,9 @@ import hashlib
 import hmac
 import json
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import Any, TypeVar, cast
+from typing import Any, TypeAlias, TypeVar, cast
 
 from ._base import validate
 from ._errors import WebhookVerificationError
@@ -31,7 +31,7 @@ from .models import (
     Webhook,
 )
 
-__all__ = ["WebhookEvent", "unwrap"]
+__all__ = ["WebhookEvent", "WebhookHeaders", "unwrap"]
 
 M = TypeVar("M", bound=NoheadModel)
 
@@ -148,16 +148,30 @@ class WebhookEvent(NoheadModel):
         return validate(model, value) if isinstance(value, dict) else None
 
 
+WebhookHeaders: TypeAlias = Mapping[str, str | Sequence[str]]
+"""A request's headers, by name in any case. A repeated header may be a list of its
+values, as some frameworks give it."""
+
+
 def unwrap(
-    body: str | bytes, headers: Mapping[str, str], *, secret: str, tolerance: int = 300
+    body: str | bytes,
+    headers: WebhookHeaders,
+    *,
+    secret: str | None,
+    tolerance: int = 300,
 ) -> WebhookEvent:
     """Checks a webhook request's signature and timestamp and returns its event.
 
     Pass the raw body exactly as received: parsing and re-serializing JSON changes the
     bytes, and the signature with them. Raises WebhookVerificationError when anything
-    does not match.
+    does not match, including an unset secret (None or empty, as from a missing
+    environment variable).
     """
-    lower = {key.lower(): value for key, value in headers.items()}
+    # A repeated header's values, space-separated.
+    lower = {
+        key.lower(): value if isinstance(value, str) else " ".join(value)
+        for key, value in headers.items()
+    }
     webhook_id = lower.get("webhook-id")
     timestamp = lower.get("webhook-timestamp")
     signatures = lower.get("webhook-signature")
@@ -178,7 +192,7 @@ def unwrap(
     # A character that can't be encoded can't have been signed: it fails to match.
     raw = body.encode(errors="replace") if isinstance(body, str) else body
     try:
-        key = base64.b64decode(secret.removeprefix("whsec_"), validate=True)
+        key = base64.b64decode((secret or "").removeprefix("whsec_"), validate=True)
     except ValueError:  # not base64, or not ASCII
         raise WebhookVerificationError("The webhook secret is not base64") from None
     if not key:  # unset, as from a missing environment variable
