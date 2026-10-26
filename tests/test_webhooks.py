@@ -310,3 +310,17 @@ def test_rejects_what_the_standard_webhooks_library_rejects(
     # Only WebhookVerificationError: any other exception fails the test.
     with pytest.raises(WebhookVerificationError):
         unwrap(body, headers, secret=secret)
+
+
+def test_rejects_an_unset_secret() -> None:
+    with pytest.raises(WebhookVerificationError, match=r"^The webhook secret is empty$"):
+        unwrap(BODY, sign(BODY), secret=None)
+
+
+def test_joins_a_repeated_header_given_as_a_list() -> None:
+    headers: dict[str, str | list[str]] = {**sign(BODY)}
+    headers["webhook-signature"] = ["v1,bm90LWl0", str(headers["webhook-signature"])]
+    assert unwrap(BODY, headers, secret=SECRET).id == "wev_1"
+    headers["webhook-signature"] = ["v1,bm90LWl0"]
+    with pytest.raises(WebhookVerificationError, match="No webhook signature matches"):
+        unwrap(BODY, headers, secret=SECRET)

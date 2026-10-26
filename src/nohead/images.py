@@ -8,8 +8,8 @@ written into it transform it (https://docs.imgproxy.net/usage/processing).
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
-from typing import Literal, Protocol
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal, Protocol
 
 _FITS = {"contain": "fit", "cover": "fill", "fill": "force"}
 
@@ -20,24 +20,30 @@ class _Image(Protocol):
 
 
 def image_url(
-    image: str | _Image,
+    image: str | _Image | Mapping[str, Any],
     *,
     width: float | None = None,
     height: float | None = None,
-    fit: Literal["contain", "cover", "fill"] = "contain",
+    fit: Literal["contain", "cover", "fill"] | None = "contain",
     format: Literal["webp", "avif", "jpeg", "png"] | None = None,
     quality: float | None = None,
     dpr: float | None = None,
     gravity: str | None = None,
     options: Sequence[str] = (),
 ) -> str:
-    """A rendition of an image (an asset, or its `image_url`). `fit`: `contain`
-    fits inside the box, `cover` fills it, cropping, `fill` stretches to it.
+    """A rendition of an image (an asset, as a model or a mapping, or its
+    `image_url`). `fit`: `contain` (the default, also for None) fits inside the box,
+    `cover` fills it, cropping, `fill` stretches to it.
     `gravity` is what a crop keeps (`sm` for smart, `fp:0.5:0.3` for a focal
     point); `options` are any other processing options, as written in a URL
     (`["bl:2"]`)."""
-    base = image if isinstance(image, str) else image.image_url
-    if not base:
+    if isinstance(image, str):
+        base: object = image
+    elif isinstance(image, Mapping):
+        base = image.get("image_url")
+    else:
+        base = image.image_url
+    if not base or not isinstance(base, str):
         raise ValueError("Not a ready image: it has no image_url")
     at = base.find("/plain/")
     if at < 0:
@@ -47,6 +53,8 @@ def image_url(
         if option and re.search(r"[/@?#]", option):
             raise ValueError(f"Not an imgproxy option: {option}")
 
+    if fit is None:
+        fit = "contain"
     if fit not in _FITS:
         raise ValueError(f"fit must be one of {', '.join(_FITS)}")
 

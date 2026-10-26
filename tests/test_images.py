@@ -65,3 +65,24 @@ def test_refuses_what_is_not_a_ready_images_url() -> None:
         image_url(Asset(None))
     with pytest.raises(ValueError, match="Not a Nohead image URL"):
         image_url("https://example.com/cat.png")
+
+
+def test_takes_an_asset_as_a_mapping() -> None:
+    assert image_url({"image_url": BASE}, width=100) == at("rs:fit:100:0")
+    with pytest.raises(ValueError, match="Not a ready image"):
+        image_url({"image_url": None}, width=100)
+    with pytest.raises(ValueError, match="Not a ready image"):
+        image_url({}, width=100)
+
+
+def test_fit_none_means_contain() -> None:
+    assert image_url(BASE, width=100, fit=None) == at("rs:fit:100:0")
+
+
+def test_refuses_an_empty_fit() -> None:
+    with pytest.raises(ValueError, match="fit must be one of contain, cover, fill"):
+        image_url(BASE, width=100, fit="")  # pyright: ignore[reportArgumentType]
+
+
+def test_leaves_empty_options_out() -> None:
+    assert image_url(BASE, width=100, gravity="", format=None) == at("rs:fit:100:0")

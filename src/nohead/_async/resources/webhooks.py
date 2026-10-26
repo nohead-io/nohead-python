@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Literal
 
 from typing_extensions import Unpack
@@ -15,7 +14,7 @@ from ...models import (
     WebhookWithSecret,
 )
 from ...params import WebhookCreate, WebhookUpdate
-from ...webhooks import WebhookEvent, unwrap
+from ...webhooks import WebhookEvent, WebhookHeaders, unwrap
 from .._client import AsyncAPIClient
 from ._resource import AsyncResource
 
@@ -108,9 +107,9 @@ class AsyncWebhooks(AsyncResource):
     def unwrap(
         self,
         body: str | bytes,
-        headers: Mapping[str, str],
+        headers: WebhookHeaders,
         *,
-        secret: str,
+        secret: str | None,
         tolerance: int = 300,
     ) -> WebhookEvent:
         """Checks a webhook request's signature and returns its event (see
