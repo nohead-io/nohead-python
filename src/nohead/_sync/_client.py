@@ -15,7 +15,13 @@ from typing import Any, TypeVar
 import httpx
 
 from .. import _base
-from .._errors import APIConnectionError, APITimeoutError, NoheadError, api_error
+from .._errors import (
+    APIConnectionError,
+    APITimeoutError,
+    NoheadError,
+    UploadError,
+    api_error,
+)
 from .._generated.operations import OPERATIONS
 from .._pagination import Page, start_pages
 from .._uploads import UploadSource, iter_file
@@ -31,13 +37,13 @@ class APIClient:
         self.settings = settings
         self.http = http or httpx.Client()
         self.owns_http = http is None
-        self._project_id = settings.project_id
+        self._project = _base.Once(settings.project_id)
 
     def copy(self, settings: _base.Settings) -> APIClient:
-        """The same connection pool and project, other settings."""
+        """The same connection pool and project (and its lookup), other settings."""
         client = APIClient(settings, self.http)
         client.owns_http = False
-        client._project_id = settings.project_id or self._project_id
+        client._project = self._project
         return client
 
     def close(self) -> None:
@@ -45,13 +51,15 @@ class APIClient:
             self.http.close()
 
     def project_id(self) -> str:
-        """The API key's project, from `GET /v1/me` the first time."""
-        if self._project_id is None:
-            me = self.request("me_get", cast=Principal)
-            if me.api_key is None:
-                raise NoheadError("The credentials are not a project API key")
-            self._project_id = me.api_key.project_id
-        return self._project_id
+        """The API key's project, from `GET /v1/me` the first time: calls that need it
+        at the same time share one lookup."""
+        return self._project.get(self._look_up_project)
+
+    def _look_up_project(self) -> str:
+        me = self.request("me_get", cast=Principal)
+        if me.api_key is None:
+            raise NoheadError("The credentials are not a project API key")
+        return me.api_key.project_id
 
     def request(
         self,
@@ -65,7 +73,7 @@ class APIClient:
         change_note: str | None = None,
         if_match: IfMatch | None = None,
     ) -> T:
-        data = self.send(
+        response = self.send(
             operation,
             path=path,
             query=query,
@@ -74,7 +82,7 @@ class APIClient:
             change_note=change_note,
             if_match=if_match,
         )
-        return _base.validate(cast, data)
+        return _base.validate(cast, _base.parse(response))
 
     def paginate(
         self,
@@ -89,7 +97,8 @@ class APIClient:
         params = dict(query or {})
 
         def fetch(cursor: str | None) -> Page[T, Any]:
-            data = self.send(operation, path=path, query={**params, "cursor": cursor})
+            response = self.send(operation, path=path, query={**params, "cursor": cursor})
+            data = _base.list_body(response)
             items: list[T] = [_base.validate(item, raw) for raw in data["data"]]
             return Page(items, _base.validate(meta, data["meta"]), fetch)
 
@@ -105,8 +114,9 @@ class APIClient:
         idempotency_key: str | None = None,
         change_note: str | None = None,
         if_match: IfMatch | None = None,
-    ) -> Any:
-        """Sends one operation, retrying as the README describes; returns the JSON."""
+    ) -> httpx.Response:
+        """Sends one operation, retrying as the README describes; returns the successful
+        response."""
         method, template = OPERATIONS[operation]
         values = dict(path or {})
         if "{project_id}" in template and "project_id" not in values:
@@ -134,46 +144,68 @@ class APIClient:
                     headers=headers,
                     content=content,
                     timeout=settings.timeout,
+                    follow_redirects=False,
                 )
             except httpx.TransportError as error:
+                failure = _connection_error(error, settings.timeout, url)
                 if attempt >= settings.max_retries or not _retryable(error):
-                    raise _connection_error(error, settings.timeout, url) from error
-                time.sleep(_base.backoff(attempt))
+                    raise failure from error
+                delay = _base.backoff(attempt)
+                _base.notify_retry(
+                    settings, attempt, delay, _base.full_url(url, params), error=failure
+                )
+                time.sleep(delay)
                 attempt += 1
                 continue
 
             _base.warn(settings, operation, response)
             if response.is_success:
-                return _base.parse(response)
+                return response
             error = api_error(response.status_code, _base.parse(response), response.headers)
             delay = _base.retry_delay(error, attempt, settings.max_retries)
             if delay is None:
                 raise error
+            _base.notify_retry(
+                settings,
+                attempt,
+                delay,
+                _base.full_url(url, params),
+                status=response.status_code,
+                error=error,
+            )
             time.sleep(delay)
             attempt += 1
 
     def put_upload(
         self, url: str, method: str, headers: Mapping[str, str], source: UploadSource
     ) -> httpx.Response:
-        """Sends a file to a presigned storage URL (no API credentials)."""
+        """Sends a file to a presigned storage URL (no API credentials). Raises
+        UploadError when the bytes don't reach storage; returns storage's answer."""
         settings = self.settings
         retries = settings.max_retries if source.replayable else 0
         attempt = 0
         while True:
+            failed: dict[str, Any]
             try:
                 response = self.http.request(
                     method,
                     url,
-                    headers={**headers, "Content-Length": str(source.byte_size)},
+                    headers=_base.merge_headers(headers, {"Content-Length": str(source.byte_size)}),
                     content=iter_file(source),
                     timeout=settings.timeout,
+                    follow_redirects=False,
                 )
                 if response.status_code not in _base.RETRYABLE_STATUSES or attempt >= retries:
                     return response
+                failed = {"status": response.status_code}
             except httpx.TransportError as error:
+                failure = _connection_error(error, settings.timeout, url)
                 if attempt >= retries or not _retryable(error):
-                    raise _connection_error(error, settings.timeout, url) from error
-            time.sleep(_base.backoff(attempt))
+                    raise UploadError(f"Could not upload {source.filename}: {failure}") from failure
+                failed = {"error": failure}
+            delay = _base.backoff(attempt)
+            _base.notify_retry(settings, attempt, delay, url, **failed)
+            time.sleep(delay)
             attempt += 1
 
 
@@ -182,6 +214,13 @@ def _retryable(error: httpx.TransportError) -> bool:
 
 
 def _connection_error(error: httpx.TransportError, timeout: float, url: str) -> NoheadError:
+    """The SDK's error for `error`, with `error` as its cause."""
+    failure = _failure(error, timeout, url)
+    failure.__cause__ = error
+    return failure
+
+
+def _failure(error: httpx.TransportError, timeout: float, url: str) -> NoheadError:
     if not _retryable(error):
         # The request itself can't be sent (an unsupported URL scheme, say): not a
         # connection problem.

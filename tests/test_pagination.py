@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from nohead import AsyncPage, NoheadError, Page
 
-from .conftest import LAST_PAGE, Make, items, json_response, page, record, resolve
+from .conftest import LAST_PAGE, Make, items, json_response, page, raw, record, resolve
 
 
 async def test_returns_the_first_page_then_pages_by_hand(make: Make) -> None:
@@ -88,3 +89,20 @@ async def test_search_totals(make: Make) -> None:
     assert hits.meta.total_estimate == 1
     assert calls.calls[0].url.path == "/v1/projects/prj_1/search"
     assert calls.calls[0].url.params["filter[collection][in]"] == "posts,pages"
+
+
+@pytest.mark.parametrize(
+    "reply",
+    [
+        httpx.Response(200, json=[record("rec_1")]),
+        httpx.Response(200, text="OK"),
+        httpx.Response(204),
+        httpx.Response(200, json={"data": None, "meta": {"has_more": False}}),
+        httpx.Response(200, json={"data": [], "meta": None}),
+    ],
+    ids=["array", "text", "empty", "data not a list", "meta not an object"],
+)
+async def test_a_list_response_it_cannot_read(make: Make, reply: httpx.Response) -> None:
+    nohead, _ = make([raw(reply)])
+    with pytest.raises(NoheadError, match=r"^The API's response could not be read \(HTTP 20\d\)$"):
+        await items(await resolve(nohead.records.list("posts")))

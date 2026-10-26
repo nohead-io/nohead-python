@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Literal, Protocol, TypeAlias, TypedDict
+
+from ._errors import NoheadError
 
 FilterValue: TypeAlias = str | int | float | bool | datetime | date | None
 
@@ -104,4 +107,23 @@ class HasRevision(Protocol):
     def revision(self) -> int: ...
 
 
-IfMatch: TypeAlias = int | HasRevision
+IfMatch: TypeAlias = int | HasRevision | Mapping[str, int]
+"""A revision number, or anything with a `revision`: a record or draft, or a mapping
+(`{"revision": 3}`)."""
+
+
+@dataclass(frozen=True)
+class RetryEvent:
+    """A retry about to happen, as the `on_retry` option receives it."""
+
+    attempt: int
+    """1 for the first retry of the request, 2 for the second..."""
+    delay: float
+    """Seconds the client waits before it."""
+    url: str
+    """The URL being retried."""
+    status: int | None = None
+    """The status that failed, or None when the connection did."""
+    error: NoheadError | None = None
+    """What failed: an APIError or an APIConnectionError (None for a status from
+    storage, during an upload)."""

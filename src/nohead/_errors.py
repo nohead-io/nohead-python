@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+import time
+from datetime import UTC, datetime
 from typing import Any, cast
 
 import httpx
@@ -29,11 +32,19 @@ class APIError(NoheadError):
     body: Any
     """The parsed response body, or its text when it was not JSON."""
 
-    def __init__(self, status: int, body: Any, headers: httpx.Headers) -> None:
+    def __init__(
+        self,
+        status: int,
+        body: Any,
+        headers: httpx.Headers,
+        *,
+        type: str | None = None,
+        message: str | None = None,
+    ) -> None:
         error = _envelope(body)
         self.status = status
-        self.type = error.get("type")
-        self.message = error.get("message") or f"Request failed with status {status}"
+        self.type = type or error.get("type")
+        self.message = message or error.get("message") or f"Request failed with status {status}"
         self.request_id = error.get("request_id") or headers.get("x-request-id")
         raw_details: list[Any] = error.get("details") or []
         self.details = [_detail(d) for d in raw_details]
@@ -139,6 +150,18 @@ _CLASSES: dict[str, type[APIError]] = {
 
 def api_error(status: int, body: Any, headers: httpx.Headers) -> APIError:
     """The error for a response, by its `type`, or by status when it has none."""
+    if 300 <= status < 400:
+        # The API never redirects: a base URL that does (http:// to https://, a moved
+        # host) would resend the request, its key included, somewhere else.
+        location = headers.get("location")
+        to = f" to {location}" if location else ""
+        return APIError(
+            status,
+            body,
+            headers,
+            type="redirect",
+            message=f"The API answered with a redirect{to}; check the base URL",
+        )
     cls = _CLASSES.get(_envelope(body).get("type") or "")
     if cls is None:
         if status == 503:
@@ -151,20 +174,53 @@ def api_error(status: int, body: Any, headers: httpx.Headers) -> APIError:
 
 
 def retry_after_seconds(headers: httpx.Headers) -> float | None:
-    value = headers.get("retry-after")
-    if not value:
-        return None
-    try:
-        return max(0.0, float(value))
-    except ValueError:
-        pass
-    from email.utils import parsedate_to_datetime
-    from time import time
+    """`Retry-After` in seconds: a number of seconds (`5`, `1.5`), or an HTTP date.
+    None for anything else (`-1`, `1e3`, `inf`, an ISO 8601 date)."""
+    value = (headers.get("retry-after") or "").strip()
+    if re.fullmatch(r"[0-9]+(\.[0-9]+)?", value):
+        return float(value)
+    at = _http_date(value)
+    return None if at is None else max(0.0, at.timestamp() - time.time())
 
-    try:
-        return max(0.0, parsedate_to_datetime(value).timestamp() - time())
-    except (TypeError, ValueError):
-        return None
+
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+_MONTH = "(?P<month>" + "|".join(_MONTHS) + ")"
+_DAY = "(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)"
+_TIME = "(?P<hour>[0-9]{2}):(?P<minute>[0-9]{2}):(?P<second>[0-9]{2})"
+_HTTP_DATES = [
+    # IMF-fixdate: Sun, 06 Nov 1994 08:49:37 GMT
+    re.compile(f"{_DAY}, (?P<day>[0-9]{{2}}) {_MONTH} (?P<year>[0-9]{{4}}) {_TIME} GMT"),
+    # RFC 850: Sunday, 06-Nov-94 08:49:37 GMT
+    re.compile(
+        "(?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day, "
+        f"(?P<day>[0-9]{{2}})-{_MONTH}-(?P<year>[0-9]{{2}}) {_TIME} GMT"
+    ),
+    # asctime: Sun Nov  6 08:49:37 1994
+    re.compile(f"{_DAY} {_MONTH} (?P<day>[0-9 ][0-9]) {_TIME} (?P<year>[0-9]{{4}})"),
+]
+
+
+def _http_date(value: str) -> datetime | None:
+    """An HTTP date in any of RFC 9110's three forms, all GMT; None for anything else."""
+    for pattern in _HTTP_DATES:
+        if match := pattern.fullmatch(value):
+            year = int(match["year"])
+            if len(match["year"]) == 2:
+                # RFC 850's two-digit year: the latest one at most 50 years ahead.
+                year += 2000 if year + 2000 <= datetime.now(UTC).year + 50 else 1900
+            try:
+                return datetime(
+                    year,
+                    _MONTHS.index(match["month"]) + 1,
+                    int(match["day"]),
+                    int(match["hour"]),
+                    int(match["minute"]),
+                    int(match["second"]),
+                    tzinfo=UTC,
+                )
+            except ValueError:  # no such day or time (31 Feb, 25:00)
+                return None
+    return None
 
 
 def _envelope(body: Any) -> dict[str, Any]:
