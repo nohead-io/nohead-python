@@ -12,8 +12,13 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import sys
+import tempfile
 import uuid
+from collections.abc import Iterator
+from pathlib import Path
+from typing import IO, Any
 
 from nohead import (
     AsyncNohead,
@@ -34,6 +39,16 @@ def expect(condition: object, message: str) -> None:
         sys.exit(1)
 
 
+@contextlib.contextmanager
+def pipe(data: bytes) -> Iterator[IO[bytes]]:
+    """A stream that can't seek or tell its size, holding `data`."""
+    read, write = os.pipe()
+    with open(write, "wb") as writer:
+        writer.write(data)  # small: it fits the pipe's buffer
+    with open(read, "rb") as reader:
+        yield reader
+
+
 def sync_flow() -> str:
     with Nohead() as nohead:
         me = nohead.me.get()
@@ -50,7 +65,8 @@ def sync_flow() -> str:
         first = nohead.records.create(collection.slug, data={"title": "One"}, idempotency_key=key)
         retried = nohead.records.create(collection.slug, data={"title": "One"}, idempotency_key=key)
         expect(retried.id == first.id, "an idempotent retry returns the same record")
-        nohead.records.create(collection.slug, data={"title": "Two"})
+        for title in ["Two", "Three", "Four", "Five"]:
+            nohead.records.create(collection.slug, data={"title": title})
 
         got = nohead.records.get(first.id)
         expect(got.data["title"] == "One", "get returns the record")
@@ -72,8 +88,13 @@ def sync_flow() -> str:
         )
         following = page.get_next_page()
         expect(following.data[0].id != page.data[0].id, "the cursor returns the next page")
-        titles = sorted(r.data["title"] for r in nohead.records.list(collection.slug, limit=1))
-        expect(titles == ["Two", "Uno"], "iterating walks every page")
+        # Five records, two a page: iterating fetches three pages.
+        walked = list(nohead.records.list(collection.slug, limit=2))
+        expect(len({r.id for r in walked}) == len(walked), "iterating returns each record once")
+        expect(
+            sorted(r.data["title"] for r in walked) == ["Five", "Four", "Three", "Two", "Uno"],
+            "iterating walks every page",
+        )
 
         # A comma inside a value is escaped, or "Two" would match too.
         chosen = nohead.records.list(
@@ -123,6 +144,36 @@ def sync_flow() -> str:
         nohead.assets.purge(asset.id)
         del LEFT["assets"]
 
+        with tempfile.TemporaryDirectory() as directory:
+            markdown = Path(directory, "notes.md")
+            markdown.write_bytes(b"# Notes\n")
+            table = Path(directory, "table.csv")
+            table.write_bytes(b"a,b\n1,2\n")
+            with table.open("rb") as opened, pipe(b"streamed bytes") as stream:
+                uploads: list[tuple[str, Any, dict[str, Any], str, int]] = [
+                    ("a path", markdown, {}, "text/markdown", 8),
+                    ("a file object", opened, {}, "text/csv", 8),
+                    (
+                        "a stream that can't seek",
+                        stream,
+                        {"filename": "stream.txt", "byte_size": 14},
+                        "text/plain",
+                        14,
+                    ),
+                ]
+                for kind, file, options, content_type, byte_size in uploads:
+                    uploaded = nohead.assets.upload(file, **options)
+                    LEFT["assets"] = uploaded.id
+                    expect(
+                        uploaded.status == "ready"
+                        and uploaded.byte_size == byte_size
+                        and uploaded.content_type == content_type,
+                        f"{kind} uploads to storage",
+                    )
+                    nohead.assets.delete(uploaded.id)
+                    nohead.assets.purge(uploaded.id)
+                    del LEFT["assets"]
+
         webhook = nohead.webhooks.create(
             url="https://example.com/nohead-smoke", event_types=["record.published"]
         )
@@ -151,8 +202,29 @@ async def async_flow(collection: str) -> None:
             (await nohead.records.get(created.id)).data["title"] == "Async",
             "the async client reads",
         )
-        titles = [r.data["title"] async for r in nohead.records.list(collection, limit=1)]
-        expect(sorted(titles) == ["Async", "Two"], "async iteration walks every page")
+        titles = [r.data["title"] async for r in nohead.records.list(collection, limit=2)]
+        expect(
+            sorted(titles) == ["Async", "Five", "Four", "Three", "Two"],
+            "async iteration walks every page",
+        )
+        try:
+            await nohead.records.get("rec_01J9ZQ3F8X5W2K7M4N6P0R1S2T")
+            expect(False, "a missing record is refused")
+        except NotFoundError as error:
+            expect((error.request_id or "").startswith("req_"), "async errors carry the request ID")
+
+        with pipe(b"streamed asynchronously") as stream:
+            asset = await nohead.assets.upload(stream, filename="stream.txt", byte_size=23)
+        LEFT["assets"] = asset.id
+        expect(
+            asset.status == "ready"
+            and asset.byte_size == 23
+            and asset.content_type == "text/plain",
+            "the async client uploads a stream that can't seek",
+        )
+        await nohead.assets.delete(asset.id)
+        await nohead.assets.purge(asset.id)
+        del LEFT["assets"]
         await nohead.collections.delete(collection)
         del LEFT["collections"]
 
