@@ -7,6 +7,69 @@ section is its GitHub release's notes.
 
 ## Unreleased
 
+- `on_retry`, a client option (and a `with_options` one), is called before
+  each retry's wait, also for an upload's bytes, with a `RetryEvent`: the
+  attempt, the delay in seconds, the URL, and the status or error that failed.
+
+- A path value of `.` or `..`, such as `records.get("..")`, raises
+  `NoheadError` (`Invalid record_id: ".."`) before sending anything, instead
+  of requesting the parent path (URL parsers resolve them, encoded or not).
+
+- An empty `project_id` counts as not given (the project is looked up), as an
+  empty `api_key` and `base_url` already did.
+
+- A `base_url` (or `NOHEAD_API_URL`) that isn't an `http` or `https` URL
+  raises `NoheadError` ("base_url must be an http or https URL") when the
+  client is built, instead of failing each request.
+
+- Headers are matched without regard to case and each is sent once: a client
+  `headers` entry such as `authorization` replaces the SDK's `Authorization`
+  instead of being sent as a second line, and the headers a call's options
+  set (`Content-Type`, `Idempotency-Key`, `If-Match`, `Nohead-Change-Note`)
+  always win. `with_options(headers=...)` replaces a header of the same name
+  in any case.
+
+- `if_match` takes a mapping with a `revision` (`{"revision": 3}`), and
+  raises `TypeError` before sending for anything that isn't a revision
+  number or doesn't have one.
+
+- A naive `datetime` in a body or query raises `ValueError` ("... has no time
+  zone: pass an aware datetime") instead of being sent without one, when its
+  moment depends on where the code runs.
+
+- `nan` and infinities in a body raise `ValueError` instead of being sent as
+  `NaN` and `Infinity`, which aren't JSON.
+
+- Calls that need the project at the same time share one `GET /v1/me`
+  lookup, also with clients from `with_options`, instead of each making one.
+
+- A redirect from the API raises `APIError` (`301 redirect: The API answered
+  with a redirect to <URL>; check the base URL`), and neither API requests nor
+  an upload's bytes follow redirects, even with an `http_client` that does.
+
+- A list response that isn't a list (not a JSON object with `data` and
+  `meta`) raises `NoheadError` ("The API's response could not be read (HTTP
+  200)") instead of `TypeError` or `KeyError`.
+
+- `Retry-After` is read as the other Nohead SDKs read it: a number of seconds
+  (`5`, `1.5`) or an HTTP date in any of its three forms, always GMT.
+  Anything else (`-1`, `+5`, `.5`, `1e3`, `inf`, `nan`, an ISO 8601 date) is
+  ignored and the usual backoff applies; `inf` made the request raise at
+  once, and `nan` retried without waiting. An asctime date was read in the
+  computer's time zone.
+
+- `assets.upload` raises `UploadError` (`Could not upload <filename>:
+  <reason>`, with the connection error as its cause) when storage can't be
+  reached or times out, instead of `APIConnectionError` or `APITimeoutError`.
+
+- `unwrap` with a `None` secret raises `WebhookVerificationError` ("The
+  webhook secret is empty") instead of `AttributeError`, and takes a header
+  given as a list of values (as some frameworks give a repeated header),
+  joined with spaces, instead of raising `TypeError`.
+
+- `image_url` takes an asset as a mapping (`{"image_url": ...}`), and
+  `fit=None` means the default, `contain`.
+
 - A field (`Field`, `FieldCreate`) is validated as the model its `type`
   names, and a batch result as the one its `status` names, instead of
   against every variant: a response that doesn't match the models warns with
