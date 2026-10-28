@@ -415,7 +415,7 @@ NOHEAD_API_URL=http://localhost:3000 NOHEAD_API_KEY=nohead_sk_... \
 
 ## Releasing
 
-1. Bump the version in `pyproject.toml` and `src/nohead/_version.py`.
+1. Bump the version in `pyproject.toml` and `src/nohead/_version.py`, then `uv lock` (CI installs with `--locked`, which fails on a stale lockfile).
 2. Add a section for it to `CHANGELOG.md` (`## 1.2.3`), which becomes the release's notes.
 3. Merge to `main`. Its ruleset requires the **CI passed** check, so the commit goes through a pull request or a branch whose CI passed, and force pushes are refused.
 4. Run the **SDK release** workflow in the Nohead API repository. It runs this commit's smoke test against the API and pushes the tag `v1.2.3`. Nobody else can push `v*` tags: a tag ruleset lets only that workflow's deploy key through.
