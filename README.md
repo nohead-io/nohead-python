@@ -44,15 +44,16 @@ It needs Python 3.11 or newer. Its dependencies are httpx and Pydantic 2. Use it
 
 ```python
 nohead = Nohead(
-    api_key=os.environ["NOHEAD_API_KEY"],  # default: NOHEAD_API_KEY
-    base_url="https://api.nohead.io",  # default: NOHEAD_API_URL, else production
+    api_key=os.environ["NOHEAD_API_KEY"],  # the default
+    timeout=10.0,
+    max_retries=3,
 )
 ```
 
 | Option | Default | |
 |---|---|---|
 | `api_key` | `NOHEAD_API_KEY` | A project API key (`nohead_sk_...`, or `nohead_pk_...` when published-only). Required. |
-| `base_url` | `NOHEAD_API_URL`, else `https://api.nohead.io` | An `http` or `https` URL; anything else raises `NoheadError`. |
+| `base_url` | `https://api.nohead.io` | For a proxy, or a mock server in tests. An `http` or `https` URL; anything else raises `NoheadError`. |
 | `project_id` | the key's project | Looked up once with `GET /v1/me` when omitted (calls made at the same time share the lookup). |
 | `max_retries` | `2` | See [retries](#retries-and-idempotency). |
 | `timeout` | `60.0` | Seconds an attempt may go without progress: to connect, to send, to get the response, and between reads of it. A response that keeps arriving doesn't time out. |
