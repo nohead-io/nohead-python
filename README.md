@@ -277,8 +277,6 @@ Thumbnails: an image's `preview_url` fits in 640×640, as WebP.
 
 **Resuming:** with an `idempotency_key`, running the same upload again resumes it: an asset that is already `ready` is returned without sending the bytes again. Once the upload's URL has expired (its `upload.expires_at`), it raises `UploadError`: start over with a new key.
 
-**Uploading from a browser:** create the upload on your server with `create_upload`, `PUT` the file from the browser, then `complete` it.
-
 **Renaming and alt text:** `update` changes an asset's `filename` and `alt` text, the default wherever the asset is used (`expand` returns it with the asset). The file itself never changes.
 
 ```python
