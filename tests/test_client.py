@@ -24,7 +24,9 @@ def test_needs_an_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
         Nohead()
 
 
-def test_reads_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_reads_the_key_from_the_environment_but_not_the_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("NOHEAD_API_KEY", "nohead_sk_env")
     monkeypatch.setenv("NOHEAD_API_URL", "https://env.test/")
     seen: list[httpx.Request] = []
@@ -35,12 +37,20 @@ def test_reads_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 
     client = Nohead(http_client=httpx.Client(transport=httpx.MockTransport(handler)))
     client.records.get("rec_1")
-    assert str(seen[0].url) == "https://env.test/v1/records/rec_1"
+    assert str(seen[0].url) == "https://api.nohead.io/v1/records/rec_1"
     assert seen[0].headers["authorization"] == "Bearer nohead_sk_env"
 
 
-def test_defaults_to_production(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("NOHEAD_API_URL", "")
+async def test_takes_the_base_url_from_its_option(
+    make: Make, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NOHEAD_API_URL", "https://env.test")
+    nohead, calls = make([json_response(200, record("rec_1"))], base_url="https://api.test")
+    await resolve(nohead.records.get("rec_1"))
+    assert str(calls.calls[0].url) == "https://api.test/v1/records/rec_1"
+
+
+def test_defaults_to_production() -> None:
     assert Nohead(api_key="nohead_sk_x")._client.settings.base_url == "https://api.nohead.io"
 
 
@@ -132,8 +142,8 @@ def test_empty_options_count_as_not_given(monkeypatch: pytest.MonkeyPatch) -> No
     nohead, calls = make_sync([ME, LAST_PAGE], api_key="", base_url="", project_id="")
     nohead.collections.list()
     assert [str(c.url) for c in calls.calls] == [
-        "https://env.test/v1/me",
-        "https://env.test/v1/projects/prj_9/collections",
+        "https://api.nohead.io/v1/me",
+        "https://api.nohead.io/v1/projects/prj_9/collections",
     ]
     assert calls.calls[0].headers["authorization"] == "Bearer nohead_sk_env"
 
@@ -148,14 +158,10 @@ def test_removes_every_trailing_slash_of_the_base_url() -> None:
     "base_url",
     ["ftp://api.test", "api.nohead.io", "localhost:3000", "http://", "https:///v1", "http://[::1"],
 )
-def test_refuses_a_base_url_that_is_not_http(
-    base_url: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    with pytest.raises(NoheadError, match=r"^base_url must be an http or https URL$"):
-        Nohead(api_key="k", base_url=base_url)
-    monkeypatch.setenv("NOHEAD_API_URL", base_url)
-    with pytest.raises(NoheadError, match=r"^base_url must be an http or https URL$"):
-        AsyncNohead(api_key="k")
+def test_refuses_a_base_url_that_is_not_http(base_url: str) -> None:
+    for client in (Nohead, AsyncNohead):
+        with pytest.raises(NoheadError, match=r"^base_url must be an http or https URL$"):
+            client(api_key="k", base_url=base_url)
 
 
 def fresh(response: httpx.Response) -> httpx.Response:

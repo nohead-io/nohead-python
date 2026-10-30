@@ -7,6 +7,11 @@ section is its GitHub release's notes.
 
 ## Unreleased
 
+- **Breaking:** the client no longer reads `NOHEAD_API_URL`: a stray value
+  sent requests, with the API key, to another host. The base URL is
+  `base_url`, else `https://api.nohead.io`; pass `base_url` to use another
+  API, as in `Nohead(base_url=os.environ["NOHEAD_API_URL"])`.
+
 - `on_retry`, a client option (and a `with_options` one), is called before
   each retry's wait, also for an upload's bytes, with a `RetryEvent`: the
   attempt, the delay in seconds, the URL, and the status or error that failed.
@@ -18,9 +23,9 @@ section is its GitHub release's notes.
 - An empty `project_id` counts as not given (the project is looked up), as an
   empty `api_key` and `base_url` already did.
 
-- A `base_url` (or `NOHEAD_API_URL`) that isn't an `http` or `https` URL
-  raises `NoheadError` ("base_url must be an http or https URL") when the
-  client is built, instead of failing each request.
+- A `base_url` that isn't an `http` or `https` URL raises `NoheadError`
+  ("base_url must be an http or https URL") when the client is built,
+  instead of failing each request.
 
 - Headers are matched without regard to case and each is sent once: a client
   `headers` entry such as `authorization` replaces the SDK's `Authorization`

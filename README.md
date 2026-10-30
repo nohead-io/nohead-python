@@ -62,7 +62,7 @@ nohead = Nohead(
 | `on_retry` | none | Called before each retry's wait, with a `RetryEvent`. See [retries](#retries-and-idempotency). |
 | `http_client` | a new `httpx.Client` | Bring your own for proxies or custom transports. |
 
-An empty string counts as not given: `api_key=""` reads `NOHEAD_API_KEY`, and so on.
+An empty string counts as not given: `api_key=""` reads `NOHEAD_API_KEY`, `base_url=""` uses `https://api.nohead.io`, and so on. The base URL comes only from `base_url`, never from the environment.
 
 API keys belong to a project, so methods like `collections.list()` need no project ID. Collections can be named by ID or slug everywhere.
 
