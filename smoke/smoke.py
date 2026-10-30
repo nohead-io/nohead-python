@@ -32,7 +32,8 @@ from nohead import (
 # when it fails.
 LEFT: dict[str, str] = {}
 
-# The API to test: the client doesn't read NOHEAD_API_URL itself.
+# The API to test: the client doesn't read NOHEAD_API_URL itself. Required (checked
+# below), so that a missing variable doesn't run the test against production.
 BASE_URL = os.environ.get("NOHEAD_API_URL")
 
 
@@ -239,6 +240,7 @@ def clean_up() -> None:
                 getattr(nohead, resource).delete(id)
 
 
+expect(BASE_URL, "NOHEAD_API_URL is set to the API to test")
 try:
     slug = sync_flow()
     asyncio.run(async_flow(slug))

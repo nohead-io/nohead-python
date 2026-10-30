@@ -39,15 +39,15 @@ def test_reads_the_key_from_the_environment_but_not_the_url(
     client.records.get("rec_1")
     assert str(seen[0].url) == "https://api.nohead.io/v1/records/rec_1"
     assert seen[0].headers["authorization"] == "Bearer nohead_sk_env"
-    assert AsyncNohead()._client.settings.base_url == "https://api.nohead.io"
 
 
-def test_takes_the_base_url_from_its_option(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_takes_the_base_url_from_its_option(
+    make: Make, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setenv("NOHEAD_API_URL", "https://env.test")
-    for client in (Nohead, AsyncNohead):
-        assert client(api_key="k", base_url="https://api.test")._client.settings.base_url == (
-            "https://api.test"
-        )
+    nohead, calls = make([json_response(200, record("rec_1"))], base_url="https://api.test")
+    await resolve(nohead.records.get("rec_1"))
+    assert str(calls.calls[0].url) == "https://api.test/v1/records/rec_1"
 
 
 def test_defaults_to_production() -> None:
@@ -138,6 +138,7 @@ async def test_leaves_a_given_http_client_open(make: Make) -> None:
 
 def test_empty_options_count_as_not_given(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("NOHEAD_API_KEY", "nohead_sk_env")
+    monkeypatch.setenv("NOHEAD_API_URL", "https://env.test")
     nohead, calls = make_sync([ME, LAST_PAGE], api_key="", base_url="", project_id="")
     nohead.collections.list()
     assert [str(c.url) for c in calls.calls] == [
