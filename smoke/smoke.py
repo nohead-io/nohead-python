@@ -1,7 +1,7 @@
 """Smoke test (Nohead spec §48.14): the core flow against a live API, with both
-clients. Needs NOHEAD_API_URL and NOHEAD_API_KEY (a key with schema, records, assets
-and webhooks read/write scopes). Exits non-zero on failure, after deleting what it
-created. Run it against the built package:
+clients. Needs NOHEAD_API_URL (the API to test, passed as base_url) and NOHEAD_API_KEY
+(a key with schema, records, assets and webhooks read/write scopes). Exits non-zero on
+failure, after deleting what it created. Run it against the built package:
 
     uv build
     NOHEAD_API_URL=http://localhost:3000 NOHEAD_API_KEY=nohead_sk_... \\
@@ -32,6 +32,9 @@ from nohead import (
 # when it fails.
 LEFT: dict[str, str] = {}
 
+# The API to test: the client doesn't read NOHEAD_API_URL itself.
+BASE_URL = os.environ.get("NOHEAD_API_URL")
+
 
 def expect(condition: object, message: str) -> None:
     if not condition:
@@ -50,7 +53,7 @@ def pipe(data: bytes) -> Iterator[IO[bytes]]:
 
 
 def sync_flow() -> str:
-    with Nohead() as nohead:
+    with Nohead(base_url=BASE_URL) as nohead:
         me = nohead.me.get()
         expect(me.api_key and me.api_key.project_id, "the key belongs to a project")
 
@@ -196,7 +199,7 @@ def sync_flow() -> str:
 
 
 async def async_flow(collection: str) -> None:
-    async with AsyncNohead() as nohead:
+    async with AsyncNohead(base_url=BASE_URL) as nohead:
         created = await nohead.records.create(collection, data={"title": "Async"})
         expect(
             (await nohead.records.get(created.id)).data["title"] == "Async",
@@ -230,7 +233,7 @@ async def async_flow(collection: str) -> None:
 
 
 def clean_up() -> None:
-    with Nohead() as nohead:
+    with Nohead(base_url=BASE_URL) as nohead:
         for resource, id in LEFT.items():
             with contextlib.suppress(Exception):
                 getattr(nohead, resource).delete(id)
