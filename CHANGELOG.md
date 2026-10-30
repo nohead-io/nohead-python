@@ -5,7 +5,7 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
-## Unreleased
+## 0.9.0
 
 - **Breaking:** the client no longer reads `NOHEAD_API_URL`: a stray value
   sent requests, with the API key, to another host. The base URL is
