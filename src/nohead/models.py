@@ -931,7 +931,7 @@ class PrincipalUser(NoheadModel):
     email: str
     name: str | None
     staff: bool
-    """Nohead staff (internal tooling access)."""
+    """Whether the user is Nohead staff."""
 
 
 class PrincipalApiKey(NoheadModel):
