@@ -40,6 +40,8 @@ pip install nohead
 
 It needs Python 3.11 or newer. Its dependencies are httpx and Pydantic 2. Use it on servers: API keys are secrets.
 
+Until 1.0, any release may break your code: pin a version, and read the changelog's **Breaking** entries before upgrading.
+
 ## Configuration
 
 ```python
@@ -404,7 +406,7 @@ git diff --exit-code                     # fails if a generated file was stale
 - The tests' mock transport (`tests/conftest.py`) checks every request against its operation in the contract, and every reply against what the operation documents for its status (`tests/spec.py`), so a fixture can't drift from the API. Build replies from the contract's examples (`example_of("Asset", status="ready")`); wrap one that breaks the contract on purpose, such as a gateway's error page, in `raw()`. A `NoheadWarning` fails a test that doesn't expect it.
 - `tests/test_contract.py` calls every public method of both clients. It fails when an API-key operation in the contract has no method, when a query parameter is never sent (no method takes it, or no call passes it), or when a request doesn't match its operation (method, path, query parameters and JSON body, against their schemas). Each call gets an example of its operation's response, built from the contract's schema, and must return it, parsed without a `NoheadWarning`.
 
-The smoke test (`smoke/smoke.py`) runs the core flow against a real API, with both clients, using the built package. Nohead's own CI runs it on every API contract change.
+The smoke test (`smoke/smoke.py`) runs the core flow against a real API, with both clients, using the built package. The Nohead API repository runs it in its end-to-end tests and before every release.
 
 ```bash
 uv build
@@ -417,7 +419,7 @@ NOHEAD_API_URL=http://localhost:3000 NOHEAD_API_KEY=nohead_sk_... \
 1. Bump the version in `pyproject.toml` and `src/nohead/_version.py`, then `uv lock` (CI installs with `--locked`, which fails on a stale lockfile).
 2. Add a section for it to `CHANGELOG.md` (`## 1.2.3`), which becomes the release's notes.
 3. Merge to `main`. Its ruleset requires the **CI passed** check, so the commit goes through a pull request or a branch whose CI passed, and force pushes are refused.
-4. Run the **SDK release** workflow in the Nohead API repository. It runs this commit's smoke test against the API and pushes the tag `v1.2.3`. Nobody else can push `v*` tags: a tag ruleset lets only that workflow's deploy key through.
+4. Run the **SDK release** workflow in the Nohead API repository. It runs this commit's smoke test against the API and pushes the tag `v1.2.3`. A tag ruleset lets only deploy keys push `v*` tags.
 5. The tag starts `.github/workflows/release.yml`. Its publishing job runs in the `release` environment, which only `v*` tags can use, and the registry's trusted publisher accepts only that environment. It checks the version and its notes, tests and builds, and publishes to PyPI through trusted publishing (no token, with attestations). Then it creates the GitHub release with the built files.
 
 ## License
