@@ -92,6 +92,7 @@ class CollectionCreate(TypedDict):
     description: NotRequired[str | None]
     public_search: NotRequired[bool]
     fields: NotRequired[list[FieldCreate]]
+    """At most 100 (`too_many`)."""
 
 
 class CollectionUpdate(TypedDict):
@@ -286,6 +287,11 @@ class IntegerFieldCreate(FieldCreateProperties):
 
 
 class JsonFieldConfiguration(TypedDict):
+    """Any JSON value up to 100,000 bytes (`too_large`), nested at most 32 levels deep
+    (`too_deep`): for data with a shape of its own, such as settings or another service's
+    payload. Content belongs in typed fields, and large data in an asset.
+    """
+
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]
@@ -372,6 +378,8 @@ class RelationFieldCreate(FieldCreateProperties):
 
 
 class RichTextFieldConfiguration(TypedDict):
+    """A rich text document up to 1,000,000 bytes (`too_large`)."""
+
     description: NotRequired[str]
     """Help text for editors."""
     searchable: NotRequired[bool]

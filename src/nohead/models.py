@@ -187,6 +187,8 @@ class LongTextFieldConfiguration(NoheadModel):
 
 
 class RichTextFieldConfiguration(NoheadModel):
+    """A rich text document up to 1,000,000 bytes (`too_large`)."""
+
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
@@ -312,6 +314,11 @@ class RelationFieldConfiguration(NoheadModel):
 
 
 class JsonFieldConfiguration(NoheadModel):
+    """Any JSON value up to 100,000 bytes (`too_large`), nested at most 32 levels deep
+    (`too_deep`): for data with a shape of its own, such as settings or another service's
+    payload. Content belongs in typed fields, and large data in an asset.
+    """
+
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
@@ -466,6 +473,7 @@ class CollectionCreate(NoheadModel):
     description: str | None = None
     public_search: bool | None = None
     fields: list[FieldCreate] | None = None
+    """At most 100 (`too_many`)."""
 
 
 class CollectionUpdate(NoheadModel):
