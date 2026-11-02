@@ -25,7 +25,7 @@ from .._generated.operations import OPERATIONS
 from .._pagination import AsyncPage, AsyncPaginator, start_async_pages
 from .._uploads import UploadSource, aiter_file
 from ..models import ListMeta, Principal
-from ..types import IfMatch
+from ..types import IfMatch, RichText
 
 T = TypeVar("T")
 M = TypeVar("M")
@@ -71,6 +71,7 @@ class AsyncAPIClient:
         idempotency_key: str | None = None,
         change_note: str | None = None,
         if_match: IfMatch | None = None,
+        rich_text: RichText | None = None,
     ) -> T:
         response = await self.send(
             operation,
@@ -80,6 +81,7 @@ class AsyncAPIClient:
             idempotency_key=idempotency_key,
             change_note=change_note,
             if_match=if_match,
+            rich_text=rich_text,
         )
         return _base.validate(cast, _base.parse(response))
 
@@ -91,12 +93,15 @@ class AsyncAPIClient:
         meta: type[M] = ListMeta,
         path: Mapping[str, str | int] | None = None,
         query: Mapping[str, Any] | None = None,
+        rich_text: RichText | None = None,
     ) -> AsyncPaginator[T, Any]:
         """A list operation as pages of `item`."""
         params = dict(query or {})
 
         async def fetch(cursor: str | None) -> AsyncPage[T, Any]:
-            response = await self.send(operation, path=path, query={**params, "cursor": cursor})
+            response = await self.send(
+                operation, path=path, query={**params, "cursor": cursor}, rich_text=rich_text
+            )
             data = _base.list_body(response)
             items: list[T] = [_base.validate(item, raw) for raw in data["data"]]
             return AsyncPage(items, _base.validate(meta, data["meta"]), fetch)
@@ -113,6 +118,7 @@ class AsyncAPIClient:
         idempotency_key: str | None = None,
         change_note: str | None = None,
         if_match: IfMatch | None = None,
+        rich_text: RichText | None = None,
     ) -> httpx.Response:
         """Sends one operation, retrying as the README describes; returns the successful
         response."""
@@ -131,7 +137,9 @@ class AsyncAPIClient:
             if_match=if_match,
         )
         content = None if body is None else _base.encode(body)
-        params = _base.query(query)
+        params = _base.query(
+            {**(query or {}), "rich_text": _base.rich_text(settings, operation, rich_text)}
+        )
 
         attempt = 0
         while True:

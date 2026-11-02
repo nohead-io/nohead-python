@@ -12,7 +12,18 @@ import pytest
 from nohead import NoheadError, models
 from nohead.models import RecordBatchResultsFailed, RecordBatchResultsSucceeded, TextField
 
-from .conftest import LAST_PAGE, Make, json_response, make_sync, page, raw, record, resolve
+from .calls import mock_reply
+from .conftest import (
+    LAST_PAGE,
+    Make,
+    items,
+    json_response,
+    make_sync,
+    page,
+    raw,
+    record,
+    resolve,
+)
 from .spec import SPEC, example_of
 
 
@@ -419,7 +430,53 @@ def test_refuses_numbers_json_cannot_carry(number: float) -> None:
 
 def test_empty_request_options_count_as_not_given() -> None:
     nohead, calls = make_sync([json_response(201, record("rec_1"))])
-    nohead.records.create("posts", data={}, idempotency_key="", change_note="")
+    nohead.records.create("posts", data={}, idempotency_key="", change_note="", rich_text="")  # pyright: ignore[reportArgumentType]
     headers = calls.calls[0].headers
     assert len(headers["idempotency-key"]) == 36
     assert "nohead-change-note" not in headers
+    assert "rich_text" not in calls.calls[0].url.params
+
+
+async def test_rich_text_from_the_client_only_where_the_operation_takes_it(make: Make) -> None:
+    nohead, calls = make([mock_reply], rich_text="markdown")
+    await resolve(nohead.records.get("rec_1"))
+    await resolve(nohead.records.count("posts"))
+    await resolve(nohead.records.revisions.get("rec_1", 1))  # history keeps documents
+    await resolve(nohead.drafts.merge("drf_1"))
+    await resolve(nohead.search("hello"))
+    sent = [c.url.params.get("rich_text") for c in calls.calls]
+    assert sent == ["markdown", None, None, "markdown", "markdown"]
+
+
+async def test_a_calls_rich_text_overrides_the_clients(make: Make) -> None:
+    nohead, calls = make([mock_reply], rich_text="markdown")
+    await resolve(nohead.records.get("rec_1", rich_text="document"))
+    await resolve(nohead.drafts.get("drf_1", rich_text="html"))
+    await resolve(nohead.with_options(rich_text="html").records.get("rec_1"))
+    await resolve(nohead.with_options(timeout=5).records.get("rec_1"))
+    sent = [c.url.params.get("rich_text") for c in calls.calls]
+    assert sent == ["document", "html", "html", "markdown"]
+
+
+async def test_rich_text_only_when_given(make: Make) -> None:
+    nohead, calls = make([mock_reply])
+    await resolve(nohead.records.get("rec_1"))
+    await resolve(nohead.records.get("rec_1", rich_text="html"))
+    assert [c.url.params.get("rich_text") for c in calls.calls] == [None, "html"]
+
+
+async def test_rich_text_on_every_page(make: Make) -> None:
+    nohead, calls = make(
+        [page([record("rec_1")], "cur_2", has_more=True), page([record("rec_2")], has_more=False)]
+    )
+    await items(nohead.records.list("posts", rich_text="html"))
+    assert [c.url.params.get("rich_text") for c in calls.calls] == ["html", "html"]
+
+
+def test_rich_text_only_for_the_operations_that_take_it() -> None:
+    nohead, calls = make_sync([LAST_PAGE])
+    with pytest.raises(TypeError, match="rich_text"):
+        nohead.records.count("posts", rich_text="html")  # pyright: ignore[reportCallIssue]
+    with pytest.raises(TypeError, match="records_count does not take rich_text"):
+        nohead._client.send("records_count", path={"collection_id": "posts"}, rich_text="html")
+    assert calls.calls == []
