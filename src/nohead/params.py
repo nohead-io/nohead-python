@@ -378,7 +378,9 @@ class RelationFieldCreate(FieldCreateProperties):
 
 
 class RichTextFieldConfiguration(TypedDict):
-    """A rich text document up to 1,000,000 bytes (`too_large`)."""
+    """A rich text document up to 1,000,000 bytes (`too_large`), written as Markdown or a
+    document (see `RecordData`).
+    """
 
     description: NotRequired[str]
     """Help text for editors."""
