@@ -11,7 +11,7 @@ import httpx
 from .. import _base
 from .._pagination import AsyncPaginator
 from ..models import Record, SearchResultsMeta
-from ..types import RetryEvent, SearchFilter
+from ..types import RetryEvent, RichText, SearchFilter
 from ._client import AsyncAPIClient
 from .resources.assets import AsyncAssets
 from .resources.drafts import AsyncDrafts
@@ -53,6 +53,7 @@ class AsyncNohead:
         headers: Mapping[str, str] | None = None,
         warnings: bool = True,
         on_retry: Callable[[RetryEvent], object] | None = None,
+        rich_text: RichText | None = None,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         """
@@ -69,6 +70,9 @@ class AsyncNohead:
             warnings: Warn about deprecated operations and plan usage (once each).
             on_retry: Called with a RetryEvent before each retry's wait, for example to
                 log it.
+            rich_text: How rich text fields read in the records and drafts returned:
+                `document` (the API's default), `html` or `markdown`. A call's own
+                `rich_text` overrides it.
             http_client: An httpx client to send requests with (proxies, transports).
 
         Empty strings count as not given.
@@ -82,6 +86,7 @@ class AsyncNohead:
             headers=headers,
             warnings=warnings,
             on_retry=on_retry,
+            rich_text=rich_text,
         )
         self._setup(AsyncAPIClient(settings, http_client))
 
@@ -107,6 +112,7 @@ class AsyncNohead:
         max_retries: int | None = None,
         headers: Mapping[str, str] | None = None,
         on_retry: Callable[[RetryEvent], object] | None = None,
+        rich_text: RichText | None = None,
     ) -> Self:
         """A client with other settings that shares this one's connections and project:
         `nohead.with_options(timeout=5).records.get(id)`. `headers` are added to this
@@ -118,6 +124,7 @@ class AsyncNohead:
             timeout=current.timeout if timeout is None else timeout,
             headers=_base.merge_headers(current.headers, headers or {}),
             on_retry=current.on_retry if on_retry is None else on_retry,
+            rich_text=rich_text or current.rich_text,
         )
         copy = object.__new__(type(self))
         copy._setup(self._client.copy(settings))
@@ -129,6 +136,7 @@ class AsyncNohead:
         *,
         collections: Sequence[str] | None = None,
         filter: SearchFilter | None = None,
+        rich_text: RichText | None = None,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> AsyncPaginator[Record, SearchResultsMeta]:
@@ -148,6 +156,7 @@ class AsyncNohead:
                 "limit": limit,
                 "cursor": cursor,
             },
+            rich_text=rich_text,
         )
 
     async def close(self) -> None:

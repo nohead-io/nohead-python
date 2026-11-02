@@ -6,8 +6,8 @@ method takes it (and a call in tests/calls.py or below passes it). Each call get
 contract's examples of its operation's response, one for each variant of its unions
 (`oneOf`, `anyOf`), and must return them, parsed without a NoheadWarning. A method
 takes `if_match` and `change_note` exactly when its operation declares `If-Match` and
-`Nohead-Change-Note`, and no request sends a header its operation doesn't declare. Both
-clients are checked."""
+`Nohead-Change-Note`, and `rich_text` when it declares that query parameter; no request
+sends a header its operation doesn't declare. Both clients are checked."""
 
 from __future__ import annotations
 
@@ -88,6 +88,31 @@ def every_parameter(nohead: Any) -> list[Callable[[], Any]]:
             cursor="cur_x",
         ),
         lambda: nohead.audit_events.list(filter={"resource_type": "record"}),
+        lambda: nohead.records.list("posts", rich_text="html"),
+        lambda: nohead.records.get("rec_01J9ZQ3F8X", rich_text="markdown"),
+        lambda: nohead.records.create("posts", data={"body": "# Hi"}, rich_text="markdown"),
+        lambda: nohead.records.update("rec_01J9ZQ3F8X", data={}, rich_text="html"),
+        lambda: nohead.records.delete("rec_01J9ZQ3F8X", rich_text="html"),
+        lambda: nohead.records.restore("rec_01J9ZQ3F8X", rich_text="html"),
+        lambda: nohead.records.publish("rec_01J9ZQ3F8X", rich_text="html"),
+        lambda: nohead.records.unpublish("rec_01J9ZQ3F8X", rich_text="html"),
+        lambda: nohead.records.drafts("rec_01J9ZQ3F8X", rich_text="html"),
+        lambda: nohead.records.bulk(
+            "posts", action="publish", record_ids=["rec_01J9ZQ3F8X"], rich_text="html"
+        ),
+        lambda: nohead.records.search("posts", "hello", rich_text="html"),
+        lambda: nohead.records.revisions.revert("rec_01J9ZQ3F8X", 1, rich_text="document"),
+        lambda: nohead.search("hello", rich_text="html"),
+        lambda: nohead.drafts.create("rec_01J9ZQ3F8X", rich_text="html"),
+        lambda: nohead.drafts.list("posts", rich_text="html"),
+        lambda: nohead.drafts.get("drf_01J9ZQ3F8X", rich_text="html"),
+        lambda: nohead.drafts.update("drf_01J9ZQ3F8X", data={}, rich_text="html"),
+        lambda: nohead.drafts.merge("drf_01J9ZQ3F8X", rich_text="html"),
+        lambda: nohead.drafts.schedule(
+            "drf_01J9ZQ3F8X", merge_at="2027-01-01T09:00:00Z", rich_text="html"
+        ),
+        lambda: nohead.drafts.unschedule("drf_01J9ZQ3F8X", rich_text="html"),
+        lambda: nohead.drafts.discard("drf_01J9ZQ3F8X", rich_text="html"),
     ]
 
 
@@ -162,7 +187,8 @@ def operations_of(method: Callable[..., Any]) -> set[str]:
 
 
 @pytest.mark.parametrize("client", [Nohead, AsyncNohead])
-def test_methods_take_the_headers_their_operations_declare(client: type[Any]) -> None:
+def test_methods_take_the_options_their_operations_declare(client: type[Any]) -> None:
+    queries = {route.id: {p.name for p in route.query} for route in ROUTES}
     checked: set[str] = set()
     for name, method in public_methods(client(api_key="nohead_sk_x")).items():
         operations = operations_of(method)
@@ -177,6 +203,9 @@ def test_methods_take_the_headers_their_operations_declare(client: type[Any]) ->
         )
         assert ("idempotency_key" in parameters) == ("idempotency-key" in declared), (
             f"{name} idempotency_key"
+        )
+        assert ("rich_text" in parameters) == ("rich_text" in queries[operation]), (
+            f"{name} rich_text"
         )
         checked.add(operation)
     assert sorted(set(OPERATIONS) - checked) == [], "operations no method was checked for"

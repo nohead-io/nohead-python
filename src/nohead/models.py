@@ -187,7 +187,9 @@ class LongTextFieldConfiguration(NoheadModel):
 
 
 class RichTextFieldConfiguration(NoheadModel):
-    """A rich text document up to 1,000,000 bytes (`too_large`)."""
+    """A rich text document up to 1,000,000 bytes (`too_large`), written as Markdown or a
+    document (see `RecordData`).
+    """
 
     description: str | None = None
     """Help text for editors."""
@@ -1316,9 +1318,10 @@ class AssetProperties(NoheadModel):
     purge_after: NullableTimestamp
     """When a deleted asset and its file are removed for good, unless restored or purged first."""
     image_url: str | None
-    """The URL of the whole image, for ready images (JPEG, PNG, GIF, WebP or AVIF), deleted
-    ones included until they are purged; null otherwise. Image URLs are open and never
-    expire. For a rendition, write [imgproxy processing
+    """The URL of the whole image, for ready images (JPEG, PNG, GIF, WebP, AVIF or SVG),
+    deleted ones included until they are purged; null otherwise. Image URLs are open and
+    never expire. An SVG is served as SVG without its scripts, unless a format such as
+    `@webp` rasterizes it. For a rendition, write [imgproxy processing
     options](https://docs.imgproxy.net/usage/processing) before `/plain/`, and a format
     after `@`: for example `https://images.nohead.io/rs:fill:800:600/g:sm/plain/…@webp`.
     Renditions are at most 4096 pixels a side, from originals of at most 50 megapixels.
@@ -1327,8 +1330,7 @@ class AssetProperties(NoheadModel):
     """
     preview_url: str | None
     """The URL of a small rendition (fits in 640×640, WebP), for ready images and SVGs
-    (rasterized; SVGs have no `image_url`), deleted ones included until they are purged;
-    null otherwise.
+    (rasterized), deleted ones included until they are purged; null otherwise.
     """
     file_url: str | None
     """The URL of the file as uploaded, for ready assets of any type, deleted ones included

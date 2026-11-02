@@ -22,14 +22,15 @@ from ...models import (
     SearchResultsMeta,
 )
 from ...params import RecordBatchRequest, RecordCreate, RecordWrite
-from ...types import IfMatch, RecordFilter, RecordSort, RevisionFilter
+from ...types import IfMatch, RecordFilter, RecordSort, RevisionFilter, RichText
 from .._client import AsyncAPIClient
 from ._resource import AsyncResource
 
 
 class AsyncRecords(AsyncResource):
     """Records: the content of a collection. `collection` is a collection ID or
-    slug; `record` a record ID (`rec_...`)."""
+    slug; `record` a record ID (`rec_...`). Methods that return records or drafts take
+    `rich_text` (`"html"` or `"markdown"`) to read rich text fields as strings."""
 
     def __init__(self, client: AsyncAPIClient) -> None:
         super().__init__(client)
@@ -42,6 +43,7 @@ class AsyncRecords(AsyncResource):
         filter: RecordFilter | None = None,
         sort: RecordSort | None = None,
         expand: Sequence[str] | None = None,
+        rich_text: RichText | None = None,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> AsyncPaginator[Record]:
@@ -62,21 +64,26 @@ class AsyncRecords(AsyncResource):
                 "limit": limit,
                 "cursor": cursor,
             },
+            rich_text=rich_text,
         )
 
-    async def get(self, record: str, *, expand: Sequence[str] | None = None) -> Record:
+    async def get(
+        self, record: str, *, expand: Sequence[str] | None = None, rich_text: RichText | None = None
+    ) -> Record:
         """A deleted record too, with `deleted_at` and `purge_after`."""
         return await self._client.request(
             "records_get",
             cast=Record,
             path={"record_id": record},
             query={"expand": expand},
+            rich_text=rich_text,
         )
 
     async def create(
         self,
         collection: str,
         *,
+        rich_text: RichText | None = None,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
@@ -92,6 +99,7 @@ class AsyncRecords(AsyncResource):
             cast=Record,
             path={"collection_id": collection},
             body=params,
+            rich_text=rich_text,
             if_match=if_match,
             idempotency_key=idempotency_key,
             change_note=change_note,
@@ -101,6 +109,7 @@ class AsyncRecords(AsyncResource):
         self,
         record: str,
         *,
+        rich_text: RichText | None = None,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
@@ -112,6 +121,7 @@ class AsyncRecords(AsyncResource):
             cast=Record,
             path={"record_id": record},
             body=params,
+            rich_text=rich_text,
             if_match=if_match,
             idempotency_key=idempotency_key,
             change_note=change_note,
@@ -121,6 +131,7 @@ class AsyncRecords(AsyncResource):
         self,
         record: str,
         *,
+        rich_text: RichText | None = None,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
@@ -131,6 +142,7 @@ class AsyncRecords(AsyncResource):
             "records_delete",
             cast=Record,
             path={"record_id": record},
+            rich_text=rich_text,
             if_match=if_match,
             idempotency_key=idempotency_key,
             change_note=change_note,
@@ -140,6 +152,7 @@ class AsyncRecords(AsyncResource):
         self,
         record: str,
         *,
+        rich_text: RichText | None = None,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
@@ -148,6 +161,7 @@ class AsyncRecords(AsyncResource):
             "records_restore",
             cast=Record,
             path={"record_id": record},
+            rich_text=rich_text,
             if_match=if_match,
             idempotency_key=idempotency_key,
             change_note=change_note,
@@ -157,6 +171,7 @@ class AsyncRecords(AsyncResource):
         self,
         record: str,
         *,
+        rich_text: RichText | None = None,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
@@ -167,6 +182,7 @@ class AsyncRecords(AsyncResource):
             "records_publish",
             cast=Record,
             path={"record_id": record},
+            rich_text=rich_text,
             if_match=if_match,
             idempotency_key=idempotency_key,
             change_note=change_note,
@@ -176,6 +192,7 @@ class AsyncRecords(AsyncResource):
         self,
         record: str,
         *,
+        rich_text: RichText | None = None,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
@@ -184,6 +201,7 @@ class AsyncRecords(AsyncResource):
             "records_unpublish",
             cast=Record,
             path={"record_id": record},
+            rich_text=rich_text,
             if_match=if_match,
             idempotency_key=idempotency_key,
             change_note=change_note,
@@ -256,7 +274,12 @@ class AsyncRecords(AsyncResource):
         )
 
     def drafts(
-        self, record: str, *, limit: int | None = None, cursor: str | None = None
+        self,
+        record: str,
+        *,
+        rich_text: RichText | None = None,
+        limit: int | None = None,
+        cursor: str | None = None,
     ) -> AsyncPaginator[Draft]:
         """The record's drafts: at most one for now."""
         return self._client.paginate(
@@ -264,6 +287,7 @@ class AsyncRecords(AsyncResource):
             item=Draft,
             path={"record_id": record},
             query={"limit": limit, "cursor": cursor},
+            rich_text=rich_text,
         )
 
     async def count(self, collection: str, *, filter: RecordFilter | None = None) -> RecordCount:
@@ -278,6 +302,7 @@ class AsyncRecords(AsyncResource):
         self,
         collection: str,
         *,
+        rich_text: RichText | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
         **params: Unpack[RecordBatchRequest],
@@ -289,6 +314,7 @@ class AsyncRecords(AsyncResource):
             cast=RecordBatch,
             path={"collection_id": collection},
             body=params,
+            rich_text=rich_text,
             idempotency_key=idempotency_key,
             change_note=change_note,
         )
@@ -310,6 +336,7 @@ class AsyncRecords(AsyncResource):
         filter: RecordFilter | None = None,
         sort: str | None = None,
         expand: Sequence[str] | None = None,
+        rich_text: RichText | None = None,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> AsyncPaginator[Record, SearchResultsMeta]:
@@ -328,6 +355,7 @@ class AsyncRecords(AsyncResource):
                 "limit": limit,
                 "cursor": cursor,
             },
+            rich_text=rich_text,
         )
 
 
@@ -365,6 +393,7 @@ class AsyncRevisions(AsyncResource):
         revision: int,
         *,
         dry_run: Literal[True],
+        rich_text: RichText | None = None,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
@@ -376,6 +405,7 @@ class AsyncRevisions(AsyncResource):
         revision: int,
         *,
         dry_run: Literal[False] = False,
+        rich_text: RichText | None = None,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
@@ -386,6 +416,7 @@ class AsyncRevisions(AsyncResource):
         revision: int,
         *,
         dry_run: bool = False,
+        rich_text: RichText | None = None,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
@@ -397,6 +428,7 @@ class AsyncRevisions(AsyncResource):
             cast=RevertPreview if dry_run else Record,
             path={"record_id": record, "revision": revision},
             query={"dry_run": dry_run or None},
+            rich_text=rich_text,
             if_match=if_match,
             idempotency_key=idempotency_key,
             change_note=change_note,

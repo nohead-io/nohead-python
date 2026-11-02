@@ -112,6 +112,13 @@ IfMatch: TypeAlias = int | HasRevision | Mapping[str, int]
 (`{"revision": 3}`)."""
 
 
+RichText: TypeAlias = Literal["document", "html", "markdown"]
+"""How rich text fields read in the records and drafts returned (and in records they embed
+with `expand`): `document`, the stored ProseMirror document (the API's default); `html`, an
+HTML fragment to put in a page as it is; or `markdown` (GitHub Flavored). As HTML or
+Markdown, the field's value is a string."""
+
+
 @dataclass(frozen=True)
 class RetryEvent:
     """A retry about to happen, as the `on_retry` option receives it."""

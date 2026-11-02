@@ -26,7 +26,7 @@ from .._generated.operations import OPERATIONS
 from .._pagination import Page, start_pages
 from .._uploads import UploadSource, iter_file
 from ..models import ListMeta, Principal
-from ..types import IfMatch
+from ..types import IfMatch, RichText
 
 T = TypeVar("T")
 M = TypeVar("M")
@@ -72,6 +72,7 @@ class APIClient:
         idempotency_key: str | None = None,
         change_note: str | None = None,
         if_match: IfMatch | None = None,
+        rich_text: RichText | None = None,
     ) -> T:
         response = self.send(
             operation,
@@ -81,6 +82,7 @@ class APIClient:
             idempotency_key=idempotency_key,
             change_note=change_note,
             if_match=if_match,
+            rich_text=rich_text,
         )
         return _base.validate(cast, _base.parse(response))
 
@@ -92,12 +94,15 @@ class APIClient:
         meta: type[M] = ListMeta,
         path: Mapping[str, str | int] | None = None,
         query: Mapping[str, Any] | None = None,
+        rich_text: RichText | None = None,
     ) -> Page[T, Any]:
         """A list operation as pages of `item`."""
         params = dict(query or {})
 
         def fetch(cursor: str | None) -> Page[T, Any]:
-            response = self.send(operation, path=path, query={**params, "cursor": cursor})
+            response = self.send(
+                operation, path=path, query={**params, "cursor": cursor}, rich_text=rich_text
+            )
             data = _base.list_body(response)
             items: list[T] = [_base.validate(item, raw) for raw in data["data"]]
             return Page(items, _base.validate(meta, data["meta"]), fetch)
@@ -114,6 +119,7 @@ class APIClient:
         idempotency_key: str | None = None,
         change_note: str | None = None,
         if_match: IfMatch | None = None,
+        rich_text: RichText | None = None,
     ) -> httpx.Response:
         """Sends one operation, retrying as the README describes; returns the successful
         response."""
@@ -132,7 +138,9 @@ class APIClient:
             if_match=if_match,
         )
         content = None if body is None else _base.encode(body)
-        params = _base.query(query)
+        params = _base.query(
+            {**(query or {}), "rich_text": _base.rich_text(settings, operation, rich_text)}
+        )
 
         attempt = 0
         while True:

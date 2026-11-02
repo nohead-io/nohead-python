@@ -20,6 +20,7 @@ for post in nohead.records.list("posts", filter={"published_at": {"exists": True
 - [Async](#async)
 - [Records](#records)
 - [Drafts](#drafts)
+- [Rich text](#rich-text)
 - [Pagination](#pagination)
 - [Errors](#errors)
 - [Retries and idempotency](#retries-and-idempotency)
@@ -62,6 +63,7 @@ nohead = Nohead(
 | `headers` | none | Added to every request. They replace the SDK's own (`Authorization`, `User-Agent`...) whatever the case of their names, but not the ones it sets from a call's options (`Content-Type`, `Idempotency-Key`, `If-Match`, `Nohead-Change-Note`). |
 | `warnings` | `True` | Warns (`NoheadWarning`) about deprecated operations and plan usage, once each. |
 | `on_retry` | none | Called before each retry's wait, with a `RetryEvent`. See [retries](#retries-and-idempotency). |
+| `rich_text` | documents | How rich text fields read: `"html"` or `"markdown"` for a string. See [rich text](#rich-text). |
 | `http_client` | a new `httpx.Client` | Bring your own for proxies or custom transports. |
 
 An empty string counts as not given: `api_key=""` reads `NOHEAD_API_KEY`, `base_url=""` uses `https://api.nohead.io`, and so on. The base URL comes only from `base_url`, never from the environment.
@@ -70,7 +72,7 @@ API keys belong to a project, so methods like `collections.list()` need no proje
 
 Close the client when you're done with it, or use it as a context manager: `with Nohead() as nohead: ...`.
 
-`nohead.with_options(timeout=5, max_retries=0)` returns a client with other settings that shares the same connections and project. It takes `timeout`, `max_retries`, `headers` (added to the client's) and `on_retry`.
+`nohead.with_options(timeout=5, max_retries=0)` returns a client with other settings that shares the same connections and project. It takes `timeout`, `max_retries`, `headers` (added to the client's), `on_retry` and `rich_text`.
 
 ## Async
 
@@ -124,6 +126,19 @@ nohead.drafts.merge(draft.id)  # or drafts.schedule(draft.id, merge_at=...)
 - A merge changes content only: a live record stays live, an unpublished one unpublished. Publishing a live record with a pending draft is a `ConflictError` (`draft_pending`).
 - `records.drafts(id)` lists a record's draft, and `drafts.list(collection)` a collection's.
 - `drafts.discard` deletes one for good.
+
+## Rich text
+
+Write a rich text field as Markdown or as a document: `data={"body": "# Hello\n\nThe **first** post."}`. It reads as the document unless you ask for HTML or Markdown with `rich_text`, on the client for every call, or on a call that returns records or drafts:
+
+```python
+nohead = Nohead(rich_text="html")
+post = nohead.records.get("rec_01J9...")
+post.data["body"]  # a string of HTML, to put in a page as it is
+nohead.records.get(post.id, rich_text="markdown")  # a call's own wins
+```
+
+The field's value is then a string, in records embedded with `expand` too. Revisions and webhooks keep documents. A string you write is read as Markdown, so write back Markdown or the document, never the HTML.
 
 ## Pagination
 

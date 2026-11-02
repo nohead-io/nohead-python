@@ -8,7 +8,7 @@
 - src/nohead/params.py: TypedDicts of the request bodies, for type checkers.
   Enums are Literals here: what the SDK sends should be checked.
 - src/nohead/_generated/operations.py: the method and path of every
-  operation an API key can call.
+  operation an API key can call, and those that take `rich_text`.
 
 Run with `uv run python scripts/generate.py` after updating openapi.json.
 """
@@ -345,6 +345,16 @@ def api_key_operations() -> list[tuple[str, str, str, Schema]]:
     return sorted(found)
 
 
+def takes_query(path: str, operation: Schema, name: str) -> bool:
+    """Whether the operation (or its path) declares the query parameter `name`."""
+    for parameter in SPEC["paths"][path].get("parameters", []) + operation.get("parameters", []):
+        if ref := ref_name(parameter):
+            parameter = SPEC["components"]["parameters"][ref]
+        if parameter["in"] == "query" and parameter["name"] == name:
+            return True
+    return False
+
+
 def main() -> None:
     operations = api_key_operations()
 
@@ -386,9 +396,17 @@ def main() -> None:
     )
 
     table = "".join(f'    "{op}": ("{method}", "{path}"),\n' for op, method, path, _ in operations)
+    rich_text = "".join(
+        f'    "{op}",\n'
+        for op, _, path, operation in operations
+        if takes_query(path, operation, "rich_text")
+    )
     (ROOT / "src/nohead/_generated/operations.py").write_text(
         f'{HEADER}"""Every operation an API key can call: (method, path)."""\n\n'
-        f"OPERATIONS: dict[str, tuple[str, str]] = {{\n{table}}}\n"
+        f"OPERATIONS: dict[str, tuple[str, str]] = {{\n{table}}}\n\n"
+        "RICH_TEXT: frozenset[str] = frozenset({\n"
+        f"{rich_text}}})\n"
+        '"""The operations that take `rich_text`: how rich text fields read."""\n'
     )
     generated = ["src/nohead/models.py", "src/nohead/params.py", "src/nohead/_generated"]
     subprocess.run(["ruff", "format", "--quiet", *generated], cwd=ROOT, check=True)

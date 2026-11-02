@@ -27,8 +27,9 @@ from pydantic import BaseModel, TypeAdapter
 from pydantic import ValidationError as PydanticValidationError
 
 from ._errors import APIError, NoheadError, retry_after_seconds
+from ._generated.operations import RICH_TEXT
 from ._version import __version__
-from .types import IfMatch, RetryEvent
+from .types import IfMatch, RetryEvent, RichText
 
 T = TypeVar("T")
 
@@ -89,6 +90,7 @@ class Settings:
     headers: Mapping[str, str] = field(default_factory=dict[str, str])
     warnings: bool = True
     on_retry: Callable[[RetryEvent], object] | None = None
+    rich_text: RichText | None = None
 
 
 def settings(
@@ -101,6 +103,7 @@ def settings(
     headers: Mapping[str, str] | None,
     warnings: bool,
     on_retry: Callable[[RetryEvent], object] | None,
+    rich_text: RichText | None,
 ) -> Settings:
     # Empty values, given or from the environment, count as unset.
     api_key = api_key or os.environ.get("NOHEAD_API_KEY") or None
@@ -119,6 +122,7 @@ def settings(
         headers=merge_headers(headers or {}),
         warnings=warnings,
         on_retry=on_retry,
+        rich_text=rich_text or None,
     )
 
 
@@ -146,6 +150,17 @@ def url(settings: Settings, template: str, values: Mapping[str, str | int]) -> s
         return quote(text, safe="")
 
     return settings.base_url + re.sub(r"\{(\w+)\}", value, template)
+
+
+def rich_text(settings: Settings, operation: str, value: RichText | None) -> RichText | None:
+    """The `rich_text` an operation sends: the request's, else the client's; None for an
+    operation that doesn't take it."""
+    if operation not in RICH_TEXT:
+        # A method that passes it is out of step with its operation.
+        if value:
+            raise TypeError(f"{operation} does not take rich_text")
+        return None
+    return value or settings.rich_text
 
 
 def one_or_in(value: str | Sequence[str] | None) -> str | dict[str, list[str]] | None:

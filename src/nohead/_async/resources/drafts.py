@@ -7,7 +7,7 @@ from typing import Any, Literal
 from ..._pagination import AsyncPaginator
 from ...models import Draft, Record
 from ...params import RecordData
-from ...types import IfMatch
+from ...types import IfMatch, RichText
 from ._resource import AsyncResource
 
 
@@ -15,7 +15,8 @@ class AsyncDrafts(AsyncResource):
     """Drafts: changes to a record's content that wait until they are merged into
     it, now or at a set time, while the record keeps its current content. A record
     has at most one. `draft` is a draft ID (`drf_...`), `record` a record ID and
-    `collection` a collection ID or slug."""
+    `collection` a collection ID or slug. Each method takes `rich_text`, as records'
+    do."""
 
     async def create(
         self,
@@ -23,6 +24,7 @@ class AsyncDrafts(AsyncResource):
         *,
         data: RecordData | None = None,
         from_revision: int | None = None,
+        rich_text: RichText | None = None,
         idempotency_key: str | None = None,
     ) -> Draft:
         """Starts the record's draft: `data` over the record's values, or with
@@ -36,6 +38,7 @@ class AsyncDrafts(AsyncResource):
             cast=Draft,
             path={"record_id": record},
             body=body,
+            rich_text=rich_text,
             idempotency_key=idempotency_key,
         )
 
@@ -44,6 +47,7 @@ class AsyncDrafts(AsyncResource):
         collection: str,
         *,
         sort: Literal["updated_at", "-updated_at"] | None = None,
+        rich_text: RichText | None = None,
         limit: int | None = None,
         cursor: str | None = None,
     ) -> AsyncPaginator[Draft]:
@@ -54,12 +58,19 @@ class AsyncDrafts(AsyncResource):
             item=Draft,
             path={"collection_id": collection},
             query={"sort": sort, "limit": limit, "cursor": cursor},
+            rich_text=rich_text,
         )
 
-    async def get(self, draft: str, *, expand: Sequence[str] | None = None) -> Draft:
+    async def get(
+        self, draft: str, *, expand: Sequence[str] | None = None, rich_text: RichText | None = None
+    ) -> Draft:
         """With `data` as the record reads after the merge, for previews."""
         return await self._client.request(
-            "drafts_get", cast=Draft, path={"draft_id": draft}, query={"expand": expand}
+            "drafts_get",
+            cast=Draft,
+            path={"draft_id": draft},
+            query={"expand": expand},
+            rich_text=rich_text,
         )
 
     async def update(
@@ -67,6 +78,7 @@ class AsyncDrafts(AsyncResource):
         draft: str,
         *,
         data: RecordData,
+        rich_text: RichText | None = None,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
     ) -> Draft:
@@ -76,6 +88,7 @@ class AsyncDrafts(AsyncResource):
             cast=Draft,
             path={"draft_id": draft},
             body={"data": data},
+            rich_text=rich_text,
             if_match=if_match,
             idempotency_key=idempotency_key,
         )
@@ -84,6 +97,7 @@ class AsyncDrafts(AsyncResource):
         self,
         draft: str,
         *,
+        rich_text: RichText | None = None,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
     ) -> Draft:
@@ -92,6 +106,7 @@ class AsyncDrafts(AsyncResource):
             "drafts_discard",
             cast=Draft,
             path={"draft_id": draft},
+            rich_text=rich_text,
             if_match=if_match,
             idempotency_key=idempotency_key,
         )
@@ -100,6 +115,7 @@ class AsyncDrafts(AsyncResource):
         self,
         draft: str,
         *,
+        rich_text: RichText | None = None,
         if_match: IfMatch | None = None,
         idempotency_key: str | None = None,
         change_note: str | None = None,
@@ -110,13 +126,19 @@ class AsyncDrafts(AsyncResource):
             "drafts_merge",
             cast=Record,
             path={"draft_id": draft},
+            rich_text=rich_text,
             if_match=if_match,
             idempotency_key=idempotency_key,
             change_note=change_note,
         )
 
     async def schedule(
-        self, draft: str, *, merge_at: datetime | str, idempotency_key: str | None = None
+        self,
+        draft: str,
+        *,
+        merge_at: datetime | str,
+        rich_text: RichText | None = None,
+        idempotency_key: str | None = None,
     ) -> Draft:
         """Merges the draft at `merge_at`, a future time; returns the draft."""
         return await self._client.request(
@@ -124,13 +146,17 @@ class AsyncDrafts(AsyncResource):
             cast=Draft,
             path={"draft_id": draft},
             body={"merge_at": merge_at},
+            rich_text=rich_text,
             idempotency_key=idempotency_key,
         )
 
-    async def unschedule(self, draft: str, *, idempotency_key: str | None = None) -> Draft:
+    async def unschedule(
+        self, draft: str, *, rich_text: RichText | None = None, idempotency_key: str | None = None
+    ) -> Draft:
         return await self._client.request(
             "drafts_unschedule",
             cast=Draft,
             path={"draft_id": draft},
+            rich_text=rich_text,
             idempotency_key=idempotency_key,
         )
