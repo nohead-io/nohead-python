@@ -5,7 +5,7 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
-## Unreleased
+## 0.10.0
 
 - `rich_text`, a client option (and a `with_options` one) and an option of the
   methods that return records or drafts, reads rich text fields as `"html"` or
