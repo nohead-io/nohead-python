@@ -871,8 +871,12 @@ class Change(NoheadModel):
     """
 
     field: str | None = None
+    """The field's key now, after any rename (its last key if it was deleted); null if the
+    field no longer exists.
+    """
     field_id: str | None = None
     field_deleted: bool | None = None
+    """Whether the field has been deleted since."""
     attribute: str | None = None
     kind: str
     before: Any = None
@@ -926,6 +930,10 @@ class RevertPreview(NoheadModel):
     to_revision: int
     data: RecordData
     changes: list[Change]
+    """What the revert would change. Rich text values read as `rich_text` asks, like `data`; a
+    change that HTML or Markdown can't show (an underline, in Markdown) reads the same on
+    both sides.
+    """
 
 
 class FeatureFlags(NoheadModel):
