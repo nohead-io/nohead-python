@@ -318,13 +318,22 @@ class Records(Resource):
             change_note=change_note,
         )
 
-    def diff(self, record: str, *, from_revision: int, to_revision: int) -> RecordDiff:
-        """The changes between two revisions."""
+    def diff(
+        self,
+        record: str,
+        *,
+        from_revision: int,
+        to_revision: int,
+        rich_text: RichText | None = None,
+    ) -> RecordDiff:
+        """The changes between two revisions; with `rich_text`, rich text fields' `before` and
+        `after` read as HTML or Markdown."""
         return self._client.request(
             "records_diff",
             cast=RecordDiff,
             path={"record_id": record},
             query={"from": from_revision, "to": to_revision},
+            rich_text=rich_text,
         )
 
     def search(

@@ -74,7 +74,9 @@ def every_call(nohead: Any) -> list[Callable[[], Any]]:
         lambda: nohead.drafts.discard("drf_01J9ZQ3F8X"),
         lambda: nohead.records.count("posts", filter={"published_at": {"exists": False}}),
         lambda: nohead.records.bulk("posts", action="publish", record_ids=["rec_01J9ZQ3F8X"]),
-        lambda: nohead.records.diff("rec_01J9ZQ3F8X", from_revision=1, to_revision=2),
+        lambda: nohead.records.diff(
+            "rec_01J9ZQ3F8X", from_revision=1, to_revision=2, rich_text="markdown"
+        ),
         lambda: nohead.records.search(
             "posts",
             "hello",

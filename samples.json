@@ -50,7 +50,7 @@
   "records_count": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.records.count(\"posts\", filter={\"published_at\": {\"exists\": False}})\n",
   "records_create": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.records.create(\"posts\", data={\"title\": \"Hi\"})\n",
   "records_delete": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.records.delete(\"rec_01J9ZQ3F8X\")\n",
-  "records_diff": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.records.diff(\"rec_01J9ZQ3F8X\", from_revision=1, to_revision=2)\n",
+  "records_diff": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.records.diff(\n    \"rec_01J9ZQ3F8X\", from_revision=1, to_revision=2, rich_text=\"markdown\"\n)\n",
   "records_get": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.records.get(\"rec_01J9ZQ3F8X\", expand=[\"author\"])\n",
   "records_get_publication": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.records.publication(\"rec_01J9ZQ3F8X\")\n",
   "records_get_schedule": "from nohead import Nohead\n\nnohead = Nohead()\n\nresult = nohead.records.get_schedule(\"rec_01J9ZQ3F8X\")\n",

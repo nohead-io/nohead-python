@@ -102,6 +102,7 @@ RICH_TEXT: frozenset[str] = frozenset(
         "records_bulk",
         "records_create",
         "records_delete",
+        "records_diff",
         "records_get",
         "records_list",
         "records_publish",
