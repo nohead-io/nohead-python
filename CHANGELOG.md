@@ -5,6 +5,12 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- `records.diff` takes `rich_text`, and the client's `rich_text` now applies to
+  it: a rich text field's `before` and `after` read as HTML or Markdown
+  instead of documents. A revert preview's `changes` follow `rich_text` too.
+
 ## 0.10.0
 
 - `rich_text`, a client option (and a `with_options` one) and an option of the

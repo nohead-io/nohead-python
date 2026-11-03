@@ -138,7 +138,7 @@ post.data["body"]  # a string of HTML, to put in a page as it is
 nohead.records.get(post.id, rich_text="markdown")  # a call's own wins
 ```
 
-The field's value is then a string, in records embedded with `expand` too. Revisions and webhooks keep documents. A string you write is read as Markdown, so write back Markdown or the document, never the HTML.
+The field's value is then a string, in records embedded with `expand` too, and so are the `before` and `after` of a `diff` or a revert preview's `changes`. Revisions and webhooks keep documents. A string you write is read as Markdown, so write back Markdown or the document, never the HTML.
 
 ## Pagination
 

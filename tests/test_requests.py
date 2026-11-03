@@ -276,6 +276,13 @@ def test_diff_names_its_revisions() -> None:
     assert dict(calls.calls[0].url.params) == {"from": "1", "to": "2"}
 
 
+def test_diff_sends_rich_text() -> None:
+    diff = {"object": "record_diff", "record_id": "rec_1", "from": 1, "to": 2, "changes": []}
+    nohead, calls = make_sync([json_response(200, diff)])
+    nohead.records.diff("rec_1", from_revision=1, to_revision=2, rich_text="markdown")
+    assert calls.calls[0].url.params["rich_text"] == "markdown"
+
+
 def test_keeps_unknown_fields_and_values() -> None:
     body = record("rec_1", title="Hi") | {"collection": "archive", "brand_new": True}
     nohead, _ = make_sync([raw(json_response(200, body))])
