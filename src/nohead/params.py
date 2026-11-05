@@ -434,6 +434,10 @@ class WebhookCreate(TypedDict):
     """An https URL on the public internet."""
     description: NotRequired[str | None]
     event_types: list[WebhookSubscription]
+    published_only: NotRequired[bool]
+    """Send only events that change what a published-only API key can read (`false` by
+    default). It can't be combined with event types it never sends, such as `draft.*`.
+    """
     enabled: NotRequired[bool]
 
 
@@ -441,6 +445,10 @@ class WebhookUpdate(TypedDict):
     url: NotRequired[str]
     description: NotRequired[str | None]
     event_types: NotRequired[list[WebhookSubscription]]
+    published_only: NotRequired[bool]
+    """Send only events that change what a published-only API key can read (`false` by
+    default). It can't be combined with event types it never sends, such as `draft.*`.
+    """
     enabled: NotRequired[bool]
 
 

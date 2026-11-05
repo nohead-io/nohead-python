@@ -1004,6 +1004,12 @@ class WebhookProperties(NoheadModel):
     description: str | None
     event_types: list[WebhookSubscription]
     """The subscribed event types and wildcards (`record.*`, or `*` for all)."""
+    published_only: bool
+    """Send only events that change what a published-only API key can read: a record's change
+    while it is published (or that publishes, unpublishes, deletes or restores it), schema
+    changes, and changes to assets that published records use. Drafts, schedules, history
+    redactions, uploads and purges are never sent. `webhook.test` always is.
+    """
     enabled: bool
     deleted_at: NullableTimestamp
     """When the webhook was deleted; null unless it is."""
@@ -1106,10 +1112,15 @@ class AuditEvent(NoheadModel):
     actor: Actor
     via: Via | None
     """The client the change came through, when known."""
+    note: str | None
+    """The change note (`Nohead-Change-Note`) the change was made with, read from the revision
+    or schema change the event references, so record and schema events have one when their
+    change did; null otherwise, and once a revision's history is pruned.
+    """
     metadata: dict[str, Any]
     """Small, action-specific references, e.g. `revision_id` and `collection_id` for record
-    events, `schema_change_id` for schema events, `changed` attribute names for updates.
-    Never content.
+    events, `schema_change_id` for schema events, `changed` attribute names for updates
+    (field keys for a draft's). Never content.
     """
     request_id: str | None
     created_at: datetime
@@ -1130,6 +1141,10 @@ class WebhookCreate(NoheadModel):
     """An https URL on the public internet."""
     description: str | None = None
     event_types: list[WebhookSubscription]
+    published_only: bool | None = None
+    """Send only events that change what a published-only API key can read (`false` by
+    default). It can't be combined with event types it never sends, such as `draft.*`.
+    """
     enabled: bool | None = None
 
 
@@ -1137,6 +1152,10 @@ class WebhookUpdate(NoheadModel):
     url: str | None = None
     description: str | None = None
     event_types: list[WebhookSubscription] | None = None
+    published_only: bool | None = None
+    """Send only events that change what a published-only API key can read (`false` by
+    default). It can't be combined with event types it never sends, such as `draft.*`.
+    """
     enabled: bool | None = None
 
 
