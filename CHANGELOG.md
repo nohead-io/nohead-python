@@ -5,6 +5,16 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- `webhooks.create` and `webhooks.update` take `published_only`, and every
+  webhook has it: a published-only webhook sends only the events that change
+  what a published-only API key reads (a record published, unpublished or
+  edited while live, schema changes, changes to assets that published records
+  use), and skips drafts, schedules and edits to unpublished records.
+- Audit events have `note`: the change note (`Nohead-Change-Note`) a record
+  or schema change was made with, or `null`.
+
 ## 0.11.0
 
 - `records.diff` takes `rich_text`, and the client's `rich_text` now applies to

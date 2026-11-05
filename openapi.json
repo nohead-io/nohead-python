@@ -8225,6 +8225,7 @@
           "url",
           "description",
           "event_types",
+          "published_only",
           "enabled",
           "deleted_at",
           "purge_after",
@@ -8260,6 +8261,10 @@
             "items": {
               "$ref": "#/components/schemas/WebhookSubscription"
             }
+          },
+          "published_only": {
+            "type": "boolean",
+            "description": "Send only events that change what a published-only API key can read: a record's change while it is published (or that publishes, unpublishes, deletes or restores it), schema changes, and changes to assets that published records use. Drafts, schedules, history redactions, uploads and purges are never sent. `webhook.test` always is."
           },
           "enabled": {
             "type": "boolean"
@@ -8527,6 +8532,7 @@
           "resource",
           "actor",
           "via",
+          "note",
           "metadata",
           "request_id",
           "created_at"
@@ -8610,9 +8616,19 @@
               }
             ]
           },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The change note (`Nohead-Change-Note`) the change was made with,\nread from the revision or schema change the event references, so\nrecord and schema events have one when their change did; null\notherwise, and once a revision's history is pruned.\n",
+            "examples": [
+              "Clearer title"
+            ]
+          },
           "metadata": {
             "type": "object",
-            "description": "Small, action-specific references, e.g. `revision_id` and\n`collection_id` for record events, `schema_change_id` for schema\nevents, `changed` attribute names for updates. Never content.\n",
+            "description": "Small, action-specific references, e.g. `revision_id` and\n`collection_id` for record events, `schema_change_id` for schema\nevents, `changed` attribute names for updates (field keys for a\ndraft's). Never content.\n",
             "additionalProperties": true
           },
           "request_id": {
@@ -8690,6 +8706,10 @@
               "$ref": "#/components/schemas/WebhookSubscription"
             }
           },
+          "published_only": {
+            "type": "boolean",
+            "description": "Send only events that change what a published-only API key can read (`false` by default). It can't be combined with event types it never sends, such as `draft.*`."
+          },
           "enabled": {
             "type": "boolean"
           }
@@ -8714,6 +8734,10 @@
             "items": {
               "$ref": "#/components/schemas/WebhookSubscription"
             }
+          },
+          "published_only": {
+            "type": "boolean",
+            "description": "Send only events that change what a published-only API key can read (`false` by default). It can't be combined with event types it never sends, such as `draft.*`."
           },
           "enabled": {
             "type": "boolean"
