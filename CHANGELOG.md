@@ -12,6 +12,8 @@ section is its GitHub release's notes.
   what a published-only API key reads (a record published, unpublished or
   edited while live, schema changes, changes to assets that published records
   use), and skips drafts, schedules and edits to unpublished records.
+- Audit events have `note`: the change note (`Nohead-Change-Note`) a record
+  or schema change was made with, or `null`.
 
 ## 0.11.0
 
