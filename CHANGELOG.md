@@ -5,6 +5,11 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## 0.13.0
+
+No changes in this SDK: the SDKs keep one version, and this release adds
+Astro support and image-loader fixes to the TypeScript SDK.
+
 ## 0.12.0
 
 - `webhooks.create` and `webhooks.update` take `published_only`, and every
