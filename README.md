@@ -58,7 +58,6 @@ nohead = Nohead(
 | Option | Default | |
 |---|---|---|
 | `api_key` | `NOHEAD_API_KEY` | A project API key (`nohead_sk_...`, or `nohead_pk_...` when published-only). Required. |
-| `base_url` | `https://api.nohead.io` | For a proxy, or a mock server in tests. An `http` or `https` URL; anything else raises `NoheadError`. |
 | `project_id` | the key's project | Looked up once with `GET /v1/me` when omitted (calls made at the same time share the lookup). |
 | `max_retries` | `2` | See [retries](#retries-and-idempotency). |
 | `timeout` | `60.0` | Seconds an attempt may go without progress: to connect, to send, to get the response, and between reads of it. A response that keeps arriving doesn't time out. |
@@ -68,7 +67,7 @@ nohead = Nohead(
 | `rich_text` | documents | How rich text fields read: `"html"` or `"markdown"` for a string. See [rich text](#rich-text). |
 | `http_client` | a new `httpx.Client` | Bring your own for proxies or custom transports. |
 
-An empty string counts as not given: `api_key=""` reads `NOHEAD_API_KEY`, `base_url=""` uses `https://api.nohead.io`, and so on. The base URL comes only from `base_url`, never from the environment.
+An empty string counts as not given: `api_key=""` reads `NOHEAD_API_KEY`, and so on.
 
 API keys belong to a project, so methods like `collections.list()` need no project ID. Collections can be named by ID or slug everywhere.
 
@@ -199,7 +198,7 @@ Every exception is a `NoheadError`. API errors are `APIError`s with `status`, `t
 | `InternalServerError` | 500 and other 5xx |
 | `ServiceUnavailableError` | 503 |
 
-The API never redirects, so a redirect (a base URL that does, such as `http://` to `https://`) isn't followed: it raises an `APIError` whose `type` is `redirect`, such as `301 redirect: The API answered with a redirect to https://api.nohead.io/v1/records; check the base URL`.
+The API never redirects, so a redirect isn't followed: it raises an `APIError` whose `type` is `redirect`, such as `301 redirect: The API answered with a redirect to https://api.nohead.io/v1/records; check the base URL`.
 
 Other errors:
 
