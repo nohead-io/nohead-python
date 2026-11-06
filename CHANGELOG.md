@@ -5,6 +5,12 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## 0.14.0
+
+No changes in this SDK: the SDKs keep one version, and this release gives
+the TypeScript SDK's Astro loader its schema and types, and its image
+service defaults from astro.config.
+
 ## 0.13.0
 
 No changes in this SDK: the SDKs keep one version, and this release adds
