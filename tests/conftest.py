@@ -170,7 +170,11 @@ BACKOFF = _base.backoff
 
 @pytest.fixture(autouse=True)
 def no_backoff(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Retries wait no time in tests, and each test warns afresh."""
+    """Retries wait no time in tests, each test warns afresh, and none sees a
+    NOHEAD_API_URL from the shell."""
     monkeypatch.setattr(_base, "backoff", lambda attempt: 0.0)  # pyright: ignore[reportUnknownLambdaType]
     monkeypatch.setattr(_base, "_warned", set[str]())
+    # The client reads NOHEAD_API_URL: one in the shell mustn't move the tests
+    # off their mocked API.
+    monkeypatch.delenv("NOHEAD_API_URL", raising=False)
     yield

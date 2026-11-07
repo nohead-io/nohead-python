@@ -109,10 +109,13 @@ def settings(
     api_key = api_key or os.environ.get("NOHEAD_API_KEY") or None
     if not api_key:
         raise NoheadError("Missing API key: pass api_key or set NOHEAD_API_KEY")
-    # Never from the environment, so the key only goes where the code says.
-    base_url = (base_url or DEFAULT_BASE_URL).rstrip("/")
+    # NOHEAD_API_URL, as the CLI reads it, so one environment points both at
+    # the same API.
+    from_environment = not base_url and os.environ.get("NOHEAD_API_URL")
+    base_url = (base_url or from_environment or DEFAULT_BASE_URL).rstrip("/")
     if not _is_http_url(base_url):
-        raise NoheadError("base_url must be an http or https URL")
+        source = "NOHEAD_API_URL" if from_environment else "base_url"
+        raise NoheadError(f"{source} must be an http or https URL")
     return Settings(
         api_key=api_key,
         base_url=base_url,
