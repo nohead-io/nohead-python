@@ -128,6 +128,7 @@ def sync_flow() -> str:
             live.published_at is not None and live.revision == 2,
             "create with publish creates it published",
         )
+        nohead.records.delete(live.id)  # out of the async flow's count
 
         try:
             nohead.records.create(collection.slug, data={})
