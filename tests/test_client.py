@@ -84,6 +84,7 @@ ME = json_response(
             "published_only": False,
             "project_id": "prj_9",
             "expires_at": None,
+            "collections": None,
         },
     },
 )
