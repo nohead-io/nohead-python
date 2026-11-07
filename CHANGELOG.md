@@ -5,7 +5,7 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
-## Unreleased
+## 0.15.0
 
 - The client reads `NOHEAD_API_URL` as its default `base_url`, as the CLI
   does, so one environment points both at the same API (before, a script
@@ -15,6 +15,10 @@ section is its GitHub release's notes.
   one request (with `upsert_on`, a record already published stays so).
 - `assets.upload` and `assets.create_upload` take `alt`, the asset's alt text
   from the start, so no `assets.update` follows each upload.
+- `me.get()`'s `api_key` has `collections`: for a key with `schema:write`,
+  its organization's active collections across all its projects and the
+  plan's limit (`None` when unlimited), so a script can check new
+  collections fit before creating any; `None` for other keys.
 
 ## 0.14.0
 
