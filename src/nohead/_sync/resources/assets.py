@@ -25,13 +25,15 @@ class Assets(Resource):
         filename: str | None = None,
         content_type: str | None = None,
         byte_size: int | None = None,
+        alt: str | None = None,
         idempotency_key: str | None = None,
     ) -> Asset:
         """Uploads a file and returns the `ready` asset: creates the upload, sends the
         bytes straight to storage, then completes it (which checks the file).
 
-        `file` is bytes, a path, or a file opened in binary mode. Raises UploadError if
-        storage refuses the bytes, and ValidationError if the file fails the checks.
+        `file` is bytes, a path, or a file opened in binary mode. `alt` is its alt text
+        from the start, as `update` would set it later. Raises UploadError if storage
+        refuses the bytes, and ValidationError if the file fails the checks.
 
         With an `idempotency_key`, running the same upload again resumes it: the key
         starts the upload, and an asset that is already `ready` is returned without
@@ -40,12 +42,14 @@ class Assets(Resource):
         """
         source = open_upload(file, filename, content_type, byte_size)
         try:
-            created = self.create_upload(
+            params = AssetUploadCreate(
                 filename=source.filename,
                 content_type=source.content_type,
                 byte_size=source.byte_size,
-                idempotency_key=idempotency_key,
             )
+            if alt is not None:
+                params["alt"] = alt
+            created = self.create_upload(idempotency_key=idempotency_key, **params)
             # A replayed start returns the first run's asset, which may be done.
             if idempotency_key is not None:
                 current = self.get(created.id)

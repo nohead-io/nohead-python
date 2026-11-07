@@ -41,6 +41,15 @@ def test_refuses_a_missing_path_parameter(value: str | None) -> None:
     assert calls.calls == []
 
 
+async def test_creates_a_record_published_upserting_in_one_request(make: Make) -> None:
+    nohead, calls = make([json_response(201, record("rec_1"))])
+    await resolve(
+        nohead.records.create("pages", data={"slug": "about"}, upsert_on="slug", publish=True)
+    )
+    assert len(calls.calls) == 1
+    assert calls.body(0) == {"data": {"slug": "about"}, "upsert_on": "slug", "publish": True}
+
+
 def test_serializes_filters_sorts_and_expansions() -> None:
     nohead, calls = make_sync([LAST_PAGE])
     nohead.records.list(

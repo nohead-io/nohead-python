@@ -90,11 +90,13 @@ class Records(Resource):
         change_note: str | None = None,
         **params: Unpack[RecordCreate],
     ) -> Record:
-        """Creates an unpublished record: `create("posts", data={"title": "Hello"})`.
+        """Creates an unpublished record: `create("posts", data={"title": "Hello"})`, or
+        with `publish=True` a published one, in one request.
 
         With `upsert_on`, the key of a `unique` field, it updates the record holding
         that value instead, if one exists, so a sync can run again without
-        duplicates; `if_match` then applies to that update."""
+        duplicates; `if_match` then applies to that update (and with `publish=True`,
+        a record already published stays published)."""
         return self._client.request(
             "records_create",
             cast=Record,

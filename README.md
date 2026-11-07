@@ -58,6 +58,7 @@ nohead = Nohead(
 | Option | Default | |
 |---|---|---|
 | `api_key` | `NOHEAD_API_KEY` | A project API key (`nohead_sk_...`, or `nohead_pk_...` when published-only). Required. |
+| `base_url` | `NOHEAD_API_URL`, else `https://api.nohead.io` | The API's address. The CLI reads the same variable, so one environment points both at the same API. |
 | `project_id` | the key's project | Looked up once with `GET /v1/me` when omitted (calls made at the same time share the lookup). |
 | `max_retries` | `2` | See [retries](#retries-and-idempotency). |
 | `timeout` | `60.0` | Seconds an attempt may go without progress: to connect, to send, to get the response, and between reads of it. A response that keeps arriving doesn't time out. |
@@ -67,7 +68,7 @@ nohead = Nohead(
 | `rich_text` | documents | How rich text fields read: `"html"` or `"markdown"` for a string. See [rich text](#rich-text). |
 | `http_client` | a new `httpx.Client` | Bring your own for proxies or custom transports. |
 
-An empty string counts as not given: `api_key=""` reads `NOHEAD_API_KEY`, and so on.
+An empty string counts as not given, as an empty environment variable does: `api_key=""` reads `NOHEAD_API_KEY`, an empty `NOHEAD_API_URL` means `https://api.nohead.io`, and so on.
 
 API keys belong to a project, so methods like `collections.list()` need no project ID. Collections can be named by ID or slug everywhere.
 
@@ -104,6 +105,8 @@ nohead.records.delete(post.id)  # soft delete; records.restore() undoes it
 Methods return models and raise on failure. Field values are in `record.data`, a dict keyed by field API key.
 
 **Upserts.** With `upsert_on`, the key of a `unique` field, `create` updates the record holding that value instead, if one exists, so a content sync can run again without duplicates: `nohead.records.create("products", data={"sku": "TEE-01", "title": "Tee"}, upsert_on="sku")`.
+
+**Creating it published.** `publish=True` creates the record published, in one request and one transaction, so it is never unpublished in between (the key's `records:write` scope covers it, as it covers publishing). With `upsert_on`, a record already published stays published: `nohead.records.create("posts", data={"title": "Hello"}, publish=True)`.
 
 **More:**
 
@@ -266,7 +269,7 @@ except PreconditionFailedError as error:
 ## Assets
 
 ```python
-asset = nohead.assets.upload("cover.jpg")
+asset = nohead.assets.upload("cover.jpg", alt="The harbour at dawn")  # alt is optional
 nohead.records.update(record_id, data={"cover": asset.id})
 ```
 
