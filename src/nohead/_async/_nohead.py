@@ -61,7 +61,7 @@ class AsyncNohead:
             api_key: A project API key (`nohead_sk_...`, or `nohead_pk_...` when
                 published-only). Defaults to NOHEAD_API_KEY.
             base_url: The API's address, an http or https URL. Defaults to
-                https://api.nohead.io (the environment isn't read for it).
+                NOHEAD_API_URL, as the CLI reads it, then https://api.nohead.io.
             project_id: The key's project. Looked up once with GET /v1/me when omitted.
             max_retries: Retries of failed requests (see the README, "Retries").
             timeout: Seconds an attempt may go without progress: to connect, to send,

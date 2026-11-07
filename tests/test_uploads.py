@@ -115,6 +115,17 @@ async def test_uploads_bytes_with_a_name(make: Make) -> None:
     }
 
 
+async def test_sends_alt_text_with_the_start_of_the_upload(make: Make) -> None:
+    nohead, calls = make([CREATED, STORED, READY])
+    await resolve(nohead.assets.upload(b"x", filename="harbour.png", alt="A harbour"))
+    assert calls.body(0) == {
+        "filename": "harbour.png",
+        "content_type": "image/png",
+        "byte_size": 1,
+        "alt": "A harbour",
+    }
+
+
 async def test_uploads_a_file_object(make: Make) -> None:
     nohead, calls = make([CREATED, STORED, READY])
     await resolve(nohead.assets.upload(io.BytesIO(b"hello"), filename="hello.txt"))

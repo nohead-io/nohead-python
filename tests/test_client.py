@@ -24,11 +24,11 @@ def test_needs_an_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
         Nohead()
 
 
-def test_reads_the_key_from_the_environment_but_not_the_url(
+def test_reads_the_key_and_the_url_from_the_environment_as_the_cli_does(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("NOHEAD_API_KEY", "nohead_sk_env")
-    monkeypatch.setenv("NOHEAD_API_URL", "https://env.test/")
+    monkeypatch.setenv("NOHEAD_API_URL", "http://localhost:3000/")
     seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -37,8 +37,9 @@ def test_reads_the_key_from_the_environment_but_not_the_url(
 
     client = Nohead(http_client=httpx.Client(transport=httpx.MockTransport(handler)))
     client.records.get("rec_1")
-    assert str(seen[0].url) == "https://api.nohead.io/v1/records/rec_1"
+    assert str(seen[0].url) == "http://localhost:3000/v1/records/rec_1"
     assert seen[0].headers["authorization"] == "Bearer nohead_sk_env"
+    assert AsyncNohead()._client.settings.base_url == "http://localhost:3000"
 
 
 async def test_takes_the_base_url_from_its_option(
@@ -50,8 +51,15 @@ async def test_takes_the_base_url_from_its_option(
     assert str(calls.calls[0].url) == "https://api.test/v1/records/rec_1"
 
 
-def test_defaults_to_production() -> None:
+def test_defaults_to_production(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NOHEAD_API_URL", "")
     assert Nohead(api_key="nohead_sk_x")._client.settings.base_url == "https://api.nohead.io"
+
+
+def test_names_nohead_api_url_when_it_is_not_http(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NOHEAD_API_URL", "api.nohead.io")
+    with pytest.raises(NoheadError, match=r"^NOHEAD_API_URL must be an http or https URL$"):
+        Nohead(api_key="k")
 
 
 def test_identifies_itself() -> None:
@@ -143,8 +151,8 @@ def test_empty_options_count_as_not_given(monkeypatch: pytest.MonkeyPatch) -> No
     nohead, calls = make_sync([ME, LAST_PAGE], api_key="", base_url="", project_id="")
     nohead.collections.list()
     assert [str(c.url) for c in calls.calls] == [
-        "https://api.nohead.io/v1/me",
-        "https://api.nohead.io/v1/projects/prj_9/collections",
+        "https://env.test/v1/me",
+        "https://env.test/v1/projects/prj_9/collections",
     ]
     assert calls.calls[0].headers["authorization"] == "Bearer nohead_sk_env"
 

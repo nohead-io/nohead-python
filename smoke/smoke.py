@@ -1,5 +1,5 @@
 """Smoke test (Nohead spec §48.14): the core flow against a live API, with both
-clients. Needs NOHEAD_API_URL (the API to test, passed as base_url) and NOHEAD_API_KEY
+clients. Needs NOHEAD_API_URL (the API to test, read as base_url) and NOHEAD_API_KEY
 (a key with schema, records, assets and webhooks read/write scopes). Exits non-zero on
 failure, after deleting what it created. Run it against the built package:
 
@@ -32,8 +32,8 @@ from nohead import (
 # when it fails.
 LEFT: dict[str, str] = {}
 
-# The API to test: the client doesn't read NOHEAD_API_URL itself. Required (checked
-# below), so that a missing variable doesn't run the test against production.
+# The API to test, which the clients read, with the key, as a script would. Required
+# (checked below), so that a missing variable doesn't run the test against production.
 BASE_URL = os.environ.get("NOHEAD_API_URL")
 
 
@@ -54,7 +54,7 @@ def pipe(data: bytes) -> Iterator[IO[bytes]]:
 
 
 def sync_flow() -> str:
-    with Nohead(base_url=BASE_URL) as nohead:
+    with Nohead() as nohead:
         me = nohead.me.get()
         expect(me.api_key and me.api_key.project_id, "the key belongs to a project")
 
@@ -123,6 +123,12 @@ def sync_flow() -> str:
         )
         unpublished = nohead.records.unpublish(first.id)
         expect(unpublished.published_at is None, "unpublish takes it back")
+        live = nohead.records.create(collection.slug, data={"title": "Live"}, publish=True)
+        expect(
+            live.published_at is not None and live.revision == 2,
+            "create with publish creates it published",
+        )
+        nohead.records.delete(live.id)  # out of the async flow's count
 
         try:
             nohead.records.create(collection.slug, data={})
@@ -139,9 +145,10 @@ def sync_flow() -> str:
         except NotFoundError as error:
             expect((error.request_id or "").startswith("req_"), "API errors carry the request ID")
 
-        asset = nohead.assets.upload(b"hello", filename="hello.txt")
+        asset = nohead.assets.upload(b"hello", filename="hello.txt", alt="A greeting")
         LEFT["assets"] = asset.id
         expect(asset.status == "ready" and asset.byte_size == 5, "assets upload to storage")
+        expect(asset.alt == "A greeting", "upload sets alt text")
         renamed = nohead.assets.update(asset.id, filename="greeting.txt")
         expect(renamed.filename == "greeting.txt", "assets rename")
         expect(nohead.assets.delete(asset.id).deleted_at, "assets soft-delete")
@@ -200,7 +207,7 @@ def sync_flow() -> str:
 
 
 async def async_flow(collection: str) -> None:
-    async with AsyncNohead(base_url=BASE_URL) as nohead:
+    async with AsyncNohead() as nohead:
         created = await nohead.records.create(collection, data={"title": "Async"})
         expect(
             (await nohead.records.get(created.id)).data["title"] == "Async",
@@ -234,7 +241,7 @@ async def async_flow(collection: str) -> None:
 
 
 def clean_up() -> None:
-    with Nohead(base_url=BASE_URL) as nohead:
+    with Nohead() as nohead:
         for resource, id in LEFT.items():
             with contextlib.suppress(Exception):
                 getattr(nohead, resource).delete(id)

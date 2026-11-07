@@ -5,6 +5,17 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- The client reads `NOHEAD_API_URL` as its default `base_url`, as the CLI
+  does, so one environment points both at the same API (before, a script
+  sent its key to `https://api.nohead.io` whatever the CLI used). An explicit
+  `base_url` still wins.
+- `records.create` takes `publish=True`: the record is created published in
+  one request (with `upsert_on`, a record already published stays so).
+- `assets.upload` and `assets.create_upload` take `alt`, the asset's alt text
+  from the start, so no `assets.update` follows each upload.
+
 ## 0.14.0
 
 No changes in this SDK: the SDKs keep one version, and this release gives
