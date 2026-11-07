@@ -959,6 +959,17 @@ class PrincipalUser(NoheadModel):
     """Whether the user is Nohead staff."""
 
 
+class PrincipalApiKeyCollections(NoheadModel):
+    """The organization's active collections, across all its projects, and how many its plan
+    allows, so a client can check that new collections fit before creating any. Creating one
+    past the limit is `402 plan_limit_exceeded`. Null for a key without `schema:write`.
+    """
+
+    usage: int
+    limit: int | None
+    """Null when the plan doesn't limit collections."""
+
+
 class PrincipalApiKey(NoheadModel):
     id: str
     name: str
@@ -966,6 +977,11 @@ class PrincipalApiKey(NoheadModel):
     published_only: PublishedOnly
     project_id: str
     expires_at: NullableTimestamp
+    collections: PrincipalApiKeyCollections | None
+    """The organization's active collections, across all its projects, and how many its plan
+    allows, so a client can check that new collections fit before creating any. Creating one
+    past the limit is `402 plan_limit_exceeded`. Null for a key without `schema:write`.
+    """
 
 
 class Principal(NoheadModel):
