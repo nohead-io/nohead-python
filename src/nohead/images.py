@@ -20,7 +20,7 @@ _SUPPORTED = frozenset(
     " ".join(
         (
             "rs resize s size rt resizing_type w width h height mw min-width mh min-height",
-            "z zoom dpr el enlarge ex extend exar extend_aspect_ratio g gravity c crop",
+            "z zoom dpr el enlarge ex extend exar extend_aspect_ratio extend_ar g gravity c crop",
             "t trim pd padding ar auto_rotate rot rotate fl flip bg background bl blur",
             "sh sharpen pix pixelate q quality fq format_quality f format ext",
             "kcr keep_copyright scp strip_color_profile ph preserve_hdr",

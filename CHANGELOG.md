@@ -7,13 +7,17 @@ section is its GitHub release's notes.
 
 ## Unreleased
 
-- **Breaking:** `image_url` refuses a processing option image URLs don't take, naming it,
-  instead of building a URL that answers 404: imgproxy Pro's options, such as
-  `sa`, `mc` or `co`, and presets other than `pr:preview`. The ones image URLs
-  take are listed in the images guide.
+- **Breaking:** `image_url` refuses a processing option image URLs don't take,
+  naming it, instead of building a URL that answers 404: imgproxy Pro's
+  options, such as `sa`, `mc` or `co`, and presets other than `pr:preview`.
+  The ones image URLs take are listed in the images guide.
 - `fields.update` and `migrations.create` take `configuration` as a change the
   API merges onto the field's options (`FieldConfigurationChange`): an option
   sent replaces its value, `None` removes it, and the rest stay.
+- Uploads send a content type only when one is given; without it, the API
+  types the file by its filename, the same for every client and from a far
+  wider list than the SDKs knew (a `.mov` is `video/quicktime` and gets a
+  `media_url`). The SDKs' own extension table is gone.
 
 ## 0.18.0
 
