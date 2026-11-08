@@ -5,7 +5,7 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
-## Unreleased
+## 0.19.0
 
 - **Breaking:** `image_url` refuses a processing option image URLs don't take,
   naming it, instead of building a URL that answers 404: imgproxy Pro's
