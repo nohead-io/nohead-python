@@ -51,6 +51,20 @@ def test_writes_other_number_types_plainly() -> None:
     assert "/dpr:1.5/" in image_url(BASE, dpr=Decimal("1.5"))  # pyright: ignore[reportArgumentType]
 
 
+def test_refuses_options_image_urls_dont_take_by_name() -> None:
+    for option in ["sa:0", "mc:1", "co:10", "min_width:50", "pr:other", "pr", "pr:preview:other"]:
+        with pytest.raises(ValueError, match=r"isn't an option Nohead image URLs take"):
+            image_url(BASE, options=[option])
+    with pytest.raises(ValueError, match=r"^sa isn't"):
+        image_url(BASE, options=["sa:0"])
+    with pytest.raises(ValueError, match=r"^pr:other isn't"):
+        image_url(BASE, options=["pr:other"])
+    # Short and long names alike.
+    assert image_url(BASE, options=["blur:2", "min-width:50", "pr:preview"]) == at(
+        "blur:2/min-width:50/pr:preview"
+    )
+
+
 def test_refuses_options_that_would_break_the_path() -> None:
     with pytest.raises(ValueError, match="Not an imgproxy option"):
         image_url(BASE, gravity="fp:0.5/0.3")
