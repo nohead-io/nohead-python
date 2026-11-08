@@ -435,7 +435,32 @@ class FieldUpdate(NoheadModel):
     """Every record must have a value. Not available for boolean fields (a boolean is true or
     false; no value reads as false).
     """
-    configuration: FieldConfiguration | None = None
+    configuration: FieldConfigurationChange | None = None
+
+
+class FieldConfigurationChange(NoheadModel):
+    """Options to change, merged onto the field's: an option sent replaces its value, one sent
+    as `null` is removed, and options left out keep theirs. So `{ "filterable": true }`
+    changes one option and keeps the rest, and `{ "max_length": null }` removes the limit.
+    Any field type's option names are accepted here; the merged options are checked against
+    the field's type (`FieldConfiguration`).
+    """
+
+    description: str | None = None
+    searchable: bool | None = None
+    filterable: bool | None = None
+    sortable: bool | None = None
+    min_length: int | None = None
+    max_length: int | None = None
+    format: str | None = None
+    unique: bool | None = None
+    min: float | None = None
+    max: float | None = None
+    include_time: bool | None = None
+    time_zone: str | None = None
+    options: list[str] | None = None
+    accepted_types: list[str] | None = None
+    target_collection_id: str | None = None
 
 
 class FieldList(NoheadModel):
@@ -575,9 +600,12 @@ class FieldMigrationRequest(NoheadModel):
     field_id: str
     """One of the collection's fields (`422` otherwise)."""
     type: FieldType | None = None
-    configuration: FieldConfiguration | None = None
-    """The complete new configuration. When the type changes and this is omitted, only
-    `description`, `searchable`, `filterable` and `sortable` carry over.
+    configuration: FieldConfigurationChange | None = None
+    """Options to change, merged as a field update merges them (`null` removes one). They merge
+    onto the field's options that carry over to the target: those its type takes, with a
+    value it accepts (a text field's `max_length` carries over to a long text, its `format`
+    doesn't), less `sortable` and `filterable` where the target can't have them. Without it,
+    those options are the target's.
     """
     multiple: bool | None = None
     """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
