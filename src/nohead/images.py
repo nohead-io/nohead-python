@@ -1,6 +1,8 @@
 """Image renditions without a request. Image URLs are open: an image asset's
-`image_url` serves the whole image, and any of imgproxy's processing options
-written into it transform it (https://docs.imgproxy.net/usage/processing).
+`image_url` serves the whole image, and imgproxy's open-source processing
+options written into it transform it (listed at
+https://docs.nohead.io/guides/images#supported-options). Any other, such as
+imgproxy Pro's `sa`, `mc` or `co`, would answer 404, so `image_url` refuses it.
 
     image_url(asset, width=800, height=600, fit="cover", format="webp")
 """
@@ -12,6 +14,34 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Literal, Protocol
 
 _FITS = {"contain": "fit", "cover": "fill", "fill": "force"}
+
+# The processing options image URLs take, by short and long name.
+_SUPPORTED = frozenset(
+    " ".join(
+        (
+            "rs resize s size rt resizing_type w width h height mw min-width mh min-height",
+            "z zoom dpr el enlarge ex extend exar extend_aspect_ratio g gravity c crop",
+            "t trim pd padding ar auto_rotate rot rotate fl flip bg background bl blur",
+            "sh sharpen pix pixelate q quality fq format_quality f format ext",
+            "kcr keep_copyright scp strip_color_profile ph preserve_hdr",
+            "eth enforce_thumbnail cb cachebuster exp expires fn filename",
+            "att return_attachment pr preset",
+        )
+    ).split()
+)
+
+
+def _check_supported(option: str) -> None:
+    """Refuses an option image URLs don't take, naming it. The only preset is
+    preview_url's."""
+    name, _, args = option.partition(":")
+    preset = name in ("pr", "preset") and args != "preview"
+    if name not in _SUPPORTED or preset:
+        raise ValueError(
+            f"{option if preset else name} isn't an option Nohead image URLs take "
+            "(imgproxy Pro's, such as sa, mc or co, aren't available): "
+            "https://docs.nohead.io/guides/images#supported-options"
+        )
 
 
 class _Image(Protocol):
@@ -36,7 +66,7 @@ def image_url(
     `cover` fills it, cropping, `fill` stretches to it.
     `gravity` is what a crop keeps (`sm` for smart, `fp:0.5:0.3` for a focal
     point); `options` are any other processing options, as written in a URL
-    (`["bl:2"]`)."""
+    (`["bl:2"]`): imgproxy's open-source ones (Pro's are refused)."""
     if isinstance(image, str):
         base: object = image
     elif isinstance(image, Mapping):
@@ -52,6 +82,9 @@ def image_url(
     for option in [gravity, *options]:
         if option and re.search(r"[/@?#]", option):
             raise ValueError(f"Not an imgproxy option: {option}")
+    for option in options:
+        if option:
+            _check_supported(option)
 
     if fit is None:
         fit = "contain"

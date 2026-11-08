@@ -5,6 +5,16 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- **Breaking:** `image_url` refuses a processing option image URLs don't take, naming it,
+  instead of building a URL that answers 404: imgproxy Pro's options, such as
+  `sa`, `mc` or `co`, and presets other than `pr:preview`. The ones image URLs
+  take are listed in the images guide.
+- `fields.update` and `migrations.create` take `configuration` as a change the
+  API merges onto the field's options (`FieldConfigurationChange`): an option
+  sent replaces its value, `None` removes it, and the rest stay.
+
 ## 0.18.0
 
 No changes in this SDK: the SDKs keep one version, and this release moves the

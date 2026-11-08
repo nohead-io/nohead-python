@@ -273,7 +273,7 @@ asset = nohead.assets.upload("cover.jpg", alt="The harbour at dawn")  # alt is o
 nohead.records.update(record_id, data={"cover": asset.id})
 ```
 
-**Images.** Image URLs are open: an image's `image_url` serves the whole image, and any of [imgproxy's processing options](https://docs.imgproxy.net/usage/processing) written into it transform it. `nohead.images.image_url` builds them without a request:
+**Images.** Image URLs are open: an image's `image_url` serves the whole image, and [imgproxy's processing options](https://docs.imgproxy.net/usage/processing) written into it transform it: the open-source ones, [listed in the docs](https://docs.nohead.io/guides/images#supported-options). Any other, such as imgproxy Pro's `sa` (saturation), would answer 404, so `nohead.images.image_url` refuses it, naming the option. It builds them without a request:
 
 ```python
 from nohead.images import image_url
