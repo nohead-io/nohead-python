@@ -1452,7 +1452,14 @@ class AssetUsage(NoheadModel):
 
 class AssetUploadCreate(NoheadModel):
     filename: str
-    content_type: str
+    content_type: str | None = None
+    """The file's MIME type. Without it (or empty), the file is typed by its filename's
+    extension, the same for every client: `clip.mov` is `video/quicktime`, `brief.docx` a
+    Word document, and a file whose extension is unknown `application/octet-stream`. Image,
+    PDF, video and audio types are checked against the file's content when the upload
+    completes. Send the file with the `Content-Type` in the response's `upload.headers`, the
+    type the asset has: storage refuses another.
+    """
     byte_size: int
     """Exact size of the file in bytes, at most the plan's largest upload (10 MB on Free, 100
     MB on paid plans).

@@ -41,11 +41,10 @@ class AsyncAssets(AsyncResource):
         """
         source = open_upload(file, filename, content_type, byte_size)
         try:
-            params = AssetUploadCreate(
-                filename=source.filename,
-                content_type=source.content_type,
-                byte_size=source.byte_size,
-            )
+            params = AssetUploadCreate(filename=source.filename, byte_size=source.byte_size)
+            # Without one, the API types the file by its filename, as for every client.
+            if source.content_type:
+                params["content_type"] = source.content_type
             if alt is not None:
                 params["alt"] = alt
             created = await self.create_upload(idempotency_key=idempotency_key, **params)

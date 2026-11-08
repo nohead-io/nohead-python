@@ -66,7 +66,8 @@ async def test_uploads_a_path(make: Make, tmp_path: Path) -> None:
         "PUT storage.test/uploads/prj_1/ast_1",
         "POST api.test/v1/assets/ast_1/complete",
     ]
-    assert calls.body(0) == {"filename": "a.png", "content_type": "image/png", "byte_size": 3}
+    # No type given: the API types the file by its name.
+    assert calls.body(0) == {"filename": "a.png", "byte_size": 3}
     put = calls.calls[1]
     assert put.content == b"\x01\x02\x03"
     assert put.headers["content-length"] == "3"
@@ -108,27 +109,20 @@ async def test_refuses_to_resume_once_the_upload_url_expired(make: Make) -> None
 async def test_uploads_bytes_with_a_name(make: Make) -> None:
     nohead, calls = make([CREATED, STORED, READY])
     await resolve(nohead.assets.upload(b"0123456789", filename="data.bin"))
-    assert calls.body(0) == {
-        "filename": "data.bin",
-        "content_type": "application/octet-stream",
-        "byte_size": 10,
-    }
+    assert calls.body(0) == {"filename": "data.bin", "byte_size": 10}
 
 
 async def test_sends_alt_text_with_the_start_of_the_upload(make: Make) -> None:
     nohead, calls = make([CREATED, STORED, READY])
     await resolve(nohead.assets.upload(b"x", filename="harbour.png", alt="A harbour"))
-    assert calls.body(0) == {
-        "filename": "harbour.png",
-        "content_type": "image/png",
-        "byte_size": 1,
-        "alt": "A harbour",
-    }
+    assert calls.body(0) == {"filename": "harbour.png", "byte_size": 1, "alt": "A harbour"}
 
 
 async def test_uploads_a_file_object(make: Make) -> None:
     nohead, calls = make([CREATED, STORED, READY])
-    await resolve(nohead.assets.upload(io.BytesIO(b"hello"), filename="hello.txt"))
+    await resolve(
+        nohead.assets.upload(io.BytesIO(b"hello"), filename="hello.txt", content_type="text/plain")
+    )
     assert calls.body(0)["content_type"] == "text/plain"
     assert calls.calls[1].content == b"hello"
 
@@ -150,23 +144,10 @@ async def test_needs_byte_size_for_a_pipe(make: Make) -> None:
     assert calls.calls == []
 
 
-@pytest.mark.parametrize(
-    ("filename", "content_type"),
-    [
-        ("notes.md", "text/markdown"),
-        ("Photo.JPG", "image/jpeg"),
-        ("data.json.gz", "application/octet-stream"),
-        ("page.html", "application/octet-stream"),
-        ("README", "application/octet-stream"),
-        (".png", "application/octet-stream"),
-    ],
-)
-async def test_guesses_the_content_type_as_the_other_sdks_do(
-    make: Make, filename: str, content_type: str
-) -> None:
+async def test_leaves_the_type_to_the_api_unless_given(make: Make) -> None:
     nohead, calls = make([CREATED, STORED, READY])
-    await resolve(nohead.assets.upload(b"x", filename=filename))
-    assert calls.body(0)["content_type"] == content_type
+    await resolve(nohead.assets.upload(b"x", filename="Clip.MOV"))
+    assert "content_type" not in calls.body(0)
 
 
 async def test_retries_the_bytes_on_a_server_error(make: Make) -> None:
@@ -284,5 +265,4 @@ async def test_does_not_follow_a_redirect_from_storage() -> None:
 async def test_empty_upload_options_count_as_not_given(make: Make, filename: str | None) -> None:
     nohead, calls = make([CREATED, STORED, READY])
     await resolve(nohead.assets.upload(b"x", filename=filename, content_type=""))
-    assert calls.body(0)["filename"] == "upload"
-    assert calls.body(0)["content_type"] == "application/octet-stream"
+    assert calls.body(0) == {"filename": "upload", "byte_size": 1}

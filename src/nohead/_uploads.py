@@ -15,32 +15,12 @@ Uploadable: TypeAlias = bytes | bytearray | memoryview | str | os.PathLike[str] 
 
 CHUNK = 1024 * 1024
 
-CONTENT_TYPES = {
-    ".avif": "image/avif",
-    ".gif": "image/gif",
-    ".jpeg": "image/jpeg",
-    ".jpg": "image/jpeg",
-    ".png": "image/png",
-    ".svg": "image/svg+xml",
-    ".webp": "image/webp",
-    ".pdf": "application/pdf",
-    ".json": "application/json",
-    ".txt": "text/plain",
-    ".md": "text/markdown",
-    ".csv": "text/csv",
-    ".mp3": "audio/mpeg",
-    ".mp4": "video/mp4",
-    ".webm": "video/webm",
-    ".zip": "application/zip",
-}
-"""Common files' types by extension, as the other SDKs guess them: the same on every
-platform and Python version, unlike `mimetypes`."""
-
 
 @dataclass
 class UploadSource:
     filename: str
-    content_type: str
+    content_type: str | None
+    """The type given; None leaves it to the API, which types the file by its filename."""
     byte_size: int
     data: bytes | None
     file: IO[bytes] | None
@@ -94,11 +74,10 @@ def open_upload(
             raise UploadError("Uploading a stream that cannot seek needs byte_size")
     if byte_size is not None:
         size = byte_size
-    guessed = CONTENT_TYPES.get(os.path.splitext(name)[1].lower(), "application/octet-stream")
     start = handle.tell() if handle is not None and handle.seekable() else 0
     return UploadSource(
         filename=name,
-        content_type=content_type or guessed,
+        content_type=content_type or None,
         byte_size=size,
         data=data,
         file=handle,
