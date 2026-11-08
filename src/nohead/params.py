@@ -181,6 +181,31 @@ class EnumFieldCreate(FieldCreateProperties):
     configuration: EnumFieldConfiguration
 
 
+class FieldConfigurationChange(TypedDict):
+    """Options to change, merged onto the field's: an option sent replaces its value, one sent
+    as `null` is removed, and options left out keep theirs. So `{ "filterable": true }`
+    changes one option and keeps the rest, and `{ "max_length": null }` removes the limit.
+    Any field type's option names are accepted here; the merged options are checked against
+    the field's type (`FieldConfiguration`).
+    """
+
+    description: NotRequired[str | None]
+    searchable: NotRequired[bool | None]
+    filterable: NotRequired[bool | None]
+    sortable: NotRequired[bool | None]
+    min_length: NotRequired[int | None]
+    max_length: NotRequired[int | None]
+    format: NotRequired[Literal["slug", "url", "email"] | None]
+    unique: NotRequired[bool | None]
+    min: NotRequired[float | None]
+    max: NotRequired[float | None]
+    include_time: NotRequired[bool | None]
+    time_zone: NotRequired[str | None]
+    options: NotRequired[list[str] | None]
+    accepted_types: NotRequired[list[str] | None]
+    target_collection_id: NotRequired[str | None]
+
+
 class FieldCreate(TypedDict):
     """A new field. Its `type` decides the options `configuration` takes."""
 
@@ -222,9 +247,12 @@ class FieldMigrationRequest(TypedDict):
     field_id: str
     """One of the collection's fields (`422` otherwise)."""
     type: NotRequired[FieldType]
-    configuration: NotRequired[FieldConfiguration]
-    """The complete new configuration. When the type changes and this is omitted, only
-    `description`, `searchable`, `filterable` and `sortable` carry over.
+    configuration: NotRequired[FieldConfigurationChange]
+    """Options to change, merged as a field update merges them (`null` removes one). They merge
+    onto the field's options that carry over to the target: those its type takes, with a
+    value it accepts (a text field's `max_length` carries over to a long text, its `format`
+    doesn't), less `sortable` and `filterable` where the target can't have them. Without it,
+    those options are the target's.
     """
     multiple: NotRequired[bool]
     """A list of distinct values (a repeated value is refused with `duplicate_value`, an empty
@@ -265,7 +293,7 @@ class FieldUpdate(TypedDict):
     """Every record must have a value. Not available for boolean fields (a boolean is true or
     false; no value reads as false).
     """
-    configuration: NotRequired[FieldConfiguration]
+    configuration: NotRequired[FieldConfigurationChange]
 
 
 class IntegerFieldConfiguration(TypedDict):
@@ -463,19 +491,6 @@ class WebhookUpdate(TypedDict):
     enabled: NotRequired[bool]
 
 
-FieldConfiguration: TypeAlias = (
-    TextFieldConfiguration
-    | LongTextFieldConfiguration
-    | RichTextFieldConfiguration
-    | IntegerFieldConfiguration
-    | DecimalFieldConfiguration
-    | DateFieldConfiguration
-    | BooleanFieldConfiguration
-    | EnumFieldConfiguration
-    | AssetFieldConfiguration
-    | RelationFieldConfiguration
-    | JsonFieldConfiguration
-)
 FieldType: TypeAlias = Literal[
     "text",
     "long_text",
