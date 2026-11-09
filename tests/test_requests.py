@@ -197,22 +197,19 @@ def test_audit_events_filter_several_resource_types_and_a_time_range() -> None:
     assert dict(calls.calls[1].url.params) == {"filter[resource_type]": "record"}
 
 
-def test_lists_assets_of_one_type_or_several() -> None:
-    nohead, calls = make_sync([LAST_PAGE, LAST_PAGE])
-    nohead.assets.list(content_type="image/*").data  # noqa: B018 (fetches it)
-    nohead.assets.list(content_type=["image/*", "application/pdf"]).data  # noqa: B018
-    assert dict(calls.calls[0].url.params) == {"filter[content_type]": "image/*"}
-    assert dict(calls.calls[1].url.params) == {
-        "filter[content_type][in]": "image/*,application/pdf"
+def test_asset_filters_take_one_value_or_several() -> None:
+    nohead, calls = make_sync([LAST_PAGE])
+    nohead.assets.list(content_type="image/*", q="hero jpg", kind="image").data  # noqa: B018 (fetches it)
+    nohead.assets.list(content_type=["image/*", "application/pdf"], kind=["image", "video"]).data  # noqa: B018
+    assert dict(calls.calls[0].url.params) == {
+        "filter[content_type]": "image/*",
+        "q": "hero jpg",
+        "filter[kind]": "image",
     }
-
-
-def test_searches_assets_and_lists_them_by_kind() -> None:
-    nohead, calls = make_sync([LAST_PAGE, LAST_PAGE])
-    nohead.assets.list(q="hero jpg", kind="image").data  # noqa: B018 (fetches it)
-    nohead.assets.list(kind=["image", "video"]).data  # noqa: B018
-    assert dict(calls.calls[0].url.params) == {"q": "hero jpg", "filter[kind]": "image"}
-    assert dict(calls.calls[1].url.params) == {"filter[kind][in]": "image,video"}
+    assert dict(calls.calls[1].url.params) == {
+        "filter[content_type][in]": "image/*,application/pdf",
+        "filter[kind][in]": "image,video",
+    }
 
 
 def test_record_batch_results_that_failed() -> None:
@@ -283,13 +280,6 @@ def test_diff_names_its_revisions() -> None:
     result = nohead.records.diff("rec_1", from_revision=1, to_revision=2)
     assert (result.from_, result.to) == (1, 2)
     assert dict(calls.calls[0].url.params) == {"from": "1", "to": "2"}
-
-
-def test_diff_sends_rich_text() -> None:
-    diff = {"object": "record_diff", "record_id": "rec_1", "from": 1, "to": 2, "changes": []}
-    nohead, calls = make_sync([json_response(200, diff)])
-    nohead.records.diff("rec_1", from_revision=1, to_revision=2, rich_text="markdown")
-    assert calls.calls[0].url.params["rich_text"] == "markdown"
 
 
 def test_keeps_unknown_fields_and_values() -> None:
@@ -451,17 +441,6 @@ def test_empty_request_options_count_as_not_given() -> None:
     assert len(headers["idempotency-key"]) == 36
     assert "nohead-change-note" not in headers
     assert "rich_text" not in calls.calls[0].url.params
-
-
-async def test_rich_text_from_the_client_only_where_the_operation_takes_it(make: Make) -> None:
-    nohead, calls = make([mock_reply], rich_text="markdown")
-    await resolve(nohead.records.get("rec_1"))
-    await resolve(nohead.records.count("posts"))
-    await resolve(nohead.records.revisions.get("rec_1", 1))  # history keeps documents
-    await resolve(nohead.drafts.merge("drf_1"))
-    await resolve(nohead.search("hello"))
-    sent = [c.url.params.get("rich_text") for c in calls.calls]
-    assert sent == ["markdown", None, None, "markdown", "markdown"]
 
 
 async def test_a_calls_rich_text_overrides_the_clients(make: Make) -> None:

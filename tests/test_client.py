@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import platform
-import time
+import threading
 import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AsyncExitStack
@@ -14,6 +14,7 @@ import httpx
 import pytest
 
 from nohead import AsyncNohead, Nohead, NoheadError, __version__
+from nohead._async._client import AsyncAPIClient
 
 from .conftest import LAST_PAGE, Make, json_response, make_sync, raw, record, resolve
 
@@ -75,7 +76,7 @@ def test_identifies_itself() -> None:
 
 
 def test_version_matches_pyproject() -> None:
-    pyproject = tomllib.loads(Path("pyproject.toml").read_text())
+    pyproject = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text())
     assert __version__ == pyproject["project"]["version"]
 
 
@@ -178,12 +179,42 @@ def fresh(response: httpx.Response) -> httpx.Response:
     return httpx.Response(response.status_code, headers=response.headers, content=response.content)
 
 
-async def test_calls_at_the_same_time_share_one_project_lookup() -> None:
+class ProjectAsks:
+    """Counts the async calls that ask for the project; `all_asked` waits until
+    `expected` have."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch, expected: int) -> None:
+        self.count = 0
+        self.expected = expected
+        self.event = asyncio.Event()
+        project_id = AsyncAPIClient.project_id
+
+        async def ask(client: AsyncAPIClient) -> str:
+            self.count += 1
+            if self.count == expected:
+                self.event.set()
+            return await project_id(client)
+
+        monkeypatch.setattr(AsyncAPIClient, "project_id", ask)
+
+    async def all_asked(self) -> None:
+        try:
+            await asyncio.wait_for(self.event.wait(), 5)
+        except TimeoutError:
+            message = f"only {self.count} of {self.expected} calls asked for the project"
+            raise AssertionError(message) from None
+
+
+async def test_calls_at_the_same_time_share_one_project_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     seen: list[str] = []
+    asks = ProjectAsks(monkeypatch, 3)
 
     async def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request.url.path)
-        await asyncio.sleep(0.01)  # the others start meanwhile
+        if request.url.path == "/v1/me":
+            await asks.all_asked()  # the lookup ends only once every call waits for it
         return fresh(ME if request.url.path == "/v1/me" else LAST_PAGE)
 
     http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
@@ -195,16 +226,37 @@ async def test_calls_at_the_same_time_share_one_project_lookup() -> None:
     assert seen.count("/v1/me") == 1
 
 
+class CountedLock:
+    """A lock that counts the threads that come to it, before they wait for it."""
+
+    def __init__(self, lock: Any, arrived: threading.Semaphore) -> None:
+        self.lock = lock
+        self.arrived = arrived
+
+    def __enter__(self) -> Any:
+        self.arrived.release()
+        return self.lock.__enter__()
+
+    def __exit__(self, *exc: Any) -> Any:
+        return self.lock.__exit__(*exc)
+
+
 def test_threads_share_one_project_lookup() -> None:
     seen: list[str] = []
+    arrived = threading.Semaphore(0)
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request.url.path)
-        time.sleep(0.05)  # the others start meanwhile
+        if request.url.path == "/v1/me":
+            # The lookup ends only once every thread is waiting for it.
+            for _ in range(3):
+                assert arrived.acquire(timeout=5), "the threads didn't all wait for the lookup"
         return fresh(ME if request.url.path == "/v1/me" else LAST_PAGE)
 
     http = httpx.Client(transport=httpx.MockTransport(handler))
     nohead = Nohead(api_key="k", base_url="https://api.test", http_client=http)
+    project = nohead._client._project
+    project._lock = CountedLock(project._lock, arrived)  # pyright: ignore[reportAttributeAccessIssue]
     copy = nohead.with_options(timeout=5)
     with ThreadPoolExecutor(3) as pool:
         for future in [
@@ -230,12 +282,15 @@ async def test_looks_up_the_project_again_after_a_failure(make: Make) -> None:
     ]
 
 
-async def test_calls_at_the_same_time_share_a_failed_lookup() -> None:
+async def test_calls_at_the_same_time_share_a_failed_lookup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     seen: list[str] = []
+    asks = ProjectAsks(monkeypatch, 2)
 
     async def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request.url.path)
-        await asyncio.sleep(0.01)
+        await asks.all_asked()
         return httpx.Response(401, json={"error": {"type": "authentication_error"}})
 
     http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
@@ -243,5 +298,8 @@ async def test_calls_at_the_same_time_share_a_failed_lookup() -> None:
     results = await asyncio.gather(
         nohead.collections.list(), nohead.webhooks.list(), return_exceptions=True
     )
+    for result in results:
+        if isinstance(result, AssertionError):
+            raise result
     assert [type(result).__name__ for result in results] == ["AuthenticationError"] * 2
     assert seen == ["/v1/me"]

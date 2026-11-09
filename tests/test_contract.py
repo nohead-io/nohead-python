@@ -24,8 +24,8 @@ from pydantic import BaseModel
 from nohead import AsyncNohead, AsyncPage, Nohead, NoheadWarning, Page
 from nohead._generated.operations import OPERATIONS
 
-from .calls import every_call, example_reply, mock_replies
-from .conftest import Recorder, api_error, json_response, make_async, make_sync, raw, record
+from .calls import every_call, example_reply, mock_reply
+from .conftest import Make, Recorder, api_error, json_response, make_sync, raw, record, resolve
 from .spec import ROUTES, VARIANTS, declared_headers, errors, route_of_request
 
 TIMESTAMP = re.compile(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?(Z|[+-]\d\d:\d\d)")
@@ -127,8 +127,9 @@ def check_requests(requests: list[httpx.Request], sent: dict[str, set[str]]) -> 
 def check_result(requests: list[httpx.Request], result: Any, variant: int) -> None:
     """The method returns the response its last request got."""
     last = requests[-1]
-    reply = example_reply(route_of_request(last), last, variant)
-    assert comparable(result) == comparable(reply)
+    route = route_of_request(last)
+    reply = example_reply(route, last, variant)
+    assert comparable(result) == comparable(reply), f"{route.id}, variant {variant}"
 
 
 def check_coverage(sent: dict[str, set[str]]) -> None:
@@ -146,30 +147,51 @@ def api_requests(recorder: Recorder, start: int) -> list[httpx.Request]:
     return [r for r in recorder.calls[start:] if r.url.host == "api.test"]
 
 
-@pytest.mark.parametrize("variant", range(VARIANTS))
-def test_the_sync_client_covers_the_contract(variant: int) -> None:
-    nohead, recorder = make_sync([mock_replies(variant)])
+def replies_of(requests: list[httpx.Request], variant: int) -> list[Any]:
+    """The replies a call's API requests get with the variant numbered `variant`."""
+    return [example_reply(route_of_request(r), r, variant) for r in requests]
+
+
+async def test_both_clients_cover_the_contract(make: Make) -> None:
+    """Each call runs with every variant of its replies' unions. A variant is skipped
+    when it gives the requests of a run already made the same replies: the client then
+    sends the same requests again, and gets the same results."""
+    variant = [0]  # the variant the mock answers with, set below
+    nohead, recorder = make([lambda request: mock_reply(request, variant[0])])
     sent: dict[str, set[str]] = {}
     for call in every_call(nohead) + every_parameter(nohead):
-        start = len(recorder.calls)
-        result = call()
-        check_requests(api_requests(recorder, start), sent)
-        check_result(api_requests(recorder, start), result, variant)
+        runs: list[tuple[list[httpx.Request], list[Any]]] = []
+        for number in range(VARIANTS):
+            if any(replies_of(requests, number) == replies for requests, replies in runs):
+                continue
+            variant[0] = number
+            start = len(recorder.calls)
+            result = await resolve(call())
+            requests = api_requests(recorder, start)
+            runs.append((requests, replies_of(requests, number)))
+            check_requests(requests, sent)
+            check_result(requests, result, number)
     check_coverage(sent)
 
 
-@pytest.mark.parametrize("variant", range(VARIANTS))
-async def test_the_async_client_covers_the_contract(variant: int) -> None:
-    nohead, recorder = make_async([mock_replies(variant)])
-    sent: dict[str, set[str]] = {}
-    for call in every_call(nohead) + every_parameter(nohead):
-        start = len(recorder.calls)
-        result = call()
-        if inspect.isawaitable(result):
-            result = await result
-        check_requests(api_requests(recorder, start), sent)
-        check_result(api_requests(recorder, start), result, variant)
-    check_coverage(sent)
+async def test_the_clients_rich_text_goes_where_it_is_declared(make: Make) -> None:
+    """The client's `rich_text` is sent with exactly the operations that declare it."""
+    nohead, recorder = make([mock_reply], rich_text="markdown")
+    # records.diff's sample passes its own rich_text: here it takes the client's.
+    calls = [
+        *every_call(nohead),
+        lambda: nohead.records.diff("rec_1", from_revision=1, to_revision=2),
+    ]
+    for call in calls:
+        await resolve(call())
+    declared = {route.id for route in ROUTES if any(p.name == "rich_text" for p in route.query)}
+    sent: set[str] = set()
+    for request in api_requests(recorder, 0):
+        operation = route_of_request(request).id
+        expected = "markdown" if operation in declared else None
+        assert request.url.params.get("rich_text") == expected, operation
+        sent.add(operation)
+    assert declared <= sent, "operations that declare rich_text no call sends"
 
 
 @pytest.mark.parametrize("variant", range(VARIANTS))
