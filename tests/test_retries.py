@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 import time
+from collections.abc import Iterator
 
 import httpx
 import pytest
@@ -137,16 +138,6 @@ async def test_backs_off_exponentially_with_jitter_up_to_8_s(
     assert waits == [0.4375, 0.875, 1.75, 3.5, 7, 7]
 
 
-async def test_reads_a_retry_after_date(
-    make: Make, waits: list[float], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(time, "time", lambda: 1790942400.0)  # 2026-10-02 12:00 UTC
-    retry_at = {"retry-after": "Fri, 02 Oct 2026 12:00:05 GMT"}
-    nohead, _ = make([api_error(429, "rate_limited", retry_at), json_response(200, record("r"))])
-    await resolve(nohead.records.get("r"))
-    assert waits == [5]
-
-
 async def test_stops_after_max_retries(make: Make) -> None:
     nohead, calls = make([httpx.ConnectError("refused")], max_retries=0)
     with pytest.raises(APIConnectionError):
@@ -211,6 +202,18 @@ async def test_times_out_slow_attempts(make: Make) -> None:
     assert calls.calls[0].extensions["timeout"]["read"] == 7
 
 
+@pytest.fixture
+def far_from_utc() -> Iterator[None]:
+    """The process's time zone is far from UTC, so a date read as local time would be
+    hours off."""
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("TZ", "America/Los_Angeles")
+        time.tzset()
+        yield
+    time.tzset()
+
+
+@pytest.mark.usefixtures("far_from_utc")
 @pytest.mark.parametrize(
     "value",
     [
@@ -223,21 +226,11 @@ async def test_times_out_slow_attempts(make: Make) -> None:
 async def test_reads_retry_after_dates_in_every_http_form_as_gmt(
     make: Make, waits: list[float], monkeypatch: pytest.MonkeyPatch, value: str
 ) -> None:
-    # Far from UTC, so a date read as local time would be hours off.
-    monkeypatch.setenv("TZ", "America/Los_Angeles")
-    time.tzset()
     monkeypatch.setattr(time, "time", lambda: 1790942400.0)  # 2026-10-02 12:00 UTC
-    try:
-        nohead, _ = make(
-            [
-                api_error(429, "rate_limited", {"retry-after": value}),
-                json_response(200, record("r")),
-            ]
-        )
-        await resolve(nohead.records.get("r"))
-    finally:
-        monkeypatch.undo()
-        time.tzset()
+    nohead, _ = make(
+        [api_error(429, "rate_limited", {"retry-after": value}), json_response(200, record("r"))]
+    )
+    await resolve(nohead.records.get("r"))
     assert waits == [5]
 
 

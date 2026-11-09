@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import copy
 from collections.abc import Callable
-from functools import partial
 from typing import Any
 
 import httpx
@@ -23,11 +22,6 @@ def mock_reply(request: httpx.Request, variant: int = 0) -> httpx.Response:
         return httpx.Response(200)
     route = route_of(request.method, request.url.path)
     return json_response(route.status, example_reply(route, request, variant))
-
-
-def mock_replies(variant: int) -> Callable[[httpx.Request], httpx.Response]:
-    """mock_reply with other variants of the responses' unions."""
-    return partial(mock_reply, variant=variant)
 
 
 def example_reply(route: Route, request: httpx.Request, variant: int = 0) -> Any:

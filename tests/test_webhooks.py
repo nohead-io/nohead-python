@@ -4,11 +4,11 @@ import base64
 import json
 import time
 import warnings
-from datetime import UTC, datetime, tzinfo
+from collections.abc import Callable
+from datetime import UTC, datetime
 
 import pytest
 import standardwebhooks
-import standardwebhooks.webhooks
 
 from nohead import Asset, NoheadWarning, WebhookVerificationError
 from nohead.models import AssetEventDataAsset
@@ -17,6 +17,8 @@ from nohead.webhooks import unwrap
 from .conftest import Make, record
 
 NOW = 1790942400  # 2026-10-02 12:00 UTC
+"""Nohead's clock in these tests (frozen_clock); the tests that check the Standard
+Webhooks library's verdict, whose clock is the real one, move it to `real_now`."""
 
 SECRET = "whsec_" + base64.b64encode(b"a-very-secret-key").decode()
 OTHER_SECRET = "whsec_" + base64.b64encode(b"another-secret-key").decode()
@@ -36,17 +38,18 @@ BODY = json.dumps(
 )
 
 
-class FrozenDatetime(datetime):
-    @classmethod
-    def now(cls, tz: tzinfo | None = None) -> FrozenDatetime:
-        return cls.fromtimestamp(NOW, tz)
-
-
 @pytest.fixture(autouse=True)
 def frozen_clock(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(time, "time", lambda: float(NOW))
-    # The Standard Webhooks library's clock, for its verify().
-    monkeypatch.setattr(standardwebhooks.webhooks, "datetime", FrozenDatetime)
+
+
+@pytest.fixture
+def real_now(monkeypatch: pytest.MonkeyPatch) -> int:
+    """The time now, Nohead's clock frozen at it: what the library signs at it, it
+    accepts while the test runs."""
+    now = int(datetime.now(UTC).timestamp())  # the library's clock, which isn't frozen
+    monkeypatch.setattr(time, "time", lambda: float(now))
+    return now
 
 
 def sign(
@@ -173,6 +176,9 @@ def test_from_either_client(make: Make) -> None:
 def test_accepts_timestamps_up_to_the_tolerance_off() -> None:
     for timestamp in (NOW - 300, NOW + 300):
         assert unwrap(BODY, sign(BODY, timestamp), secret=SECRET).id == "wev_1"
+    for timestamp in (NOW - 301, NOW + 301):
+        with pytest.raises(WebhookVerificationError):
+            unwrap(BODY, sign(BODY, timestamp), secret=SECRET)
     old = sign(BODY, NOW - 600)
     assert unwrap(BODY, old, secret=SECRET, tolerance=600).id == "wev_1"
     with pytest.raises(WebhookVerificationError):
@@ -237,9 +243,9 @@ NON_ASCII_BODY = json.dumps(
 @pytest.mark.parametrize("body", [BODY, NON_ASCII_BODY], ids=["ascii", "non-ascii"])
 @pytest.mark.parametrize("as_bytes", [False, True], ids=["str", "bytes"])
 def test_accepts_what_the_standard_webhooks_library_signs(
-    secret: str, body: str, as_bytes: bool
+    secret: str, body: str, as_bytes: bool, real_now: int
 ) -> None:
-    headers = sign(body, secret=secret)
+    headers = sign(body, real_now, secret=secret)
     received = body.encode() if as_bytes else body
     sent = json.loads(body)
     assert standardwebhooks.Webhook(secret).verify(received, headers) == sent
@@ -254,14 +260,16 @@ def test_accepts_what_the_standard_webhooks_library_signs(
     [[0, 1, 2], [2, 1, 0], [1, 0, 2]],
     ids=["matching first", "matching last", "matching in the middle"],
 )
-def test_accepts_one_matching_signature_among_several(order: list[int]) -> None:
+def test_accepts_one_matching_signature_among_several(order: list[int], real_now: int) -> None:
     # As during a secret rotation: one signature per secret, and one of another version.
     signatures = [
-        sign(NON_ASCII_BODY, secret=API_SECRET)["webhook-signature"],
-        sign(NON_ASCII_BODY, secret=OTHER_SECRET)["webhook-signature"].replace("v1,", "v2,"),
-        sign(NON_ASCII_BODY, secret=OTHER_SECRET)["webhook-signature"],
+        sign(NON_ASCII_BODY, real_now, secret=API_SECRET)["webhook-signature"],
+        sign(NON_ASCII_BODY, real_now, secret=OTHER_SECRET)["webhook-signature"].replace(
+            "v1,", "v2,"
+        ),
+        sign(NON_ASCII_BODY, real_now, secret=OTHER_SECRET)["webhook-signature"],
     ]
-    headers = sign(NON_ASCII_BODY, secret=API_SECRET) | {
+    headers = sign(NON_ASCII_BODY, real_now, secret=API_SECRET) | {
         "webhook-signature": " ".join(signatures[i] for i in order)
     }
     assert standardwebhooks.Webhook(API_SECRET).verify(NON_ASCII_BODY, headers)
@@ -270,21 +278,30 @@ def test_accepts_one_matching_signature_among_several(order: list[int]) -> None:
 
 
 @pytest.mark.parametrize(
-    ("body", "headers", "secret"),
+    ("body", "signed", "secret"),
     [
-        (NON_ASCII_BODY.replace("東京", "大阪"), sign(NON_ASCII_BODY), SECRET),
-        (NON_ASCII_BODY.replace("ë", "e"), sign(NON_ASCII_BODY), SECRET),
-        (BODY.replace("Hi", "Bye"), sign(BODY), SECRET),
-        (BODY, sign(BODY), OTHER_SECRET),
-        (BODY, sign(BODY, secret=API_SECRET), SECRET),
-        (BODY, sign(BODY, NOW - 301), SECRET),
-        (BODY, sign(BODY, NOW - 86400), SECRET),
-        (BODY, sign(BODY, NOW + 301), SECRET),
-        (BODY, sign(BODY) | {"webhook-id": "msg_2"}, SECRET),
-        (BODY, {k: v.replace("v1,", "v2,") for k, v in sign(BODY).items()}, SECRET),
-        (BODY, {k: v for k, v in sign(BODY).items() if k != "webhook-signature"}, SECRET),
-        (BODY, {}, SECRET),
-        (BODY, sign(BODY) | {"webhook-timestamp": "soon"}, SECRET),
+        (NON_ASCII_BODY.replace("東京", "大阪"), lambda now: sign(NON_ASCII_BODY, now), SECRET),
+        (NON_ASCII_BODY.replace("ë", "e"), lambda now: sign(NON_ASCII_BODY, now), SECRET),
+        (BODY.replace("Hi", "Bye"), lambda now: sign(BODY, now), SECRET),
+        (BODY, lambda now: sign(BODY, now), OTHER_SECRET),
+        (BODY, lambda now: sign(BODY, now, secret=API_SECRET), SECRET),
+        (BODY, lambda now: sign(BODY, now - 301), SECRET),
+        (BODY, lambda now: sign(BODY, now - 86400), SECRET),
+        # 30 s past the tolerance: the library's clock runs on while the test does.
+        (BODY, lambda now: sign(BODY, now + 330), SECRET),
+        (BODY, lambda now: sign(BODY, now) | {"webhook-id": "msg_2"}, SECRET),
+        (
+            BODY,
+            lambda now: {k: v.replace("v1,", "v2,") for k, v in sign(BODY, now).items()},
+            SECRET,
+        ),
+        (
+            BODY,
+            lambda now: {k: v for k, v in sign(BODY, now).items() if k != "webhook-signature"},
+            SECRET,
+        ),
+        (BODY, lambda now: {}, SECRET),
+        (BODY, lambda now: sign(BODY, now) | {"webhook-timestamp": "soon"}, SECRET),
     ],
     ids=[
         "tampered non-ascii body",
@@ -303,8 +320,9 @@ def test_accepts_one_matching_signature_among_several(order: list[int]) -> None:
     ],
 )
 def test_rejects_what_the_standard_webhooks_library_rejects(
-    body: str, headers: dict[str, str], secret: str
+    body: str, signed: Callable[[int], dict[str, str]], secret: str, real_now: int
 ) -> None:
+    headers = signed(real_now)
     with pytest.raises(standardwebhooks.WebhookVerificationError):
         standardwebhooks.Webhook(secret).verify(body, headers)
     # Only WebhookVerificationError: any other exception fails the test.

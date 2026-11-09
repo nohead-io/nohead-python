@@ -27,6 +27,9 @@ from .spec import example_of
 TIMEOUT = 0.25
 """The clients' timeout here, in seconds: short, so the tests are fast."""
 
+SHORT = 0.15
+"""The timeout of the test that waits it out."""
+
 
 @dataclass
 class Seen:
@@ -246,21 +249,22 @@ async def test_the_timeout_is_for_no_progress_not_the_whole_response(
 
 async def test_times_out_when_the_response_stalls(server: LocalServer, connect: Connect) -> None:
     server.routes = {("GET", "/v1/records/rec_1"): trickle(9, 0.0, stall=True)}
-    nohead = connect(max_retries=0)
-    with pytest.raises(APITimeoutError, match=rf"timed out after {TIMEOUT} s"):
+    nohead = connect(max_retries=0, timeout=SHORT)
+    with pytest.raises(APITimeoutError) as caught:
         await resolve(nohead.records.get("rec_1"))
+    assert str(caught.value) == f"The request to 127.0.0.1 timed out after {SHORT} s"
     assert len(server.seen) == 1
 
 
-@pytest.mark.parametrize("status", [301, 302])
 @pytest.mark.parametrize("follow_redirects", [False, True], ids=["default", "following"])
 async def test_does_not_follow_a_redirect(
-    server: LocalServer, connect: Connect, status: int, follow_redirects: bool
+    server: LocalServer, connect: Connect, follow_redirects: bool
 ) -> None:
+    # The statuses and messages are test_errors.py's: this is httpx's behaviour.
     def moved(handler: Handler) -> None:
         body = b"<html>Moved</html>"
         location = f"{server.url}/v1/records/rec_2"
-        handler.head(status, len(body), {"Location": location, "Content-Type": "text/html"})
+        handler.head(302, len(body), {"Location": location, "Content-Type": "text/html"})
         handler.wfile.write(body)
 
     server.routes = {
@@ -271,7 +275,7 @@ async def test_does_not_follow_a_redirect(
     with pytest.raises(APIError) as caught:
         await resolve(nohead.records.get("rec_1"))
     assert type(caught.value) is APIError
-    assert (caught.value.status, caught.value.type) == (status, "redirect")
+    assert (caught.value.status, caught.value.type) == (302, "redirect")
     assert f"redirect to {server.url}/v1/records/rec_2" in str(caught.value)
     assert [s.path for s in server.seen] == ["/v1/records/rec_1"]
 
@@ -285,9 +289,10 @@ async def test_a_malformed_response_is_a_connection_error(
 
     server.routes = {("GET", "/v1/records/rec_1"): garbage}
     nohead = connect(max_retries=1)
-    with pytest.raises(APIConnectionError, match=r"Could not reach 127\.0\.0\.1") as caught:
+    with pytest.raises(APIConnectionError) as caught:
         await resolve(nohead.records.get("rec_1"))
     assert not isinstance(caught.value, APITimeoutError)
+    assert str(caught.value).startswith("Could not reach 127.0.0.1: ")
     assert isinstance(caught.value.__cause__, httpx.RemoteProtocolError)
     # Like a dropped connection, retried.
     assert len(server.seen) == 2

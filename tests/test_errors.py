@@ -12,7 +12,6 @@ from nohead import (
     ConflictError,
     InternalServerError,
     InvalidRequestError,
-    Nohead,
     NotFoundError,
     PlanLimitExceededError,
     PreconditionFailedError,
@@ -21,7 +20,7 @@ from nohead import (
     ValidationError,
 )
 
-from .conftest import Make, Recorder, api_error, raw, resolve
+from .conftest import Make, api_error, raw, resolve
 from .spec import SPEC
 
 
@@ -144,12 +143,3 @@ async def test_refuses_a_redirect_without_a_location(make: Make) -> None:
         "redirect",
         "The API answered with a redirect; check the base URL",
     )
-
-
-def test_does_not_follow_redirects_even_when_the_http_client_does() -> None:
-    recorder = Recorder([raw(httpx.Response(301, headers={"location": "https://elsewhere.test/"}))])
-    http = httpx.Client(transport=httpx.MockTransport(recorder), follow_redirects=True)
-    nohead = Nohead(api_key="k", base_url="https://api.test", project_id="prj_1", http_client=http)
-    with pytest.raises(APIError, match=r"redirect to https://elsewhere\.test/"):
-        nohead.records.get("rec_1")
-    assert [c.url.host for c in recorder.calls] == ["api.test"]
