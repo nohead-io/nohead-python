@@ -9,8 +9,8 @@ section is its GitHub release's notes.
 
 - A response whose compressed body can't be decompressed raises
   `APIConnectionError` ("The response from … could not be read") and is
-  retried like a dropped connection, as in the TypeScript and Ruby SDKs.
-  Before, httpx's own `DecodingError` reached your code, and the request
+  retried like a dropped connection, as the TypeScript and Ruby SDKs retry
+  it. Before, httpx's own `DecodingError` reached your code, and the request
   wasn't retried. For an upload's bytes, it is the `UploadError`'s cause.
 
 ## 0.20.0

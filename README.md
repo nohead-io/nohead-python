@@ -226,7 +226,7 @@ except ValidationError as error:
 
 Failed requests are retried twice by default (`max_retries`), with exponential backoff:
 
-- what's retried: connection errors, timeouts, 429, 500, 502, 503, 504, and a 409 for a request that is still running
+- what's retried: connection errors (a response that can't be read included), timeouts, 429, 500, 502, 503, 504, and a 409 for a request that is still running
 - `Retry-After` is honored up to 60 seconds; a longer one raises `RateLimitError` straight away. It is a number of seconds (`5`, `1.5`) or an HTTP date; anything else is ignored, and the usual backoff applies
 
 `on_retry` is called before each retry's wait, also for an upload's bytes, with a `RetryEvent`: the `attempt` (1 for the first retry), the `delay` in seconds, the `url`, and the `status` that failed (None when the connection did) and the `error` (an `APIError` or `APIConnectionError`; None for a status from storage):
