@@ -76,6 +76,7 @@ RETRIES: list[tuple[str, httpx.Response | Exception, list[float] | None]] = [
     ],
     ("connection error", httpx.ConnectError("refused"), [BACKOFF_WAIT]),
     ("dropped connection", httpx.RemoteProtocolError("Server disconnected"), [BACKOFF_WAIT]),
+    ("corrupt compressed body", httpx.DecodingError("incorrect header check"), [BACKOFF_WAIT]),
     ("timeout", httpx.ReadTimeout("slow"), [BACKOFF_WAIT]),
 ]
 

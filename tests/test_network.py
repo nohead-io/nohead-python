@@ -296,3 +296,24 @@ async def test_a_malformed_response_is_a_connection_error(
     assert isinstance(caught.value.__cause__, httpx.RemoteProtocolError)
     # Like a dropped connection, retried.
     assert len(server.seen) == 2
+
+
+async def test_a_corrupt_compressed_body_is_a_connection_error(
+    server: LocalServer, connect: Connect
+) -> None:
+    def corrupt(handler: Handler) -> None:
+        body = b"not gzip at all"
+        handler.head(
+            200, len(body), {"Content-Type": "application/json", "Content-Encoding": "gzip"}
+        )
+        handler.wfile.write(body)
+
+    server.routes = {("GET", "/v1/records/rec_1"): corrupt}
+    nohead = connect(max_retries=1)
+    with pytest.raises(
+        APIConnectionError, match=r"^The response from 127\.0\.0\.1 could not be read: "
+    ) as caught:
+        await resolve(nohead.records.get("rec_1"))
+    assert isinstance(caught.value.__cause__, httpx.DecodingError)
+    # Like a malformed response, retried.
+    assert len(server.seen) == 2
