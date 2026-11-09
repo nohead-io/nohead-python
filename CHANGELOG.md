@@ -5,6 +5,14 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- A response whose compressed body can't be decompressed raises
+  `APIConnectionError` ("The response from … could not be read") and is
+  retried like a dropped connection, as in the TypeScript and Ruby SDKs.
+  Before, httpx's own `DecodingError` reached your code, and the request
+  wasn't retried. For an upload's bytes, it is the `UploadError`'s cause.
+
 ## 0.20.0
 
 - The docs of `PrincipalApiKey.collections` say what it counts since the API

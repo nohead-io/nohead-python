@@ -154,7 +154,7 @@ class APIClient:
                     timeout=settings.timeout,
                     follow_redirects=False,
                 )
-            except httpx.TransportError as error:
+            except _base.TRANSPORT_ERRORS as error:
                 failure = _connection_error(error, settings.timeout, url)
                 if attempt >= settings.max_retries or not _retryable(error):
                     raise failure from error
@@ -206,7 +206,7 @@ class APIClient:
                 if response.status_code not in _base.RETRYABLE_STATUSES or attempt >= retries:
                     return response
                 failed = {"status": response.status_code}
-            except httpx.TransportError as error:
+            except _base.TRANSPORT_ERRORS as error:
                 failure = _connection_error(error, settings.timeout, url)
                 if attempt >= retries or not _retryable(error):
                     raise UploadError(f"Could not upload {source.filename}: {failure}") from failure
@@ -217,18 +217,18 @@ class APIClient:
             attempt += 1
 
 
-def _retryable(error: httpx.TransportError) -> bool:
+def _retryable(error: httpx.RequestError) -> bool:
     return isinstance(error, _base.RETRYABLE_TRANSPORT_ERRORS)
 
 
-def _connection_error(error: httpx.TransportError, timeout: float, url: str) -> NoheadError:
+def _connection_error(error: httpx.RequestError, timeout: float, url: str) -> NoheadError:
     """The SDK's error for `error`, with `error` as its cause."""
     failure = _failure(error, timeout, url)
     failure.__cause__ = error
     return failure
 
 
-def _failure(error: httpx.TransportError, timeout: float, url: str) -> NoheadError:
+def _failure(error: httpx.RequestError, timeout: float, url: str) -> NoheadError:
     if not _retryable(error):
         # The request itself can't be sent (an unsupported URL scheme, say): not a
         # connection problem.
@@ -236,4 +236,6 @@ def _failure(error: httpx.TransportError, timeout: float, url: str) -> NoheadErr
     host = httpx.URL(url).host
     if isinstance(error, httpx.TimeoutException):
         return APITimeoutError(f"The request to {host} timed out after {timeout} s")
+    if isinstance(error, httpx.DecodingError):
+        return APIConnectionError(f"The response from {host} could not be read: {error}")
     return APIConnectionError(f"Could not reach {host}: {error}")

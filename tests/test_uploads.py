@@ -221,6 +221,11 @@ async def test_gives_up_when_storage_fails_every_attempt(make: Make) -> None:
             APITimeoutError,
             "The request to storage.test timed out after 60.0 s",
         ),
+        (
+            httpx.DecodingError("incorrect header check"),
+            APIConnectionError,
+            "The response from storage.test could not be read: incorrect header check",
+        ),
     ],
 )
 async def test_storage_out_of_reach(

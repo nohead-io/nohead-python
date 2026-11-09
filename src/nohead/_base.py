@@ -35,11 +35,15 @@ T = TypeVar("T")
 
 DEFAULT_BASE_URL = "https://api.nohead.io"
 RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
+TRANSPORT_ERRORS = (httpx.TransportError, httpx.DecodingError)
+"""What httpx raises when a request fails on the way there or back: a transport error,
+or a response body it can't decompress."""
 RETRYABLE_TRANSPORT_ERRORS = (
     httpx.TimeoutException,
     httpx.NetworkError,
     httpx.RemoteProtocolError,  # a dropped connection
     httpx.ProxyError,
+    httpx.DecodingError,  # a corrupt compressed body
 )
 """Transport errors a retry can fix. The others (an unsupported URL scheme, a header
 httpx can't send) fail the same way every time."""
