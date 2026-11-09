@@ -5,6 +5,13 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## 0.20.0
+
+- The docs of `PrincipalApiKey.collections` say what it counts since the API
+  limits collections per project: the key's project's active collections, and
+  how many the plan allows in one project. Nothing else changed: the SDKs
+  share one version, and this release matches the TypeScript SDK's 0.20.0.
+
 ## 0.19.0
 
 - **Breaking:** `image_url` refuses a processing option image URLs don't take,
