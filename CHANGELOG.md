@@ -5,6 +5,15 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- The field configuration types in `nohead.params` follow the API's search
+  options: `included` on every field, `expanded` on asset and relation
+  fields, and `searched` on relation fields, for what public search hits
+  return and match. `searchable` on boolean, date and asset fields is
+  `Literal[False]` only, since the API refuses `True` there (they hold no
+  words to match).
+
 ## 0.21.0
 
 - A response whose compressed body can't be decompressed raises
