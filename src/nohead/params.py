@@ -10,7 +10,7 @@ from typing import Any, Literal, NotRequired, TypeAlias, TypedDict
 class AssetFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[Literal[false]]
+    searchable: NotRequired[Literal[False]]
     """An asset field is indexed as an asset ID, with no words for searches to match, so it
     can't be searchable.
     """
@@ -96,7 +96,7 @@ class AssetUploadCreate(TypedDict):
 class BooleanFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[Literal[false]]
+    searchable: NotRequired[Literal[False]]
     """A boolean field has no words for searches to match, so it can't be searchable."""
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""
@@ -132,7 +132,7 @@ class CollectionUpdate(TypedDict):
 class DateFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[Literal[false]]
+    searchable: NotRequired[Literal[False]]
     """A date field has no words for searches to match, so it can't be searchable."""
     filterable: NotRequired[bool]
     """API searches can filter on it. Default false."""
