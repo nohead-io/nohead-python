@@ -39,6 +39,11 @@ def ref_name(schema: Schema) -> str | None:
     return ref.rsplit("/", 1)[1] if isinstance(ref, str) else None
 
 
+def literal(value: Any) -> str:
+    """A value as Python source for a Literal: True and False, not JSON's true and false."""
+    return repr(value) if isinstance(value, bool) else json.dumps(value)
+
+
 def pascal(name: str) -> str:
     return "".join(part[:1].upper() + part[1:] for part in re.split(r"[_\W]+", name) if part)
 
@@ -105,13 +110,13 @@ class Generator:
         if "const" in schema:
             value = schema["const"]
             if self.mode == "params":
-                return f"Literal[{json.dumps(value)}]"
+                return f"Literal[{literal(value)}]"
             return {bool: "bool", int: "int", float: "float"}.get(type(value), "str")
         if "enum" in schema:
             values = [v for v in schema["enum"] if v is not None]
             nullable = None in schema["enum"]
             if self.mode == "params":
-                base = f"Literal[{', '.join(json.dumps(v) for v in values)}]"
+                base = f"Literal[{', '.join(literal(v) for v in values)}]"
             else:
                 base = "str" if all(isinstance(v, str) for v in values) else "Any"
             return f"{base} | None" if nullable else base
