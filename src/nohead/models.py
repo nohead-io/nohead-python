@@ -157,6 +157,10 @@ class TextFieldConfiguration(NoheadModel):
     """API searches can filter on it. Default false."""
     sortable: bool | None = None
     """API searches can sort on it (one value only). Default false."""
+    included: bool | None = None
+    """Public search hits (search tokens) include the field. Default true. A field not included
+    can still be searched, filtered and sorted on.
+    """
     min_length: int | None = None
     max_length: int | None = None
     format: str | None = None
@@ -182,6 +186,10 @@ class LongTextFieldConfiguration(NoheadModel):
     """API searches can filter on it. Default false."""
     sortable: bool | None = None
     """API searches can sort on it (one value only). Default false."""
+    included: bool | None = None
+    """Public search hits (search tokens) include the field. Default true. A field not included
+    can still be searched, filtered and sorted on.
+    """
     min_length: int | None = None
     max_length: int | None = None
 
@@ -201,6 +209,10 @@ class RichTextFieldConfiguration(NoheadModel):
     """API searches can filter on it. Default false."""
     sortable: bool | None = None
     """API searches can sort on it (one value only). Default false."""
+    included: bool | None = None
+    """Public search hits (search tokens) include the field. Default true. A field not included
+    can still be searched, filtered and sorted on.
+    """
 
 
 class IntegerFieldConfiguration(NoheadModel):
@@ -214,6 +226,10 @@ class IntegerFieldConfiguration(NoheadModel):
     """API searches can filter on it. Default false."""
     sortable: bool | None = None
     """API searches can sort on it (one value only). Default false."""
+    included: bool | None = None
+    """Public search hits (search tokens) include the field. Default true. A field not included
+    can still be searched, filtered and sorted on.
+    """
     min: int | None = None
     max: int | None = None
     unique: bool | None = None
@@ -231,6 +247,10 @@ class DecimalFieldConfiguration(NoheadModel):
     """API searches can filter on it. Default false."""
     sortable: bool | None = None
     """API searches can sort on it (one value only). Default false."""
+    included: bool | None = None
+    """Public search hits (search tokens) include the field. Default true. A field not included
+    can still be searched, filtered and sorted on.
+    """
     min: float | None = None
     max: float | None = None
 
@@ -238,14 +258,16 @@ class DecimalFieldConfiguration(NoheadModel):
 class DateFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
-    searchable: bool | None = None
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
+    searchable: Any = None
+    """A date field has no words for searches to match, so it can't be searchable."""
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
     sortable: bool | None = None
     """API searches can sort on it (one value only). Default false."""
+    included: bool | None = None
+    """Public search hits (search tokens) include the field. Default true. A field not included
+    can still be searched, filtered and sorted on.
+    """
     include_time: bool | None = None
     """Holds a moment (ISO 8601 with an offset) instead of a calendar date; changing it is a
     field migration.
@@ -259,14 +281,16 @@ class DateFieldConfiguration(NoheadModel):
 class BooleanFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
-    searchable: bool | None = None
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
+    searchable: Any = None
+    """A boolean field has no words for searches to match, so it can't be searchable."""
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
     sortable: bool | None = None
     """API searches can sort on it (one value only). Default false."""
+    included: bool | None = None
+    """Public search hits (search tokens) include the field. Default true. A field not included
+    can still be searched, filtered and sorted on.
+    """
 
 
 class EnumFieldConfiguration(NoheadModel):
@@ -280,20 +304,36 @@ class EnumFieldConfiguration(NoheadModel):
     """API searches can filter on it. Default false."""
     sortable: bool | None = None
     """API searches can sort on it (one value only). Default false."""
+    included: bool | None = None
+    """Public search hits (search tokens) include the field. Default true. A field not included
+    can still be searched, filtered and sorted on.
+    """
     options: list[str]
 
 
 class AssetFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
-    searchable: bool | None = None
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
+    searchable: Any = None
+    """An asset field is indexed as an asset ID, with no words for searches to match, so it
+    can't be searchable.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
     sortable: bool | None = None
     """API searches can sort on it (one value only). Default false."""
+    included: bool | None = None
+    """Public search hits (search tokens) include the field. Default true. A field not included
+    can still be searched, filtered and sorted on.
+    """
+    expanded: list[str] | None = None
+    """What public search hits return of the field's assets under `expanded`, while it's
+    included: any of an image's `image_url`, `dimensions` (as `width` and `height`) and
+    `alt`, and any file's `file_url`, `filename` and `content_type`, as the API's assets
+    have them. By default an image's URL and dimensions where the field takes images, and a
+    file's URL and filename where it takes other files (`accepted_types`; both when it takes
+    any file). API reads expand what `?expand=` asks for.
+    """
     accepted_types: list[str] | None = None
     """MIME types or `type/*` wildcards newly written values must have (`["image/*",
     "application/pdf"]`); any file when absent.
@@ -304,13 +344,32 @@ class RelationFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
     searchable: bool | None = None
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
+    """Search words match the related fields `searched` lists, in every search (API keys,
+    search tokens, members). Default false.
     """
     filterable: bool | None = None
     """API searches can filter on it. Default false."""
     sortable: bool | None = None
     """API searches can sort on it (one value only). Default false."""
+    included: bool | None = None
+    """Public search hits (search tokens) include the field. Default true. A field not included
+    can still be searched, filtered and sorted on.
+    """
+    expanded: list[str] | None = None
+    """The related collection's fields, by ID (`fld_...`), that public search hits return of
+    each published related record under `expanded`, while the field is included, by their
+    current keys (a list holds the first 100 related records that exist). None by default:
+    the IDs only, whether or not the related collection is in public search. A filterable
+    relation field also filters on them. API reads expand what `?expand=` asks for.
+    """
+    searched: list[str] | None = None
+    """The related collection's fields, by ID (`fld_...`), whose words searches match in each
+    published related record while the field is `searchable`, in every search, whether or
+    not hits return them; only text, long text, rich text and enum fields are matched. None
+    by default. A filterable relation field also filters on them: under
+    `expanded.<key>.data.<field>` when hits return them, `expanded.<key>.searched.<field>`
+    when they don't.
+    """
     target_collection_id: str
     """The collection (same project) whose records it points at."""
 
@@ -331,6 +390,10 @@ class JsonFieldConfiguration(NoheadModel):
     """API searches can filter on it. Default false."""
     sortable: bool | None = None
     """API searches can sort on it (one value only). Default false."""
+    included: bool | None = None
+    """Public search hits (search tokens) include the field. Default true. A field not included
+    can still be searched, filtered and sorted on.
+    """
 
 
 class RecordCount(NoheadModel):
@@ -450,6 +513,13 @@ class FieldConfigurationChange(NoheadModel):
     searchable: bool | None = None
     filterable: bool | None = None
     sortable: bool | None = None
+    included: bool | None = None
+    expanded: list[str] | None = None
+    """For an asset field, parts of its assets (`image_url`, `dimensions`, `alt`, `file_url`,
+    `filename`, `content_type`); for a relation field, field IDs of the related collection.
+    """
+    searched: list[str] | None = None
+    """For a relation field, field IDs of the related collection whose words searches match."""
     min_length: int | None = None
     max_length: int | None = None
     format: str | None = None
@@ -486,7 +556,9 @@ class Collection(NoheadModel):
     """Whether the project's search tokens (made in the web app) find its published records,
     from a browser or a backend. Off by default: every field of those records becomes
     readable by anyone with a token, so turn it on only for collections whose published
-    records are public. A change reaches search tokens within seconds.
+    records are public. A change reaches search tokens within seconds. Off, its fields can
+    still come along with hits of another collection that is on, through a relation field's
+    `expanded` and `searched`.
     """
     fields: list[Field]
     """Active fields in position order."""
