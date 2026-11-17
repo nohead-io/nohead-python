@@ -5,7 +5,7 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
-## Unreleased
+## 0.22.0
 
 - `ValidationError.field_errors`: the first message for each field, by its
   key (`{"email": "is required"}`), to show beside a form's fields.
