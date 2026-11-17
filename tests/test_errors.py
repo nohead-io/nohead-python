@@ -82,6 +82,52 @@ async def test_details_that_do_not_match_keep_what_they_say(make: Make) -> None:
     assert (error.details[1].code, error.details[1].message) == ("unknown", "odd")
 
 
+@pytest.mark.parametrize(
+    ("details", "field_errors"),
+    [
+        ([], {}),
+        (
+            [
+                {"field": "title", "code": "required", "message": "is required"},
+                {"field": "slug", "code": "taken", "message": "is already used"},
+            ],
+            {"title": "is required", "slug": "is already used"},
+        ),
+        (
+            [
+                {"field": "title", "code": "too_long", "message": "is too long"},
+                {"field": "title", "code": "invalid", "message": "is invalid"},
+            ],
+            {"title": "is too long"},
+        ),
+        (
+            [
+                {"code": "draft_exists", "message": "has a draft"},
+                {"field": "", "code": "required", "message": "is required"},
+            ],
+            {},
+        ),
+    ],
+)
+async def test_field_errors(
+    make: Make, details: list[dict[str, str]], field_errors: dict[str, str]
+) -> None:
+    error = await failure(make, api_error(422, "validation_error", details=details))
+    assert isinstance(error, ValidationError)
+    assert error.field_errors == field_errors
+
+
+async def test_field_errors_skip_fields_that_are_not_text(make: Make) -> None:
+    details = [
+        {"field": ["a"], "code": "x"},
+        {"field": "title", "code": "y", "message": "is invalid"},
+    ]
+    response = raw(api_error(422, "validation_error", details=details))
+    error = await failure(make, response)
+    assert isinstance(error, ValidationError)
+    assert error.field_errors == {"title": "is invalid"}
+
+
 async def test_current_revision(make: Make) -> None:
     detail = {
         "code": "revision_mismatch",

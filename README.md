@@ -196,7 +196,7 @@ Every exception is a `NoheadError`. API errors are `APIError`s with `status`, `t
 | `NotFoundError` | 404 |
 | `ConflictError` | 409 |
 | `PreconditionFailedError` | 412 (`current_revision`) |
-| `ValidationError` | 422 |
+| `ValidationError` | 422 (`field_errors`) |
 | `RateLimitError` | 429 (`retry_after`) |
 | `InternalServerError` | 500 and other 5xx |
 | `ServiceUnavailableError` | 503 |
@@ -212,14 +212,18 @@ Other errors:
 
 Values that can't be sent raise Python's own errors before sending: `TypeError` for an `if_match` that isn't a revision number and has no `revision`, and `ValueError` for a `datetime` without a time zone, `nan` or an infinity.
 
+A form that writes a record shows a `ValidationError`'s `field_errors` beside its fields: the first message for each field, by its key. `details` has every problem with its `code` (`required`, `taken`), for words of your own.
+
 ```python
 from nohead import ValidationError
 
-try:
-    nohead.records.create("posts", data={})
-except ValidationError as error:
-    for detail in error.details:
-        print(detail.field, detail.code, detail.message)
+
+def apply(name: str, email: str) -> dict[str, object]:
+    try:
+        nohead.records.create("applications", data={"name": name, "email": email})
+    except ValidationError as error:
+        return {"sent": False, "errors": error.field_errors}  # {"email": "is required"}
+    return {"sent": True}
 ```
 
 ## Retries and idempotency
