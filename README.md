@@ -217,10 +217,13 @@ A form that writes a record shows a `ValidationError`'s `field_errors` beside it
 ```python
 from nohead import ValidationError
 
-try:
-    nohead.records.create("applications", data={"name": name, "email": email})
-except ValidationError as error:
-    return {"errors": error.field_errors}  # {"email": "is required"}
+
+def apply(name: str, email: str) -> dict[str, object]:
+    try:
+        nohead.records.create("applications", data={"name": name, "email": email})
+    except ValidationError as error:
+        return {"sent": False, "errors": error.field_errors}  # {"email": "is required"}
+    return {"sent": True}
 ```
 
 ## Retries and idempotency

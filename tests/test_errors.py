@@ -117,6 +117,17 @@ async def test_field_errors(
     assert error.field_errors == field_errors
 
 
+async def test_field_errors_skip_fields_that_are_not_text(make: Make) -> None:
+    details = [
+        {"field": ["a"], "code": "x"},
+        {"field": "title", "code": "y", "message": "is invalid"},
+    ]
+    response = raw(api_error(422, "validation_error", details=details))
+    error = await failure(make, response)
+    assert isinstance(error, ValidationError)
+    assert error.field_errors == {"title": "is invalid"}
+
+
 async def test_current_revision(make: Make) -> None:
     detail = {
         "code": "revision_mismatch",

@@ -101,8 +101,10 @@ class ValidationError(APIError):
         `details` keeps their codes."""
         errors: dict[str, str] = {}
         for detail in self.details:
-            if detail.field and detail.field not in errors:
-                errors[detail.field] = detail.message
+            # A detail that didn't validate keeps its `field` as it came.
+            field: object = detail.field
+            if isinstance(field, str) and field and field not in errors:
+                errors[field] = detail.message
         return errors
 
 
