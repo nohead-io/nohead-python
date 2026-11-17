@@ -94,7 +94,16 @@ class PreconditionFailedError(APIError):
 
 
 class ValidationError(APIError):
-    pass
+    @property
+    def field_errors(self) -> dict[str, str]:
+        """The first message for each field, by its key: `{"title": "is required"}`,
+        to show beside a form's fields. Details without a field are left out;
+        `details` keeps their codes."""
+        errors: dict[str, str] = {}
+        for detail in self.details:
+            if detail.field and detail.field not in errors:
+                errors[detail.field] = detail.message
+        return errors
 
 
 class RateLimitError(APIError):
