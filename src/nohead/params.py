@@ -489,7 +489,9 @@ class RelationFieldCreate(FieldCreateProperties):
 
 class RichTextFieldConfiguration(TypedDict):
     """A rich text document up to 1,000,000 bytes (`too_large`), written as Markdown or a
-    document (see `RecordData`).
+    document (see `RecordData`). `min_length` and `max_length` count its text as a reader
+    reads it: its characters, and a line break between blocks and for each hard break; not
+    markup, Markdown syntax or images.
     """
 
     description: NotRequired[str]
@@ -506,6 +508,12 @@ class RichTextFieldConfiguration(TypedDict):
     """Public search hits (search tokens) include the field. Default true. A field not included
     can still be searched, filtered and sorted on.
     """
+    min_length: NotRequired[int]
+    """The fewest characters of text a value may have (`too_short`); an empty document has no
+    value, which `required` asks for.
+    """
+    max_length: NotRequired[int]
+    """The most characters of text a value may have (`too_long`)."""
 
 
 class RichTextFieldCreate(FieldCreateProperties):
