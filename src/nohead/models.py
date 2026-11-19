@@ -1142,6 +1142,24 @@ class WebhookProperties(NoheadModel):
     redactions, uploads and purges are never sent. `webhook.test` always is.
     """
     enabled: bool
+    last_attempt_at: NullableTimestamp
+    """When a delivery to it was last attempted; null before the first attempt."""
+    last_status_code: int | None
+    """The HTTP status the last attempt got; null if it got no response (`last_error` says why)
+    or before the first attempt.
+    """
+    last_error: str | None
+    """Why the last attempt got no response, such as a timeout or a refused connection; null
+    when it got one.
+    """
+    last_succeeded_at: NullableTimestamp
+    """When an attempt last got a 2xx response; null if none has."""
+    failing_since: NullableTimestamp
+    """When its attempts started failing: set by a failed attempt after a success (or by a
+    first attempt that fails), and cleared by the next success. Null while it works, and
+    before the first attempt. To check a webhook at once, send it a test event (`POST
+    /v1/webhooks/{webhook_id}/test`).
+    """
     deleted_at: NullableTimestamp
     """When the webhook was deleted; null unless it is."""
     purge_after: NullableTimestamp
