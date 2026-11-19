@@ -31,7 +31,7 @@ from .models import (
     Webhook,
 )
 
-__all__ = ["WebhookEvent", "WebhookHeaders", "unwrap"]
+__all__ = ["WebhookEvent", "WebhookHeaders", "WebhookVerificationError", "unwrap"]
 
 M = TypeVar("M", bound=NoheadModel)
 
