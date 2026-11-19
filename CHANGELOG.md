@@ -5,10 +5,16 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
-## Unreleased
+## 0.23.0
 
 - `nohead.webhooks` exports `WebhookVerificationError` too, so a receiver
   imports the error it catches from the same place as `unwrap`.
+- `Webhook` has its health: `last_attempt_at`, `last_status_code`,
+  `last_error`, `last_succeeded_at` and `failing_since`, and
+  `disabled_reason` (`"failing"` when Nohead disabled it after 3 days of
+  failed attempts).
+- The rich text field configuration types take `min_length` and
+  `max_length`, counted on the document's text.
 
 ## 0.22.0
 
