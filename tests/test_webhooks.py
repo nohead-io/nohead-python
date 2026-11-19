@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 import pytest
 import standardwebhooks
 
-from nohead import Asset, NoheadWarning, WebhookVerificationError
+from nohead import Asset, NoheadWarning, WebhookVerificationError, webhooks
 from nohead.models import AssetEventDataAsset
 from nohead.webhooks import unwrap
 
@@ -79,6 +79,12 @@ def test_the_standard_webhooks_spec_example(monkeypatch: pytest.MonkeyPatch) -> 
     assert (event.record, event.revision, event.draft_id) == (None, None, None)
     with pytest.raises(WebhookVerificationError, match="No webhook signature matches"):
         unwrap('{"test": 2432232315}', headers, secret=secret)
+
+
+def test_exports_the_error_it_raises() -> None:
+    # The same class as nohead's, listed so type checkers accept the import.
+    assert "WebhookVerificationError" in webhooks.__all__
+    assert webhooks.WebhookVerificationError is WebhookVerificationError
 
 
 def test_returns_the_event() -> None:
