@@ -99,4 +99,6 @@ def test_refuses_an_empty_fit() -> None:
 
 
 def test_leaves_empty_options_out() -> None:
-    assert image_url(BASE, width=100, gravity="", format=None) == at("rs:fit:100:0")
+    assert image_url(BASE, width=100, gravity="", format=None, options=["", "bl:2", ""]) == at(
+        "rs:fit:100:0/bl:2"
+    )

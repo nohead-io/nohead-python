@@ -66,7 +66,8 @@ def image_url(
     `cover` fills it, cropping, `fill` stretches to it.
     `gravity` is what a crop keeps (`sm` for smart, `fp:0.5:0.3` for a focal
     point); `options` are any other processing options, as written in a URL
-    (`["bl:2"]`): imgproxy's open-source ones (Pro's are refused)."""
+    (`["bl:2"]`): imgproxy's open-source ones (Pro's are refused). Empty options
+    count as unset."""
     if isinstance(image, str):
         base: object = image
     elif isinstance(image, Mapping):
@@ -79,12 +80,12 @@ def image_url(
     if at < 0:
         raise ValueError(f"Not a Nohead image URL: {base}")
 
-    for option in [gravity, *options]:
+    others = [option for option in options if option]
+    for option in [gravity, *others]:
         if option and re.search(r"[/@?#]", option):
             raise ValueError(f"Not an imgproxy option: {option}")
-    for option in options:
-        if option:
-            _check_supported(option)
+    for option in others:
+        _check_supported(option)
 
     if fit is None:
         fit = "contain"
@@ -100,7 +101,7 @@ def image_url(
         segments.append(f"dpr:{_number(dpr)}")
     if quality:
         segments.append(f"q:{_number(quality)}")
-    segments.extend(options)
+    segments.extend(others)
 
     # The source comes last; a format replaces any the URL already names.
     source = base[at:]
