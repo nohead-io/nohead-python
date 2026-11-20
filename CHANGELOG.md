@@ -9,6 +9,9 @@ section is its GitHub release's notes.
 
 - `image_url` leaves empty `options` out, as it does an empty `gravity`,
   rather than writing an empty segment into the URL.
+- `assets.upload` sends at most `byte_size` bytes of a file, and raises
+  `UploadError` when the file has fewer, rather than an error of the HTTP
+  library's.
 
 ## 0.23.0
 

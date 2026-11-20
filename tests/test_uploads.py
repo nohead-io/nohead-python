@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from nohead import (
     APITimeoutError,
     Nohead,
     RetryEvent,
+    Uploadable,
     UploadError,
     ValidationError,
 )
@@ -189,6 +191,31 @@ async def test_does_not_retry_a_stream_it_cannot_send_again(make: Make) -> None:
     assert caught.value.status == 503
     assert [c.method for c in calls.calls] == ["POST", "PUT"]
     assert calls.calls[1].content == b"hello"
+
+
+SOURCES: list[Callable[[], Uploadable]] = [
+    lambda: b"hello world",
+    lambda: io.BytesIO(b"hello world"),
+    lambda: Stream(b"hello world"),
+]
+SOURCE_IDS = ["bytes", "file", "stream"]
+
+
+@pytest.mark.parametrize("source", SOURCES, ids=SOURCE_IDS)
+async def test_sends_byte_size_bytes_at_most(make: Make, source: Callable[[], Uploadable]) -> None:
+    nohead, calls = make([CREATED, STORED, READY])
+    await resolve(nohead.assets.upload(source(), filename="a.txt", byte_size=5))
+    assert calls.body(0)["byte_size"] == 5
+    assert calls.calls[1].content == b"hello"
+
+
+@pytest.mark.parametrize("source", SOURCES, ids=SOURCE_IDS)
+async def test_a_file_shorter_than_its_byte_size(
+    make: Make, source: Callable[[], Uploadable]
+) -> None:
+    nohead, _ = make([CREATED, STORED, READY])
+    with pytest.raises(UploadError, match=r"^Could not upload a.txt: it has 11 bytes, fewer"):
+        await resolve(nohead.assets.upload(source(), filename="a.txt", byte_size=20))
 
 
 async def test_sends_a_file_again_from_where_it_started(make: Make) -> None:

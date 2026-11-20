@@ -33,14 +33,29 @@ class UploadSource:
         return self.data is not None or (self.file is not None and self.file.seekable())
 
     def chunks(self) -> Iterator[bytes]:
+        """The first `byte_size` bytes, the length the upload declared. Raises
+        UploadError when the file ends sooner."""
         if self.data is not None:
-            yield self.data
+            if len(self.data) < self.byte_size:
+                raise self._too_short(len(self.data))
+            yield self.data[: self.byte_size]
             return
         assert self.file is not None
         if self.file.seekable():
             self.file.seek(self.start)
-        while chunk := self.file.read(CHUNK):
+        sent = 0
+        while sent < self.byte_size:
+            chunk = self.file.read(min(CHUNK, self.byte_size - sent))
+            if not chunk:
+                raise self._too_short(sent)
+            sent += len(chunk)
             yield chunk
+
+    def _too_short(self, size: int) -> UploadError:
+        return UploadError(
+            f"Could not upload {self.filename}: it has {size} bytes, fewer than its "
+            f"byte_size ({self.byte_size})"
+        )
 
     def close(self) -> None:
         if self.owned and self.file is not None:
