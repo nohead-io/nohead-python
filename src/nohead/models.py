@@ -1144,7 +1144,7 @@ class WebhookProperties(NoheadModel):
     enabled: bool
     disabled_reason: str | None
     """Why it was disabled, when Nohead did it: `failing`, after its attempts failed for 3
-    days. Its project's owners and admins are emailed after it has failed for a day (an
+    days. Its organization's owners and admins are emailed after it has failed for a day (an
     hour, if it has never worked), and again when it's disabled. Null when it's enabled, or
     was disabled by someone; enabling it again clears it.
     """
@@ -1162,7 +1162,8 @@ class WebhookProperties(NoheadModel):
     """When an attempt last got a 2xx response; null if none has."""
     failing_since: NullableTimestamp
     """When its attempts started failing: set by a failed attempt after a success (or by a
-    first attempt that fails), and cleared by the next success. Null while it works, and
+    first attempt that fails), and cleared by the next success, by enabling it again, by
+    changing its URL, and by restoring it while it's enabled. Null while it works, and
     before the first attempt. To check a webhook at once, send it a test event (`POST
     /v1/webhooks/{webhook_id}/test`).
     """
