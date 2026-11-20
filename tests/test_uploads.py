@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import threading
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -246,9 +247,17 @@ async def test_needs_byte_size_for_a_path_that_is_not_a_file(make: Make) -> None
     # A device's size on disk (0) isn't what it holds.
     nohead, calls = make([CREATED])
     with pytest.raises(
-        UploadError, match=r"^Uploading a\.txt, which is not a file, needs byte_size"
+        UploadError,
+        match=f"^Uploading {re.escape(os.devnull)}, which is not a file, needs byte_size$",
     ):
         await resolve(nohead.assets.upload(os.devnull, filename="a.txt"))
+    assert calls.calls == []
+
+
+async def test_needs_byte_size_for_an_open_device(make: Make) -> None:
+    nohead, calls = make([CREATED])
+    with open(os.devnull, "rb") as device, pytest.raises(UploadError, match="needs byte_size"):
+        await resolve(nohead.assets.upload(device))
     assert calls.calls == []
 
 
@@ -270,13 +279,13 @@ async def test_refuses_a_non_blocking_stream(make: Make) -> None:
     # Nothing written yet: read() returns None rather than waiting.
     reader, writer = os.pipe()
     os.set_blocking(reader, False)
-    try:
-        with os.fdopen(reader, "rb") as stream:
-            nohead, calls = make([CREATED, STORED, READY])
-            with pytest.raises(UploadError, match="non-blocking"):
-                await resolve(nohead.assets.upload(stream, filename="a.txt", byte_size=5))
-    finally:
-        os.close(writer)
+    nohead, calls = make([CREATED, STORED, READY])
+    with (
+        os.fdopen(reader, "rb") as stream,
+        os.fdopen(writer, "wb"),
+        pytest.raises(UploadError, match="non-blocking"),
+    ):
+        await resolve(nohead.assets.upload(stream, filename="a.txt", byte_size=5))
     assert [c.method for c in calls.calls] == ["POST"]
 
 
