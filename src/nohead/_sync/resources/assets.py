@@ -50,7 +50,7 @@ class Assets(Resource):
                 params["alt"] = alt
             created = self.create_upload(idempotency_key=idempotency_key, **params)
             # A replayed start returns the first run's asset, which may be done.
-            if idempotency_key is not None:
+            if idempotency_key:
                 current = self.get(created.id)
                 if current.status == "ready":
                     return current

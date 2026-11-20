@@ -296,5 +296,9 @@ async def test_does_not_follow_a_redirect_from_storage() -> None:
 @pytest.mark.parametrize("filename", ["", None])
 async def test_empty_upload_options_count_as_not_given(make: Make, filename: str | None) -> None:
     nohead, calls = make([CREATED, STORED, READY])
-    await resolve(nohead.assets.upload(b"x", filename=filename, content_type=""))
+    await resolve(
+        nohead.assets.upload(b"x", filename=filename, content_type="", idempotency_key="")
+    )
     assert calls.body(0) == {"filename": "upload", "byte_size": 1}
+    # No key: nothing to resume, so no look at the asset before sending the bytes.
+    assert [c.method for c in calls.calls] == ["POST", "PUT", "POST"]

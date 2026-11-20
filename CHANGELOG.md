@@ -12,6 +12,8 @@ section is its GitHub release's notes.
 - `assets.upload` sends at most `byte_size` bytes of a file, and raises
   `UploadError` when the file has fewer, rather than an error of the HTTP
   library's.
+- An empty `idempotency_key` for `assets.upload` counts as not given, as it
+  does for every other method.
 
 ## 0.23.0
 
