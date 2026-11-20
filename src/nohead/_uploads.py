@@ -35,9 +35,7 @@ class UploadSource:
     def chunks(self) -> Iterator[bytes]:
         """The first `byte_size` bytes, the length the upload declared. Raises
         UploadError when the file ends sooner."""
-        if self.data is not None:
-            if len(self.data) < self.byte_size:
-                raise self._too_short(len(self.data))
+        if self.data is not None:  # open_upload refused bytes that are too few
             yield self.data[: self.byte_size]
             return
         assert self.file is not None
@@ -47,12 +45,9 @@ class UploadSource:
         while sent < self.byte_size:
             chunk = self.file.read(min(CHUNK, self.byte_size - sent))
             if not chunk:
-                raise self._too_short(sent)
+                raise _too_short(self.filename, sent, self.byte_size)
             sent += len(chunk)
             yield chunk
-
-    def _too_short(self, size: int) -> UploadError:
-        return _too_short(self.filename, size, self.byte_size)
 
     def close(self) -> None:
         if self.owned and self.file is not None:
@@ -77,7 +72,8 @@ def open_upload(
         handle = path.open("rb")
         owned = True
         name = filename or path.name
-        size = path.stat().st_size
+        # A pipe's or a device's size (/dev/stdin) is not what it holds.
+        size = path.stat().st_size if path.is_file() else None
     else:
         handle = file
         name = filename or os.path.basename(str(getattr(file, "name", "") or "")) or "upload"

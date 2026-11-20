@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+import threading
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -220,6 +221,18 @@ async def test_a_file_shorter_than_its_byte_size(
     with pytest.raises(UploadError, match=r"^Could not upload a.txt: it has 11 bytes, fewer"):
         await resolve(nohead.assets.upload(source(), filename="a.txt", byte_size=20))
     assert [c.method for c in calls.calls] == requests
+
+
+async def test_uploads_a_named_pipe_with_its_byte_size(make: Make, tmp_path: Path) -> None:
+    # Its size on disk is 0, whatever it holds.
+    fifo = tmp_path / "fifo"
+    os.mkfifo(fifo)
+    writer = threading.Thread(target=fifo.write_bytes, args=(b"hello",))
+    writer.start()
+    nohead, calls = make([CREATED, STORED, READY])
+    await resolve(nohead.assets.upload(fifo, byte_size=5))
+    writer.join(timeout=5)
+    assert calls.calls[1].content == b"hello"
 
 
 async def test_sends_a_file_again_from_where_it_started(make: Make) -> None:
