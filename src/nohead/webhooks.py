@@ -182,11 +182,10 @@ def unwrap(
     # Every valid header is ASCII; anything else could only fail to encode or compare.
     if not (webhook_id + timestamp + signatures).isascii():
         raise WebhookVerificationError("A webhook header is not ASCII")
-    try:
-        sent_at = int(timestamp)
-    except ValueError:
-        raise WebhookVerificationError("The webhook timestamp is not a number") from None
-    if abs(time.time() - sent_at) > tolerance:
+    # Digits only: int() would also read signs, spaces and underscores.
+    if not timestamp.isdigit():
+        raise WebhookVerificationError("The webhook timestamp is not a number")
+    if abs(time.time() - int(timestamp)) > tolerance:
         raise WebhookVerificationError("The webhook timestamp is too far from the current time")
 
     # A character that can't be encoded can't have been signed: it fails to match.

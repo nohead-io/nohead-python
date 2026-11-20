@@ -14,6 +14,8 @@ section is its GitHub release's notes.
   library's.
 - An empty `idempotency_key` for `assets.upload` counts as not given, as it
   does for every other method.
+- `webhooks.unwrap` accepts a `webhook-timestamp` of digits only, as the
+  other SDKs do.
 
 ## 0.23.0
 
