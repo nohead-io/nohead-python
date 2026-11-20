@@ -1,4 +1,4 @@
-"""Smoke test (Nohead spec §48.14): the core flow against a live API, with both
+"""Smoke test: the core flow against a live API, with both
 clients. Needs NOHEAD_API_URL (the API to test, read as base_url) and NOHEAD_API_KEY
 (a key with schema, records, assets and webhooks read/write scopes). Exits non-zero on
 failure, after deleting what it created. Run it against the built package:
