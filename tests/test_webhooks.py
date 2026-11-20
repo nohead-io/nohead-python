@@ -244,8 +244,13 @@ def test_rejects_a_signed_timestamp_that_is_not_only_digits(timestamp: str) -> N
 
 @pytest.mark.parametrize("digits", [309, 5000])
 def test_rejects_a_timestamp_too_long_for_a_number(digits: int) -> None:
-    with pytest.raises(WebhookVerificationError, match="timestamp"):
+    with pytest.raises(WebhookVerificationError, match=r"^The webhook timestamp is too far"):
         unwrap(BODY, sign_as(BODY, "9" * digits), secret=SECRET)
+
+
+def test_accepts_a_timestamp_with_leading_zeros() -> None:
+    padded = str(NOW).zfill(5000)
+    assert unwrap(BODY, sign_as(BODY, padded), secret=SECRET).id == "wev_1"
 
 
 def test_signs_as_the_library_does() -> None:
