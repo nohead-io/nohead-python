@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import os
 import stat
 from collections.abc import AsyncIterator, Iterator
@@ -78,10 +79,12 @@ def open_upload(
         path = Path(file)
         name = filename or path.name
         info = path.stat()  # a missing path raises FileNotFoundError, as open() would
+        if stat.S_ISDIR(info.st_mode):
+            raise IsADirectoryError(errno.EISDIR, os.strerror(errno.EISDIR), str(path))
         # A pipe's or a device's size (/dev/stdin) is not what it holds.
         size = info.st_size if stat.S_ISREG(info.st_mode) else None
         if size is None and byte_size is None:
-            raise UploadError(f"Uploading {path.name}, which is not a file, needs byte_size")
+            raise UploadError(f"Uploading {name}, which is not a file, needs byte_size")
         handle = path.open("rb")
         owned = True
     else:
