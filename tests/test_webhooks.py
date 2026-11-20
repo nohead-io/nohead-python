@@ -242,6 +242,12 @@ def test_rejects_a_signed_timestamp_that_is_not_only_digits(timestamp: str) -> N
         unwrap(BODY, sign_as(BODY, timestamp), secret=SECRET)
 
 
+@pytest.mark.parametrize("digits", [309, 5000])
+def test_rejects_a_timestamp_too_long_for_a_number(digits: int) -> None:
+    with pytest.raises(WebhookVerificationError, match="timestamp"):
+        unwrap(BODY, sign_as(BODY, "9" * digits), secret=SECRET)
+
+
 def test_signs_as_the_library_does() -> None:
     assert sign_as(BODY, str(NOW)) == sign(BODY)
 
