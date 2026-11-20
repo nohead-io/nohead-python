@@ -227,12 +227,21 @@ async def test_uploads_a_named_pipe_with_its_byte_size(make: Make, tmp_path: Pat
     # Its size on disk is 0, whatever it holds.
     fifo = tmp_path / "fifo"
     os.mkfifo(fifo)
-    writer = threading.Thread(target=fifo.write_bytes, args=(b"hello",))
+    writer = threading.Thread(target=fifo.write_bytes, args=(b"hello",), daemon=True)
     writer.start()
     nohead, calls = make([CREATED, STORED, READY])
     await resolve(nohead.assets.upload(fifo, byte_size=5))
     writer.join(timeout=5)
+    assert not writer.is_alive()
     assert calls.calls[1].content == b"hello"
+
+
+async def test_needs_byte_size_for_a_path_that_is_not_a_file(make: Make) -> None:
+    # A device's size on disk (0) isn't what it holds.
+    nohead, calls = make([CREATED])
+    with pytest.raises(UploadError, match="byte_size"):
+        await resolve(nohead.assets.upload(os.devnull))
+    assert calls.calls == []
 
 
 async def test_sends_a_file_again_from_where_it_started(make: Make) -> None:

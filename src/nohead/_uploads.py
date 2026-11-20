@@ -69,11 +69,13 @@ def open_upload(
         size = len(data)
     elif isinstance(file, str | os.PathLike):
         path = Path(file)
-        handle = path.open("rb")
-        owned = True
         name = filename or path.name
         # A pipe's or a device's size (/dev/stdin) is not what it holds.
         size = path.stat().st_size if path.is_file() else None
+        if size is None and byte_size is None:
+            raise UploadError(f"Uploading {path.name}, which is not a file, needs byte_size")
+        handle = path.open("rb")
+        owned = True
     else:
         handle = file
         name = filename or os.path.basename(str(getattr(file, "name", "") or "")) or "upload"

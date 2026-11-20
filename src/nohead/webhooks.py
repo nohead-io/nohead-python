@@ -185,7 +185,8 @@ def unwrap(
     # Digits only: int() would also read signs, spaces and underscores.
     if not timestamp.isdigit():
         raise WebhookVerificationError("The webhook timestamp is not a number")
-    # More digits are centuries off, and too many for a float (or, past 4300, int()).
+    # Past leading zeros, more digits are centuries off, and too many for a float (or,
+    # past 4300, for int()).
     seconds = timestamp.lstrip("0") or "0"
     if len(seconds) > 12 or abs(time.time() - int(seconds)) > tolerance:
         raise WebhookVerificationError("The webhook timestamp is too far from the current time")
