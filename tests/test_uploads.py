@@ -244,6 +244,33 @@ async def test_needs_byte_size_for_a_path_that_is_not_a_file(make: Make) -> None
     assert calls.calls == []
 
 
+@pytest.mark.parametrize("byte_size", [None, 5])
+async def test_a_missing_path_is_not_found(
+    make: Make, tmp_path: Path, byte_size: int | None
+) -> None:
+    nohead, calls = make([CREATED])
+    with pytest.raises(FileNotFoundError):
+        await resolve(nohead.assets.upload(tmp_path / "missing.png", byte_size=byte_size))
+    assert calls.calls == []
+
+
+class NonBlocking(io.RawIOBase):
+    """A non-blocking stream with nothing to read yet: read() returns None."""
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, buffer: object) -> None:
+        return None
+
+
+async def test_refuses_a_non_blocking_stream(make: Make) -> None:
+    nohead, calls = make([CREATED, STORED, READY])
+    with pytest.raises(UploadError, match="non-blocking"):
+        await resolve(nohead.assets.upload(NonBlocking(), filename="a.txt", byte_size=5))
+    assert [c.method for c in calls.calls] == ["POST"]
+
+
 async def test_sends_a_file_again_from_where_it_started(make: Make) -> None:
     file = io.BytesIO(b"header:hello")
     file.seek(7)

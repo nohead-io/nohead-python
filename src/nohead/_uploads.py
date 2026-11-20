@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import os
+import stat
 from collections.abc import AsyncIterator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import IO, TypeAlias
+from typing import IO, TypeAlias, cast
 
 from ._errors import UploadError
 
@@ -35,15 +36,21 @@ class UploadSource:
     def chunks(self) -> Iterator[bytes]:
         """The first `byte_size` bytes, the length the upload declared. Raises
         UploadError when the file ends sooner."""
-        if self.data is not None:  # open_upload refused bytes that are too few
-            yield self.data[: self.byte_size]
+        if self.data is not None:  # open_upload cut them to byte_size
+            yield self.data
             return
         assert self.file is not None
         if self.file.seekable():
             self.file.seek(self.start)
         sent = 0
         while sent < self.byte_size:
-            chunk = self.file.read(min(CHUNK, self.byte_size - sent))
+            # A non-blocking raw stream returns None when it has nothing to read yet.
+            chunk = cast("bytes | None", self.file.read(min(CHUNK, self.byte_size - sent)))
+            if chunk is None:
+                raise UploadError(
+                    f"Could not upload {self.filename}: it is a non-blocking stream, "
+                    "which can't be uploaded"
+                )
             if not chunk:
                 raise _too_short(self.filename, sent, self.byte_size)
             sent += len(chunk)
@@ -70,8 +77,9 @@ def open_upload(
     elif isinstance(file, str | os.PathLike):
         path = Path(file)
         name = filename or path.name
+        info = path.stat()  # a missing path raises FileNotFoundError, as open() would
         # A pipe's or a device's size (/dev/stdin) is not what it holds.
-        size = path.stat().st_size if path.is_file() else None
+        size = info.st_size if stat.S_ISREG(info.st_mode) else None
         if size is None and byte_size is None:
             raise UploadError(f"Uploading {path.name}, which is not a file, needs byte_size")
         handle = path.open("rb")
@@ -87,6 +95,8 @@ def open_upload(
                 handle.close()
             raise _too_short(name, size, byte_size)
         size = byte_size
+        if data is not None:
+            data = data[:size]
     if size is None:
         raise UploadError("Uploading a stream that cannot seek needs byte_size")
     start = handle.tell() if handle is not None and handle.seekable() else 0
