@@ -84,7 +84,7 @@ def open_upload(
         # A pipe's or a device's size (/dev/stdin) is not what it holds.
         size = info.st_size if stat.S_ISREG(info.st_mode) else None
         if size is None and byte_size is None:
-            raise UploadError(f"Uploading {path}, which is not a file, needs byte_size")
+            raise UploadError(f"Uploading {path.name}, which is not a file, needs byte_size")
         handle = path.open("rb")
         owned = True
     else:
@@ -101,7 +101,7 @@ def open_upload(
         if data is not None:
             data = data[:size]
     if size is None:
-        raise UploadError("Uploading a stream whose size isn't known needs byte_size")
+        raise UploadError("Uploading a stream that isn't a file needs byte_size")
     start = handle.tell() if handle is not None and handle.seekable() else 0
     return UploadSource(
         filename=name,
