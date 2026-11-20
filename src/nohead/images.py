@@ -79,12 +79,12 @@ def image_url(
     if at < 0:
         raise ValueError(f"Not a Nohead image URL: {base}")
 
+    options = [option for option in options if option]
     for option in [gravity, *options]:
         if option and re.search(r"[/@?#]", option):
             raise ValueError(f"Not an imgproxy option: {option}")
     for option in options:
-        if option:
-            _check_supported(option)
+        _check_supported(option)
 
     if fit is None:
         fit = "contain"

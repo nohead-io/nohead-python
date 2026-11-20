@@ -5,6 +5,11 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- `image_url` leaves empty `options` out, as it does an empty `gravity`,
+  rather than writing an empty segment into the URL.
+
 ## 0.23.0
 
 - `nohead.webhooks` exports `WebhookVerificationError` too, so a receiver
