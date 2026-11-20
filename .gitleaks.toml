@@ -1,0 +1,34 @@
+# gitleaks' default rules, plus Nohead's own secrets by their exact shape:
+# the defaults only catch them beside a word like "key", and GitHub's secret
+# scanning doesn't know them. CI scans the whole history; to scan by hand:
+# `gitleaks git .` from the repository root. The same file is in each of
+# Nohead's SDK repositories.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "nohead-secret-key"
+description = "Nohead API key with full access"
+regex = '''nohead_sk_[a-z0-9]{12}_[A-Za-z0-9]{40}'''
+keywords = ["nohead_sk_"]
+
+[[rules]]
+id = "nohead-published-key"
+description = "Nohead API key for published content only"
+regex = '''nohead_pk_[a-z0-9]{12}_[A-Za-z0-9]{40}'''
+keywords = ["nohead_pk_"]
+
+[[rules]]
+id = "nohead-webhook-secret"
+description = "Nohead webhook signing secret (32 bytes, base64)"
+regex = '''whsec_[A-Za-z0-9+/]{43}='''
+keywords = ["whsec_"]
+
+# Test fixtures in the SDKs' tests, not secrets: the Standard Webhooks
+# specification's published test vector, and a made-up search token
+# ({"alg":"HS256"}.{"searchRules":{}}).
+[[allowlists]]
+regexes = [
+  '''^whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw$''',
+  '''^eyJhbGciOiJIUzI1NiJ9\.eyJzZWFyY2hSdWxlcyI6e319\.c2lnbmF0dXJl$''',
+]
