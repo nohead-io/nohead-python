@@ -234,6 +234,14 @@ async def test_uploads_a_named_pipe_with_its_byte_size(make: Make, tmp_path: Pat
     assert calls.calls[1].content == b"hello"
 
 
+async def test_uploads_a_device_with_its_byte_size(make: Make) -> None:
+    # Its size (0) isn't what it holds.
+    nohead, calls = make([CREATED, STORED, READY])
+    with open("/dev/zero", "rb") as zero:
+        await resolve(nohead.assets.upload(zero, byte_size=5))
+    assert calls.calls[1].content == b"\0" * 5
+
+
 async def test_needs_byte_size_for_a_path_that_is_not_a_file(make: Make) -> None:
     # A device's size on disk (0) isn't what it holds.
     nohead, calls = make([CREATED])

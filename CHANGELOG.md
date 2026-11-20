@@ -11,9 +11,9 @@ section is its GitHub release's notes.
   rather than writing an empty segment into the URL.
 - `assets.upload` sends at most `byte_size` bytes of a file, and raises
   `UploadError` when the file has fewer, rather than an error of the HTTP
-  library's. A path that isn't a file, such as a named pipe or
-  `/dev/stdin`, needs `byte_size`, as a stream does: its size on disk isn't
-  what it holds.
+  library's. A path or an open file that isn't a regular file, such as a
+  named pipe or `/dev/stdin`, needs `byte_size`, as a stream does: its size
+  on disk isn't what it holds.
 - An empty `idempotency_key` for `assets.upload` counts as not given, as it
   does for every other method.
 - `webhooks.unwrap` accepts a `webhook-timestamp` of digits only, as the

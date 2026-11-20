@@ -122,9 +122,10 @@ def _too_short(filename: str, size: int, byte_size: int) -> UploadError:
 
 def _remaining(file: IO[bytes]) -> int | None:
     """The bytes from here to the end, or None when the file can't seek (a pipe or a
-    socket, whose size `fstat` doesn't know)."""
+    socket, whose size `fstat` doesn't know) or is a device (/dev/stdin), whose size
+    isn't what it holds."""
     try:
-        if not file.seekable():
+        if not file.seekable() or not _regular(file):
             return None
         here = file.tell()
         end = file.seek(0, os.SEEK_END)
@@ -132,6 +133,15 @@ def _remaining(file: IO[bytes]) -> int | None:
         return end - here
     except (OSError, ValueError):
         return None
+
+
+def _regular(file: IO[bytes]) -> bool:
+    """Whether the file is a regular one, or has no descriptor (BytesIO) to say."""
+    try:
+        descriptor = file.fileno()
+    except (AttributeError, OSError, ValueError):
+        return True
+    return stat.S_ISREG(os.fstat(descriptor).st_mode)
 
 
 def iter_file(source: UploadSource) -> Iterator[bytes]:
