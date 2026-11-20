@@ -52,10 +52,7 @@ class UploadSource:
             yield chunk
 
     def _too_short(self, size: int) -> UploadError:
-        return UploadError(
-            f"Could not upload {self.filename}: it has {size} bytes, fewer than its "
-            f"byte_size ({self.byte_size})"
-        )
+        return _too_short(self.filename, size, self.byte_size)
 
     def close(self) -> None:
         if self.owned and self.file is not None:
@@ -84,11 +81,16 @@ def open_upload(
     else:
         handle = file
         name = filename or os.path.basename(str(getattr(file, "name", "") or "")) or "upload"
-        size = byte_size if byte_size is not None else _remaining(file)
-        if size is None:
-            raise UploadError("Uploading a stream that cannot seek needs byte_size")
+        size = _remaining(file)
     if byte_size is not None:
+        # A file known to be shorter fails before the upload starts.
+        if size is not None and size < byte_size:
+            if owned and handle is not None:
+                handle.close()
+            raise _too_short(name, size, byte_size)
         size = byte_size
+    if size is None:
+        raise UploadError("Uploading a stream that cannot seek needs byte_size")
     start = handle.tell() if handle is not None and handle.seekable() else 0
     return UploadSource(
         filename=name,
@@ -98,6 +100,12 @@ def open_upload(
         file=handle,
         start=start,
         owned=owned,
+    )
+
+
+def _too_short(filename: str, size: int, byte_size: int) -> UploadError:
+    return UploadError(
+        f"Could not upload {filename}: it has {size} bytes, fewer than its byte_size ({byte_size})"
     )
 
 
