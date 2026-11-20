@@ -58,24 +58,23 @@ jobs:
       - run: git diff --exit-code
       - run: uv build
 
-  # gitleaks' default rules, and Nohead's own key shapes (.gitleaks.toml),
-  # over the whole history. Run as a container: gitleaks-action needs a
-  # license for organizations.
   secrets:
-    name: Secret scan
+    name: Secrets in the git history
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Secrets in the git history
-        run: |
-          # gitleaks 8.30.0
-          docker run --rm -v "$PWD:/repo" \
-            ghcr.io/gitleaks/gitleaks@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9 \
-            git /repo --no-banner --redact --exit-code 1
+      # gitleaks' default rules and Nohead's own key shapes (.gitleaks.toml),
+      # over the whole history of the commit under test (not other branches):
+      # it takes seconds. The image is gitleaks 8.30.0, run as a container
+      # because gitleaks-action needs a license for organizations.
+      - run: >-
+          docker run --rm -v "$PWD:/repo"
+          ghcr.io/gitleaks/gitleaks@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9
+          git /repo --log-opts=HEAD --no-banner --redact --exit-code 1
 
   # The one check main's ruleset requires, so the required checks don't change
   # when the version matrix does.
