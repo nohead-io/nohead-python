@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 import os
+import threading
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -15,6 +17,7 @@ from nohead import (
     APITimeoutError,
     Nohead,
     RetryEvent,
+    Uploadable,
     UploadError,
     ValidationError,
 )
@@ -191,6 +194,103 @@ async def test_does_not_retry_a_stream_it_cannot_send_again(make: Make) -> None:
     assert calls.calls[1].content == b"hello"
 
 
+# Files of "hello world", by kind.
+SOURCES: dict[str, Callable[[], Uploadable]] = {
+    "bytes": lambda: b"hello world",
+    "file": lambda: io.BytesIO(b"hello world"),
+    "stream": lambda: Stream(b"hello world"),
+}
+
+
+@pytest.mark.parametrize("kind", SOURCES)
+async def test_sends_byte_size_bytes_at_most(make: Make, kind: str) -> None:
+    nohead, calls = make([CREATED, STORED, READY])
+    await resolve(nohead.assets.upload(SOURCES[kind](), filename="a.txt", byte_size=5))
+    assert calls.body(0)["byte_size"] == 5
+    assert calls.calls[1].content == b"hello"
+
+
+# The requests made before a short one fails: none when its size is known.
+@pytest.mark.parametrize(("kind", "requests"), [("bytes", []), ("file", []), ("stream", ["POST"])])
+async def test_a_file_shorter_than_its_byte_size(
+    make: Make, kind: str, requests: list[str]
+) -> None:
+    nohead, calls = make([CREATED, STORED, READY])
+    with pytest.raises(UploadError, match=r"^Could not upload a.txt: it has 11 bytes, fewer"):
+        await resolve(nohead.assets.upload(SOURCES[kind](), filename="a.txt", byte_size=20))
+    assert [c.method for c in calls.calls] == requests
+
+
+async def test_uploads_a_named_pipe_with_its_byte_size(make: Make, tmp_path: Path) -> None:
+    # Its size on disk is 0, whatever it holds.
+    fifo = tmp_path / "fifo"
+    os.mkfifo(fifo)
+    writer = threading.Thread(target=fifo.write_bytes, args=(b"hello",), daemon=True)
+    writer.start()
+    nohead, calls = make([CREATED, STORED, READY])
+    await resolve(nohead.assets.upload(fifo, byte_size=5))
+    writer.join(timeout=5)
+    assert not writer.is_alive()
+    assert calls.calls[1].content == b"hello"
+
+
+async def test_uploads_a_device_with_its_byte_size(make: Make) -> None:
+    # Its size (0) isn't what it holds.
+    nohead, calls = make([CREATED, STORED, READY])
+    with open("/dev/zero", "rb") as zero:
+        await resolve(nohead.assets.upload(zero, byte_size=5))
+    assert calls.calls[1].content == b"\0" * 5
+
+
+async def test_needs_byte_size_for_a_path_that_is_not_a_file(make: Make) -> None:
+    # A device's size on disk (0) isn't what it holds.
+    nohead, calls = make([CREATED])
+    with pytest.raises(
+        UploadError,
+        match=r"^Uploading null, which is not a file, needs byte_size$",
+    ):
+        await resolve(nohead.assets.upload(os.devnull, filename="a.txt"))
+    assert calls.calls == []
+
+
+async def test_needs_byte_size_for_an_open_device(make: Make) -> None:
+    nohead, calls = make([CREATED])
+    with (
+        open(os.devnull, "rb") as device,
+        pytest.raises(UploadError, match=r"^Uploading a stream that isn't a file needs byte_size$"),
+    ):
+        await resolve(nohead.assets.upload(device))
+    assert calls.calls == []
+
+
+# A path that can't be read fails as opening it would, whether or not byte_size is given.
+@pytest.mark.parametrize("byte_size", [None, 5])
+@pytest.mark.parametrize(
+    ("name", "error"), [("missing.png", FileNotFoundError), (".", IsADirectoryError)]
+)
+async def test_a_path_that_cannot_be_read(
+    make: Make, tmp_path: Path, name: str, error: type[OSError], byte_size: int | None
+) -> None:
+    nohead, calls = make([CREATED])
+    with pytest.raises(error):
+        await resolve(nohead.assets.upload(tmp_path / name, byte_size=byte_size))
+    assert calls.calls == []
+
+
+async def test_refuses_a_non_blocking_stream(make: Make) -> None:
+    # Nothing written yet: read() returns None rather than waiting.
+    nohead, calls = make([CREATED, STORED, READY])
+    reader, writer = os.pipe()
+    os.set_blocking(reader, False)
+    with (
+        os.fdopen(reader, "rb") as stream,
+        os.fdopen(writer, "wb"),
+        pytest.raises(UploadError, match="non-blocking"),
+    ):
+        await resolve(nohead.assets.upload(stream, filename="a.txt", byte_size=5))
+    assert [c.method for c in calls.calls] == ["POST"]
+
+
 async def test_sends_a_file_again_from_where_it_started(make: Make) -> None:
     file = io.BytesIO(b"header:hello")
     file.seek(7)
@@ -269,5 +369,9 @@ async def test_does_not_follow_a_redirect_from_storage() -> None:
 @pytest.mark.parametrize("filename", ["", None])
 async def test_empty_upload_options_count_as_not_given(make: Make, filename: str | None) -> None:
     nohead, calls = make([CREATED, STORED, READY])
-    await resolve(nohead.assets.upload(b"x", filename=filename, content_type=""))
+    await resolve(
+        nohead.assets.upload(b"x", filename=filename, content_type="", idempotency_key="")
+    )
     assert calls.body(0) == {"filename": "upload", "byte_size": 1}
+    # No key: nothing to resume, so no look at the asset before sending the bytes.
+    assert [c.method for c in calls.calls] == ["POST", "PUT", "POST"]

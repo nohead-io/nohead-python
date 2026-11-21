@@ -49,7 +49,7 @@ class AsyncAssets(AsyncResource):
                 params["alt"] = alt
             created = await self.create_upload(idempotency_key=idempotency_key, **params)
             # A replayed start returns the first run's asset, which may be done.
-            if idempotency_key is not None:
+            if idempotency_key:
                 current = await self.get(created.id)
                 if current.status == "ready":
                     return current

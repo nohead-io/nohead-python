@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import json
 import time
 import warnings
@@ -217,6 +219,42 @@ def test_rejects_what_the_standard_webhooks_library_fails_on(
     # (other digits) accepts the timestamp; unwrap raises only WebhookVerificationError.
     with pytest.raises(WebhookVerificationError):
         unwrap(body, headers, secret=SECRET)
+
+
+def sign_as(body: str, timestamp: str) -> dict[str, str]:
+    """Signs with any webhook-timestamp, as the library's sign() can't."""
+    key = base64.b64decode(SECRET.removeprefix("whsec_"))
+    digest = hmac.new(key, f"msg_1.{timestamp}.{body}".encode(), hashlib.sha256).digest()
+    return {
+        "webhook-id": "msg_1",
+        "webhook-timestamp": timestamp,
+        "webhook-signature": "v1," + base64.b64encode(digest).decode(),
+    }
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [f"+{NOW}", f" {NOW}", f"{NOW}\n", f"{NOW:_}"],
+    ids=["plus sign", "leading space", "trailing newline", "underscores"],
+)
+def test_rejects_a_signed_timestamp_that_is_not_only_digits(timestamp: str) -> None:
+    with pytest.raises(WebhookVerificationError, match="timestamp"):
+        unwrap(BODY, sign_as(BODY, timestamp), secret=SECRET)
+
+
+@pytest.mark.parametrize("digits", [309, 5000])
+def test_rejects_a_timestamp_too_long_for_a_number(digits: int) -> None:
+    with pytest.raises(WebhookVerificationError, match=r"^The webhook timestamp is too far"):
+        unwrap(BODY, sign_as(BODY, "9" * digits), secret=SECRET)
+
+
+def test_accepts_a_timestamp_with_leading_zeros() -> None:
+    padded = str(NOW).zfill(5000)
+    assert unwrap(BODY, sign_as(BODY, padded), secret=SECRET).id == "wev_1"
+
+
+def test_signs_as_the_library_does() -> None:
+    assert sign_as(BODY, str(NOW)) == sign(BODY)
 
 
 @pytest.mark.parametrize("secret", ["", "whsec_"])
