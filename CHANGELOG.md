@@ -5,6 +5,19 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## 0.25.0
+
+- **Breaking, types:** a field's search options are its configuration's
+  `search` group, as the API now has them: `searchable`, `filterable`,
+  `sortable` and `returned` (`SearchOptions`, and `AssetSearchOptions`,
+  `RelationSearchOptions` and `UnsearchableSearchOptions` for the types
+  that differ), where a relation's `searchable` and an asset's or
+  relation's `returned` take a list (related field IDs, or an asset's
+  parts) in place of `True`. The old `searchable`, `filterable`,
+  `sortable`, `included`, `expanded` and `searched` options are gone.
+  Search-only related fields filter and facet under
+  `expanded.<key>.unreturned.<field>`.
+
 ## 0.24.0
 
 - `image_url` leaves empty `options` out, as it does an empty `gravity`,
