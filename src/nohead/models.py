@@ -149,18 +149,7 @@ class TextFieldConfiguration(NoheadModel):
 
     description: str | None = None
     """Help text for editors."""
-    searchable: bool | None = None
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: bool | None = None
-    """API searches can filter on it. Default false."""
-    sortable: bool | None = None
-    """API searches can sort on it (one value only). Default false."""
-    included: bool | None = None
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: SearchOptions | None = None
     min_length: int | None = None
     max_length: int | None = None
     format: str | None = None
@@ -178,18 +167,7 @@ class LongTextFieldConfiguration(NoheadModel):
 
     description: str | None = None
     """Help text for editors."""
-    searchable: bool | None = None
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: bool | None = None
-    """API searches can filter on it. Default false."""
-    sortable: bool | None = None
-    """API searches can sort on it (one value only). Default false."""
-    included: bool | None = None
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: SearchOptions | None = None
     min_length: int | None = None
     max_length: int | None = None
 
@@ -203,18 +181,7 @@ class RichTextFieldConfiguration(NoheadModel):
 
     description: str | None = None
     """Help text for editors."""
-    searchable: bool | None = None
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: bool | None = None
-    """API searches can filter on it. Default false."""
-    sortable: bool | None = None
-    """API searches can sort on it (one value only). Default false."""
-    included: bool | None = None
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: SearchOptions | None = None
     min_length: int | None = None
     """The fewest characters of text a value may have (`too_short`); an empty document has no
     value, which `required` asks for.
@@ -226,18 +193,7 @@ class RichTextFieldConfiguration(NoheadModel):
 class IntegerFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
-    searchable: bool | None = None
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: bool | None = None
-    """API searches can filter on it. Default false."""
-    sortable: bool | None = None
-    """API searches can sort on it (one value only). Default false."""
-    included: bool | None = None
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: SearchOptions | None = None
     min: int | None = None
     max: int | None = None
     unique: bool | None = None
@@ -247,18 +203,7 @@ class IntegerFieldConfiguration(NoheadModel):
 class DecimalFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
-    searchable: bool | None = None
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: bool | None = None
-    """API searches can filter on it. Default false."""
-    sortable: bool | None = None
-    """API searches can sort on it (one value only). Default false."""
-    included: bool | None = None
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: SearchOptions | None = None
     min: float | None = None
     max: float | None = None
 
@@ -266,16 +211,7 @@ class DecimalFieldConfiguration(NoheadModel):
 class DateFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
-    searchable: Any = None
-    """A date field has no words for searches to match, so it can't be searchable."""
-    filterable: bool | None = None
-    """API searches can filter on it. Default false."""
-    sortable: bool | None = None
-    """API searches can sort on it (one value only). Default false."""
-    included: bool | None = None
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: UnsearchableSearchOptions | None = None
     include_time: bool | None = None
     """Holds a moment (ISO 8601 with an offset) instead of a calendar date; changing it is a
     field migration.
@@ -289,59 +225,20 @@ class DateFieldConfiguration(NoheadModel):
 class BooleanFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
-    searchable: Any = None
-    """A boolean field has no words for searches to match, so it can't be searchable."""
-    filterable: bool | None = None
-    """API searches can filter on it. Default false."""
-    sortable: bool | None = None
-    """API searches can sort on it (one value only). Default false."""
-    included: bool | None = None
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: UnsearchableSearchOptions | None = None
 
 
 class EnumFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
-    searchable: bool | None = None
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: bool | None = None
-    """API searches can filter on it. Default false."""
-    sortable: bool | None = None
-    """API searches can sort on it (one value only). Default false."""
-    included: bool | None = None
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: SearchOptions | None = None
     options: list[str]
 
 
 class AssetFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
-    searchable: Any = None
-    """An asset field is indexed as an asset ID, with no words for searches to match, so it
-    can't be searchable.
-    """
-    filterable: bool | None = None
-    """API searches can filter on it. Default false."""
-    sortable: bool | None = None
-    """API searches can sort on it (one value only). Default false."""
-    included: bool | None = None
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
-    expanded: list[str] | None = None
-    """What public search hits return of the field's assets under `expanded`, while it's
-    included: any of an image's `image_url`, `dimensions` (as `width` and `height`) and
-    `alt`, and any file's `file_url`, `filename` and `content_type`, as the API's assets
-    have them. By default an image's URL and dimensions where the field takes images, and a
-    file's URL and filename where it takes other files (`accepted_types`; both when it takes
-    any file). API reads expand what `?expand=` asks for.
-    """
+    search: AssetSearchOptions | None = None
     accepted_types: list[str] | None = None
     """MIME types or `type/*` wildcards newly written values must have (`["image/*",
     "application/pdf"]`); any file when absent.
@@ -351,33 +248,7 @@ class AssetFieldConfiguration(NoheadModel):
 class RelationFieldConfiguration(NoheadModel):
     description: str | None = None
     """Help text for editors."""
-    searchable: bool | None = None
-    """Search words match the related fields `searched` lists, in every search (API keys,
-    search tokens, members). Default false.
-    """
-    filterable: bool | None = None
-    """API searches can filter on it. Default false."""
-    sortable: bool | None = None
-    """API searches can sort on it (one value only). Default false."""
-    included: bool | None = None
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
-    expanded: list[str] | None = None
-    """The related collection's fields, by ID (`fld_...`), that public search hits return of
-    each published related record under `expanded`, while the field is included, by their
-    current keys (a list holds the first 100 related records that exist). None by default:
-    the IDs only, whether or not the related collection is in public search. A filterable
-    relation field also filters on them. API reads expand what `?expand=` asks for.
-    """
-    searched: list[str] | None = None
-    """The related collection's fields, by ID (`fld_...`), whose words searches match in each
-    published related record while the field is `searchable`, in every search, whether or
-    not hits return them; only text, long text, rich text and enum fields are matched. None
-    by default. A filterable relation field also filters on them: under
-    `expanded.<key>.data.<field>` when hits return them, `expanded.<key>.searched.<field>`
-    when they don't.
-    """
+    search: RelationSearchOptions | None = None
     target_collection_id: str
     """The collection (same project) whose records it points at."""
 
@@ -390,17 +261,98 @@ class JsonFieldConfiguration(NoheadModel):
 
     description: str | None = None
     """Help text for editors."""
+    search: SearchOptions | None = None
+
+
+class SearchOptions(NoheadModel):
+    """How searches use the field, and what public search hits return of it. A setting left out
+    takes its default.
+    """
+
     searchable: bool | None = None
     """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
+    Default true for text, long text, rich text and enum fields, false for the others.
     """
     filterable: bool | None = None
-    """API searches can filter on it. Default false."""
+    """Searches can filter and count on it. Default false. Not for rich text and JSON fields."""
     sortable: bool | None = None
-    """API searches can sort on it (one value only). Default false."""
-    included: bool | None = None
-    """Public search hits (search tokens) include the field. Default true. A field not included
+    """Searches can sort on it, for a single-value text, integer, decimal, boolean, date or
+    enum field. Default false.
+    """
+    returned: bool | None = None
+    """Public search hits (search tokens) return the field. Default true. A field not returned
     can still be searched, filtered and sorted on.
+    """
+
+
+class UnsearchableSearchOptions(NoheadModel):
+    """How searches use a date or boolean field, and whether public search hits return it. A
+    setting left out takes its default.
+    """
+
+    searchable: Any = None
+    """Date and boolean fields hold no words for searches to match, so they can't be
+    searchable.
+    """
+    filterable: bool | None = None
+    """Searches can filter and count on it. Default false."""
+    sortable: bool | None = None
+    """Searches can sort on it (one value only). Default false."""
+    returned: bool | None = None
+    """Public search hits (search tokens) return the field. Default true. A field not returned
+    can still be filtered and sorted on.
+    """
+
+
+class AssetSearchOptions(NoheadModel):
+    """How searches use an asset field, and what public search hits return of its assets. A
+    setting left out takes its default.
+    """
+
+    searchable: Any = None
+    """An asset field is indexed as asset IDs, with no words for searches to match, so it can't
+    be searchable.
+    """
+    filterable: bool | None = None
+    """Searches can filter and count on its asset IDs. Default false."""
+    sortable: Any = None
+    """Asset IDs don't sort, so an asset field can't be sortable."""
+    returned: bool | list[str] | None = None
+    """What public search hits return of the field: `true` (the default), each asset's ID with
+    its default parts under `expanded`, an image's URL and dimensions where the field takes
+    images and a file's URL and filename where it takes other files (`accepted_types`; both
+    when it takes any file); a list of the parts to return instead, any of an image's
+    `image_url`, `dimensions` (as `width` and `height`) and `alt`, and any file's
+    `file_url`, `filename` and `content_type`; or `false`, nothing. A relation that returns
+    the field from another collection returns the same parts. API reads expand what
+    `?expand=` asks for.
+    """
+
+
+class RelationSearchOptions(NoheadModel):
+    """How searches use a relation field, and what public search hits return of its related
+    records. A setting left out takes its default.
+    """
+
+    searchable: Any = None
+    """`false` (the default), or the related collection's fields, by ID (`fld_...`), whose
+    words searches match in each published related record, in every search, whether or not
+    hits return them; only text, long text, rich text and enum fields are matched. A
+    relation holds IDs, with no words of its own, so `true` alone is refused.
+    """
+    filterable: bool | None = None
+    """Searches can filter and count on its related records' IDs, and on the related fields it
+    lists: under `expanded.<key>.data.<field>` when hits return them,
+    `expanded.<key>.unreturned.<field>` when only searches match them. Default false.
+    """
+    sortable: bool | None = None
+    """Searches can sort on it (one value only). Default false."""
+    returned: bool | list[str] | None = None
+    """What public search hits return of the field: `true` (the default), the related records'
+    IDs; the related collection's fields, by ID (`fld_...`), to return with each published
+    related record under `expanded`, by their current keys (a list holds the first 100
+    related records that exist), whether or not the related collection is in public search;
+    or `false`, nothing. API reads expand what `?expand=` asks for.
     """
 
 
@@ -509,25 +461,38 @@ class FieldUpdate(NoheadModel):
     configuration: FieldConfigurationChange | None = None
 
 
+class FieldConfigurationChangeSearch(NoheadModel):
+    """Search settings to change, merged onto the field's the same way: a setting sent replaces
+    its value, one sent as `null` is removed, and the rest stay. So `{ "search": {
+    "returned": false } }` keeps the field's `searchable`.
+    """
+
+    searchable: bool | list[str] | None = None
+    """True or false, or for a relation field the related collection's field IDs whose words
+    searches match.
+    """
+    filterable: bool | None = None
+    sortable: bool | None = None
+    returned: bool | list[str] | None = None
+    """True or false, or the parts of an asset field's assets, or the field IDs of a relation
+    field's related collection, to return.
+    """
+
+
 class FieldConfigurationChange(NoheadModel):
     """Options to change, merged onto the field's: an option sent replaces its value, one sent
-    as `null` is removed, and options left out keep theirs. So `{ "filterable": true }`
+    as `null` is removed, and options left out keep theirs. So `{ "max_length": 200 }`
     changes one option and keeps the rest, and `{ "max_length": null }` removes the limit.
     Any field type's option names are accepted here; the merged options are checked against
     the field's type (`FieldConfiguration`).
     """
 
     description: str | None = None
-    searchable: bool | None = None
-    filterable: bool | None = None
-    sortable: bool | None = None
-    included: bool | None = None
-    expanded: list[str] | None = None
-    """For an asset field, parts of its assets (`image_url`, `dimensions`, `alt`, `file_url`,
-    `filename`, `content_type`); for a relation field, field IDs of the related collection.
+    search: FieldConfigurationChangeSearch | None = None
+    """Search settings to change, merged onto the field's the same way: a setting sent replaces
+    its value, one sent as `null` is removed, and the rest stay. So `{ "search": {
+    "returned": false } }` keeps the field's `searchable`.
     """
-    searched: list[str] | None = None
-    """For a relation field, field IDs of the related collection whose words searches match."""
     min_length: int | None = None
     max_length: int | None = None
     format: str | None = None
@@ -566,7 +531,7 @@ class Collection(NoheadModel):
     readable by anyone with a token, so turn it on only for collections whose published
     records are public. A change reaches search tokens within seconds. Off, its fields can
     still come along with hits of another collection that is on, through a relation field's
-    `expanded` and `searched`.
+    `search` settings (`searchable` and `returned`).
     """
     fields: list[Field]
     """Active fields in position order."""

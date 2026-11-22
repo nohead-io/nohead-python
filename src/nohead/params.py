@@ -10,28 +10,7 @@ from typing import Any, Literal, NotRequired, TypeAlias, TypedDict
 class AssetFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[Literal[False]]
-    """An asset field is indexed as an asset ID, with no words for searches to match, so it
-    can't be searchable.
-    """
-    filterable: NotRequired[bool]
-    """API searches can filter on it. Default false."""
-    sortable: NotRequired[bool]
-    """API searches can sort on it (one value only). Default false."""
-    included: NotRequired[bool]
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
-    expanded: NotRequired[
-        list[Literal["image_url", "dimensions", "alt", "file_url", "filename", "content_type"]]
-    ]
-    """What public search hits return of the field's assets under `expanded`, while it's
-    included: any of an image's `image_url`, `dimensions` (as `width` and `height`) and
-    `alt`, and any file's `file_url`, `filename` and `content_type`, as the API's assets
-    have them. By default an image's URL and dimensions where the field takes images, and a
-    file's URL and filename where it takes other files (`accepted_types`; both when it takes
-    any file). API reads expand what `?expand=` asks for.
-    """
+    search: NotRequired[AssetSearchOptions]
     accepted_types: NotRequired[list[str]]
     """MIME types or `type/*` wildcards newly written values must have (`["image/*",
     "application/pdf"]`); any file when absent.
@@ -66,6 +45,34 @@ class AssetFieldCreate(FieldCreateProperties):
     configuration: NotRequired[AssetFieldConfiguration]
 
 
+class AssetSearchOptions(TypedDict):
+    """How searches use an asset field, and what public search hits return of its assets. A
+    setting left out takes its default.
+    """
+
+    searchable: NotRequired[Literal[False]]
+    """An asset field is indexed as asset IDs, with no words for searches to match, so it can't
+    be searchable.
+    """
+    filterable: NotRequired[bool]
+    """Searches can filter and count on its asset IDs. Default false."""
+    sortable: NotRequired[Literal[False]]
+    """Asset IDs don't sort, so an asset field can't be sortable."""
+    returned: NotRequired[
+        bool
+        | list[Literal["image_url", "dimensions", "alt", "file_url", "filename", "content_type"]]
+    ]
+    """What public search hits return of the field: `true` (the default), each asset's ID with
+    its default parts under `expanded`, an image's URL and dimensions where the field takes
+    images and a file's URL and filename where it takes other files (`accepted_types`; both
+    when it takes any file); a list of the parts to return instead, any of an image's
+    `image_url`, `dimensions` (as `width` and `height`) and `alt`, and any file's
+    `file_url`, `filename` and `content_type`; or `false`, nothing. A relation that returns
+    the field from another collection returns the same parts. API reads expand what
+    `?expand=` asks for.
+    """
+
+
 class AssetUpdate(TypedDict):
     filename: NotRequired[str]
     """Control characters are removed and path separators become `_`, as on upload."""
@@ -96,16 +103,7 @@ class AssetUploadCreate(TypedDict):
 class BooleanFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[Literal[False]]
-    """A boolean field has no words for searches to match, so it can't be searchable."""
-    filterable: NotRequired[bool]
-    """API searches can filter on it. Default false."""
-    sortable: NotRequired[bool]
-    """API searches can sort on it (one value only). Default false."""
-    included: NotRequired[bool]
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: NotRequired[UnsearchableSearchOptions]
 
 
 class BooleanFieldCreate(FieldCreateProperties):
@@ -132,16 +130,7 @@ class CollectionUpdate(TypedDict):
 class DateFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[Literal[False]]
-    """A date field has no words for searches to match, so it can't be searchable."""
-    filterable: NotRequired[bool]
-    """API searches can filter on it. Default false."""
-    sortable: NotRequired[bool]
-    """API searches can sort on it (one value only). Default false."""
-    included: NotRequired[bool]
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: NotRequired[UnsearchableSearchOptions]
     include_time: NotRequired[bool]
     """Holds a moment (ISO 8601 with an offset) instead of a calendar date; changing it is a
     field migration.
@@ -160,18 +149,7 @@ class DateFieldCreate(FieldCreateProperties):
 class DecimalFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[bool]
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: NotRequired[bool]
-    """API searches can filter on it. Default false."""
-    sortable: NotRequired[bool]
-    """API searches can sort on it (one value only). Default false."""
-    included: NotRequired[bool]
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: NotRequired[SearchOptions]
     min: NotRequired[float]
     max: NotRequired[float]
 
@@ -194,18 +172,7 @@ class DraftScheduleUpdate(TypedDict):
 class EnumFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[bool]
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: NotRequired[bool]
-    """API searches can filter on it. Default false."""
-    sortable: NotRequired[bool]
-    """API searches can sort on it (one value only). Default false."""
-    included: NotRequired[bool]
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: NotRequired[SearchOptions]
     options: list[str]
 
 
@@ -214,25 +181,38 @@ class EnumFieldCreate(FieldCreateProperties):
     configuration: EnumFieldConfiguration
 
 
+class FieldConfigurationChangeSearch(TypedDict):
+    """Search settings to change, merged onto the field's the same way: a setting sent replaces
+    its value, one sent as `null` is removed, and the rest stay. So `{ "search": {
+    "returned": false } }` keeps the field's `searchable`.
+    """
+
+    searchable: NotRequired[bool | list[str] | None]
+    """True or false, or for a relation field the related collection's field IDs whose words
+    searches match.
+    """
+    filterable: NotRequired[bool | None]
+    sortable: NotRequired[bool | None]
+    returned: NotRequired[bool | list[str] | None]
+    """True or false, or the parts of an asset field's assets, or the field IDs of a relation
+    field's related collection, to return.
+    """
+
+
 class FieldConfigurationChange(TypedDict):
     """Options to change, merged onto the field's: an option sent replaces its value, one sent
-    as `null` is removed, and options left out keep theirs. So `{ "filterable": true }`
+    as `null` is removed, and options left out keep theirs. So `{ "max_length": 200 }`
     changes one option and keeps the rest, and `{ "max_length": null }` removes the limit.
     Any field type's option names are accepted here; the merged options are checked against
     the field's type (`FieldConfiguration`).
     """
 
     description: NotRequired[str | None]
-    searchable: NotRequired[bool | None]
-    filterable: NotRequired[bool | None]
-    sortable: NotRequired[bool | None]
-    included: NotRequired[bool | None]
-    expanded: NotRequired[list[str] | None]
-    """For an asset field, parts of its assets (`image_url`, `dimensions`, `alt`, `file_url`,
-    `filename`, `content_type`); for a relation field, field IDs of the related collection.
+    search: NotRequired[FieldConfigurationChangeSearch | None]
+    """Search settings to change, merged onto the field's the same way: a setting sent replaces
+    its value, one sent as `null` is removed, and the rest stay. So `{ "search": {
+    "returned": false } }` keeps the field's `searchable`.
     """
-    searched: NotRequired[list[str] | None]
-    """For a relation field, field IDs of the related collection whose words searches match."""
     min_length: NotRequired[int | None]
     max_length: NotRequired[int | None]
     format: NotRequired[Literal["slug", "url", "email"] | None]
@@ -339,18 +319,7 @@ class FieldUpdate(TypedDict):
 class IntegerFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[bool]
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: NotRequired[bool]
-    """API searches can filter on it. Default false."""
-    sortable: NotRequired[bool]
-    """API searches can sort on it (one value only). Default false."""
-    included: NotRequired[bool]
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: NotRequired[SearchOptions]
     min: NotRequired[int]
     max: NotRequired[int]
     unique: NotRequired[bool]
@@ -370,18 +339,7 @@ class JsonFieldConfiguration(TypedDict):
 
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[bool]
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: NotRequired[bool]
-    """API searches can filter on it. Default false."""
-    sortable: NotRequired[bool]
-    """API searches can sort on it (one value only). Default false."""
-    included: NotRequired[bool]
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: NotRequired[SearchOptions]
 
 
 class JsonFieldCreate(FieldCreateProperties):
@@ -394,18 +352,7 @@ class LongTextFieldConfiguration(TypedDict):
 
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[bool]
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: NotRequired[bool]
-    """API searches can filter on it. Default false."""
-    sortable: NotRequired[bool]
-    """API searches can sort on it (one value only). Default false."""
-    included: NotRequired[bool]
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: NotRequired[SearchOptions]
     min_length: NotRequired[int]
     max_length: NotRequired[int]
 
@@ -451,33 +398,7 @@ class RecordWrite(TypedDict):
 class RelationFieldConfiguration(TypedDict):
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[bool]
-    """Search words match the related fields `searched` lists, in every search (API keys,
-    search tokens, members). Default false.
-    """
-    filterable: NotRequired[bool]
-    """API searches can filter on it. Default false."""
-    sortable: NotRequired[bool]
-    """API searches can sort on it (one value only). Default false."""
-    included: NotRequired[bool]
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
-    expanded: NotRequired[list[str]]
-    """The related collection's fields, by ID (`fld_...`), that public search hits return of
-    each published related record under `expanded`, while the field is included, by their
-    current keys (a list holds the first 100 related records that exist). None by default:
-    the IDs only, whether or not the related collection is in public search. A filterable
-    relation field also filters on them. API reads expand what `?expand=` asks for.
-    """
-    searched: NotRequired[list[str]]
-    """The related collection's fields, by ID (`fld_...`), whose words searches match in each
-    published related record while the field is `searchable`, in every search, whether or
-    not hits return them; only text, long text, rich text and enum fields are matched. None
-    by default. A filterable relation field also filters on them: under
-    `expanded.<key>.data.<field>` when hits return them, `expanded.<key>.searched.<field>`
-    when they don't.
-    """
+    search: NotRequired[RelationSearchOptions]
     target_collection_id: str
     """The collection (same project) whose records it points at."""
 
@@ -485,6 +406,33 @@ class RelationFieldConfiguration(TypedDict):
 class RelationFieldCreate(FieldCreateProperties):
     type: Literal["relation"]
     configuration: RelationFieldConfiguration
+
+
+class RelationSearchOptions(TypedDict):
+    """How searches use a relation field, and what public search hits return of its related
+    records. A setting left out takes its default.
+    """
+
+    searchable: NotRequired[Literal[False] | list[str]]
+    """`false` (the default), or the related collection's fields, by ID (`fld_...`), whose
+    words searches match in each published related record, in every search, whether or not
+    hits return them; only text, long text, rich text and enum fields are matched. A
+    relation holds IDs, with no words of its own, so `true` alone is refused.
+    """
+    filterable: NotRequired[bool]
+    """Searches can filter and count on its related records' IDs, and on the related fields it
+    lists: under `expanded.<key>.data.<field>` when hits return them,
+    `expanded.<key>.unreturned.<field>` when only searches match them. Default false.
+    """
+    sortable: NotRequired[bool]
+    """Searches can sort on it (one value only). Default false."""
+    returned: NotRequired[bool | list[str]]
+    """What public search hits return of the field: `true` (the default), the related records'
+    IDs; the related collection's fields, by ID (`fld_...`), to return with each published
+    related record under `expanded`, by their current keys (a list holds the first 100
+    related records that exist), whether or not the related collection is in public search;
+    or `false`, nothing. API reads expand what `?expand=` asks for.
+    """
 
 
 class RichTextFieldConfiguration(TypedDict):
@@ -496,18 +444,7 @@ class RichTextFieldConfiguration(TypedDict):
 
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[bool]
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: NotRequired[bool]
-    """API searches can filter on it. Default false."""
-    sortable: NotRequired[bool]
-    """API searches can sort on it (one value only). Default false."""
-    included: NotRequired[bool]
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: NotRequired[SearchOptions]
     min_length: NotRequired[int]
     """The fewest characters of text a value may have (`too_short`); an empty document has no
     value, which `required` asks for.
@@ -521,23 +458,33 @@ class RichTextFieldCreate(FieldCreateProperties):
     configuration: NotRequired[RichTextFieldConfiguration]
 
 
+class SearchOptions(TypedDict):
+    """How searches use the field, and what public search hits return of it. A setting left out
+    takes its default.
+    """
+
+    searchable: NotRequired[bool]
+    """Search words match the field, in every search (API keys, search tokens, members).
+    Default true for text, long text, rich text and enum fields, false for the others.
+    """
+    filterable: NotRequired[bool]
+    """Searches can filter and count on it. Default false. Not for rich text and JSON fields."""
+    sortable: NotRequired[bool]
+    """Searches can sort on it, for a single-value text, integer, decimal, boolean, date or
+    enum field. Default false.
+    """
+    returned: NotRequired[bool]
+    """Public search hits (search tokens) return the field. Default true. A field not returned
+    can still be searched, filtered and sorted on.
+    """
+
+
 class TextFieldConfiguration(TypedDict):
     """Plain text up to 10,000 characters, or a `format`."""
 
     description: NotRequired[str]
     """Help text for editors."""
-    searchable: NotRequired[bool]
-    """Search words match the field, in every search (API keys, search tokens, members).
-    Default true for text, long_text, rich_text and enum.
-    """
-    filterable: NotRequired[bool]
-    """API searches can filter on it. Default false."""
-    sortable: NotRequired[bool]
-    """API searches can sort on it (one value only). Default false."""
-    included: NotRequired[bool]
-    """Public search hits (search tokens) include the field. Default true. A field not included
-    can still be searched, filtered and sorted on.
-    """
+    search: NotRequired[SearchOptions]
     min_length: NotRequired[int]
     max_length: NotRequired[int]
     format: NotRequired[Literal["slug", "url", "email"]]
@@ -553,6 +500,25 @@ class TextFieldConfiguration(TypedDict):
 class TextFieldCreate(FieldCreateProperties):
     type: Literal["text"]
     configuration: NotRequired[TextFieldConfiguration]
+
+
+class UnsearchableSearchOptions(TypedDict):
+    """How searches use a date or boolean field, and whether public search hits return it. A
+    setting left out takes its default.
+    """
+
+    searchable: NotRequired[Literal[False]]
+    """Date and boolean fields hold no words for searches to match, so they can't be
+    searchable.
+    """
+    filterable: NotRequired[bool]
+    """Searches can filter and count on it. Default false."""
+    sortable: NotRequired[bool]
+    """Searches can sort on it (one value only). Default false."""
+    returned: NotRequired[bool]
+    """Public search hits (search tokens) return the field. Default true. A field not returned
+    can still be filtered and sorted on.
+    """
 
 
 class WebhookCreate(TypedDict):
