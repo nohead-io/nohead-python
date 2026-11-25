@@ -846,6 +846,10 @@ class Draft(NoheadModel):
     changed_fields: list[str]
     """Keys of the fields the draft changes."""
     schedule: DraftSchedule
+    editor_url: str
+    """The record's page in the web editor, where the project's members review the draft,
+    change it and merge it. Give it to whoever will review the draft.
+    """
     created_by: Actor
     edited_by: list[Actor]
     """Everyone who changed it since, in order."""
