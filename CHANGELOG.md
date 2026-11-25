@@ -5,6 +5,11 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
+## Unreleased
+
+- **Types:** a `Draft` has `editor_url`, the record's page in the web app,
+  where your team reviews the draft and merges it.
+
 ## 0.25.0
 
 - **Breaking, types:** a field's search options are its configuration's
