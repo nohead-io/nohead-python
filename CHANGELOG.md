@@ -5,7 +5,7 @@ Changes to the `nohead` package that you can notice. Versions follow
 releases; a change that could break your code is a major one. Each release's
 section is its GitHub release's notes.
 
-## Unreleased
+## 0.26.0
 
 - `expand` takes a dotted key, which reaches one relation further:
   `author.photo` embeds the author, and the author's photo under the
