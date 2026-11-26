@@ -7,6 +7,9 @@ section is its GitHub release's notes.
 
 ## Unreleased
 
+- `expand` takes a dotted key, which reaches one relation further:
+  `author.photo` embeds the author, and the author's photo under the
+  author's own `expanded`. It counts the author toward the five fields.
 - **Types:** a `Draft` has `editor_url`, the record's page in the web app,
   where your team reviews the draft and merges it.
 

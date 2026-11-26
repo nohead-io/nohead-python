@@ -50,8 +50,10 @@ class AsyncRecords(AsyncResource):
         """A collection's records, newest first by default.
 
         `filter` holds filters (`{"published_at": {"exists": True}}` for published
-        records), `expand` relation or asset fields to embed under `expanded` (at
-        most 5).
+        records), `expand` relation, asset or rich text fields to embed under
+        `expanded` (at most 5). A dotted key reaches one relation further, and counts
+        the relation too: `"author.photo"` embeds the author, and the author's photo
+        under the author's own `expanded`.
         """
         return self._client.paginate(
             "records_list",

@@ -21,10 +21,12 @@ from pathlib import Path
 from typing import IO, Any
 
 from nohead import (
+    Asset,
     AsyncNohead,
     Nohead,
     NotFoundError,
     PreconditionFailedError,
+    Record,
     ValidationError,
 )
 
@@ -151,6 +153,50 @@ def sync_flow() -> str:
         expect(asset.alt == "A greeting", "upload sets alt text")
         renamed = nohead.assets.update(asset.id, filename="greeting.txt")
         expect(renamed.filename == "greeting.txt", "assets rename")
+        # A dotted expand: a note's author, and the author's photo under the author's
+        # own `expanded`. Notes are deleted first: their relation points at People.
+        with contextlib.ExitStack() as made:
+            suffix = uuid.uuid4().hex[:8]
+            people = nohead.collections.create(
+                name="Python smoke people",
+                slug=f"sdk-python-people-{suffix}",
+                fields=[
+                    {"name": "Name", "key": "name", "type": "text", "required": True},
+                    {"name": "Photo", "key": "photo", "type": "asset"},
+                ],
+            )
+            made.callback(nohead.collections.delete, people.id)
+            notes = nohead.collections.create(
+                name="Python smoke notes",
+                slug=f"sdk-python-notes-{suffix}",
+                fields=[
+                    {"name": "Title", "key": "title", "type": "text", "required": True},
+                    {
+                        "name": "Author",
+                        "key": "author",
+                        "type": "relation",
+                        "configuration": {"target_collection_id": people.id},
+                    },
+                ],
+            )
+            made.callback(nohead.collections.delete, notes.id)
+            ada = nohead.records.create(
+                people.slug, data={"name": "Ada Lovelace", "photo": asset.id}
+            )
+            note = nohead.records.create(
+                notes.slug, data={"title": "Notes on the engine", "author": ada.id}
+            )
+            read = nohead.records.get(note.id, expand=["author.photo"])
+            author = (read.expanded or {}).get("author")
+            photo = (author.expanded or {}).get("photo") if isinstance(author, Record) else None
+            expect(
+                isinstance(author, Record)
+                and author.data["name"] == "Ada Lovelace"
+                and isinstance(photo, Asset)
+                and photo.id == asset.id,
+                "a dotted expand embeds the related record, and its asset under it",
+            )
+
         expect(nohead.assets.delete(asset.id).deleted_at, "assets soft-delete")
         nohead.assets.purge(asset.id)
         del LEFT["assets"]
