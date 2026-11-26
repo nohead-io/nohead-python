@@ -918,8 +918,8 @@ class Record(NoheadModel):
     keyed by field key: records for relation fields, assets for asset fields. A single value
     is the object, or null when it no longer exists; a multiple value is a list of those
     that still exist. For a rich text field, the list of assets its images show, in document
-    order, leaving out those that no longer exist. Expanded records are not expanded
-    further.
+    order, leaving out those that no longer exist. An expanded record has its own `expanded`
+    only for the dotted keys that reach through it (`author.photo`).
     """
     created_at: Timestamp
     updated_at: Timestamp
